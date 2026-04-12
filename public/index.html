@@ -1120,23 +1120,95 @@
             } 
         }
 
-        function goToCheckout() {
-            let tabTotalSum = 0; for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) tabTotalSum += (cartItems[k].pricePerUnit * cartItems[k].count); } if(tabTotalSum === 0) return;
-            setDeliveryMode('delivery'); document.getElementById('pickup-address').innerText = database[cartActiveTabResId].address; updateReceipt();
-            history.pushState({screen: 'checkout'}, '');
-            showScreen('checkout');
-        }
+        // =======================================================
+// БЛОК ОФОРМЛЕНИЯ ЗАКАЗА И ОПЛАТЫ (ВСЕ ФУНКЦИИ ВМЕСТЕ)
+// =======================================================
 
-        async function createOrder() {
-    const address = document.getElementById('order-address').value; // Проверь ID инпута!
-    if (!address) return alert('Введите адрес доставки!');
+// 1. Переход из корзины к оформлению
+function goToCheckout() {
+    let tabTotalSum = 0; 
+    for(let k in cartItems) { 
+        if(cartItems[k].resId === cartActiveTabResId) {
+            tabTotalSum += (cartItems[k].pricePerUnit * cartItems[k].count); 
+        } 
+    } 
+    if(tabTotalSum === 0) return;
+
+    setDeliveryMode('delivery'); // Теперь эта функция точно существует!
+    document.getElementById('pickup-address').innerText = database[cartActiveTabResId].address; 
+    updateReceipt();
+
+    history.pushState({screen: 'checkout'}, '');
+    showScreen('checkout');
+}
+
+// 2. Переключение Доставка / Самовывоз
+function setDeliveryMode(mode) {
+    document.getElementById('tab-delivery').classList.remove('active');
+    document.getElementById('tab-pickup').classList.remove('active');
+    
+    if (mode === 'delivery') {
+        document.getElementById('tab-delivery').classList.add('active');
+        document.getElementById('block-delivery').classList.remove('hidden');
+        document.getElementById('block-pickup').classList.add('hidden');
+        document.getElementById('delivery-label').innerText = 'Тариф доставки';
+        currentDeliveryFee = baseDeliveryFee;
+        document.getElementById('check-delivery').innerText = currentDeliveryFee + ' сом';
+    } else {
+        document.getElementById('tab-pickup').classList.add('active');
+        document.getElementById('block-delivery').classList.add('hidden');
+        document.getElementById('block-pickup').classList.remove('hidden');
+        document.getElementById('delivery-label').innerText = 'Самовывоз';
+        currentDeliveryFee = 0;
+        document.getElementById('check-delivery').innerText = '0 сом';
+    }
+    updateReceipt();
+}
+
+// 3. Пересчет итоговой суммы в чеке
+function updateReceipt() {
+    let tabTotalSum = 0; 
+    for(let k in cartItems) { 
+        if(cartItems[k].resId === cartActiveTabResId) {
+            tabTotalSum += (cartItems[k].pricePerUnit * cartItems[k].count); 
+        }
+    }
+    document.getElementById('check-items').innerText = tabTotalSum + ' сом';
+    let total = tabTotalSum + currentDeliveryFee;
+    document.getElementById('check-total').innerText = total + ' сом';
+    document.getElementById('pay-btn-sum').innerText = total + ' сом';
+}
+
+// 4. Выбор способа оплаты (QR / Наличные)
+function selectPay(el) {
+    if(el.classList.contains('disabled')) return;
+    document.querySelectorAll('.pay-card').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+}
+
+// 5. ФИНАЛ: Отправка данных на твой сервер Render
+async function createOrder() {
+    tg.HapticFeedback.notificationOccurred('success');
+
+    const addressInput = document.getElementById('checkout-address');
+    const address = addressInput ? addressInput.value : globalAddressText;
+
+    if (!address || address === "Бишкек") {
+        return alert('Пожалуйста, укажите точный адрес доставки!');
+    }
 
     const orderData = {
-        queryId: tg.initDataUnsafe?.query_id,
-        products: cart, // Твоя переменная с товарами
-        totalPrice: document.getElementById('final-price').innerText, // Твоя цена
+        queryId: tg.initDataUnsafe?.query_id || "test_id",
+        user: tg.initDataUnsafe?.user,
+        products: Object.values(cartItems).map(c => ({
+            name: c.item.name,
+            count: c.count,
+            price: c.pricePerUnit,
+            options: c.optionsData
+        })),
+        totalPrice: document.getElementById('pay-btn-sum').innerText,
         address: address,
-        comment: document.getElementById('order-comment').value
+        comment: document.getElementById('order-comment').value || "Нет комментария"
     };
 
     try {
@@ -1147,12 +1219,14 @@
         });
 
         if (response.ok) {
-            tg.close(); // Закрываем приложение, чтобы увидеть чек в боте
+            alert("Заказ успешно отправлен!");
+            tg.close();
         } else {
-            alert('Ошибка сервера. Попробуйте позже.');
+            alert('Ошибка сервера. Статус: ' + response.status);
         }
     } catch (e) {
-        alert('Сбой сети. Проверьте интернет.');
+        alert('Ошибка сети! Проверьте интернет.');
+        console.error("Ошибка при отправке: ", e);
     }
 }
     </script>
