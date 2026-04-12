@@ -10,26 +10,29 @@ app.use(express.json());
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const WEBAPP_URL = 'https://superkgapp.vercel.app';
 
+// Основное меню (обычные кнопки на всю ширину)
 bot.start((ctx) => {
     ctx.reply(
-        `Привет! 👋\nВыбери нужный раздел:`,
-        Markup.inlineKeyboard([
-            [Markup.button.webApp('🍕 ЗАКАЗАТЬ ЕДУ (ONLINE)', WEBAPP_URL)],
-            [Markup.button.webApp('🚀 ОФОРМИТЬ ДОСТАВКУ', `${WEBAPP_URL}/taxi.html`)],
-            [Markup.button.callback('👤 МОЙ ПРОФИЛЬ', 'user_profile')],
-            [Markup.button.callback('📞 КОНТАКТЫ И ПОДДЕРЖКА', 'our_contacts')]
-        ])
+        `Привет, ${ctx.from.first_name}! 👋\nМы рады видеть тебя здесь. 🍕🚕\n\nПожалуйста, выбери один из пунктов:`,
+        Markup.keyboard([
+            [Markup.button.webApp('Заказать еду 🍔', WEBAPP_URL)],
+            [Markup.button.webApp('Оформить доставку 🚀', `${WEBAPP_URL}/taxi.html`)],
+            ['Профиль 👤'],
+            ['Наши контакты 📞']
+        ]).resize() // Эта команда делает кнопки компактными и на всю ширину
     );
 });
 
-bot.action('our_contacts', (ctx) => {
+// Обработка текстовых кнопок
+bot.hears('Наши контакты 📞', (ctx) => {
     ctx.reply('📞 Наш телефон: +996 (XXX) XX-XX-XX\n📍 Адрес: г. Бишкек');
 });
 
-bot.action('user_profile', (ctx) => {
-    ctx.reply(`👤 Профиль пользователя:\nИмя: ${ctx.from.first_name}\nID: ${ctx.from.id}`);
+bot.hears('Профиль 👤', (ctx) => {
+    ctx.reply(`👤 Ваш профиль:\nИмя: ${ctx.from.first_name}\nID: ${ctx.from.id}\nСтатус: Клиент`);
 });
 
+// Прием заказов
 app.post('/web-data', async (req, res) => {
     const { queryId, products, totalPrice, address } = req.body;
     try {
