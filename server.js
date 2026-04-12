@@ -10,25 +10,28 @@ app.use(express.json());
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const WEBAPP_URL = 'https://superkgapp.vercel.app';
 
-// Основное меню (обычные кнопки на всю ширину)
+// Главное меню с правильными кнопками (как в Икеда)
 bot.start((ctx) => {
     ctx.reply(
         `Привет, ${ctx.from.first_name}! 👋\nМы рады видеть тебя здесь. 🍕🚕\n\nПожалуйста, выбери один из пунктов:`,
-        Markup.keyboard([
-            [Markup.button.webApp('Заказать еду 🍔', WEBAPP_URL)],
-            [Markup.button.webApp('Оформить доставку 🚀', `${WEBAPP_URL}/taxi.html`)],
-            ['Профиль 👤'],
-            ['Наши контакты 📞']
-        ]).resize() // Эта команда делает кнопки компактными и на всю ширину
+        {
+            ...Markup.inlineKeyboard([
+                [Markup.button.webApp('Заказать еду 🍔', WEBAPP_URL)],
+                [Markup.button.webApp('Оформить доставку 🚀', `${WEBAPP_URL}/taxi.html`)],
+                [Markup.button.callback('Профиль 👤', 'user_profile')],
+                [Markup.button.callback('Наши контакты 📞', 'our_contacts')]
+            ]),
+            ...Markup.removeKeyboard() // Это навсегда удалит серые кнопки снизу
+        }
     );
 });
 
-// Обработка текстовых кнопок
-bot.hears('Наши контакты 📞', (ctx) => {
+// Обработчики кнопок
+bot.action('our_contacts', (ctx) => {
     ctx.reply('📞 Наш телефон: +996 (XXX) XX-XX-XX\n📍 Адрес: г. Бишкек');
 });
 
-bot.hears('Профиль 👤', (ctx) => {
+bot.action('user_profile', (ctx) => {
     ctx.reply(`👤 Ваш профиль:\nИмя: ${ctx.from.first_name}\nID: ${ctx.from.id}\nСтатус: Клиент`);
 });
 
