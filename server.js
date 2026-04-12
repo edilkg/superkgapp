@@ -8,15 +8,16 @@ app.use(cors());
 app.use(express.json());
 
 // Инициализация двух ботов
-const bot = new Telegraf(process.env.BOT_TOKEN); // Клиентский
+const bot = new Telegraf(process.env.BOT_TOKEN); // Клиентский (и он же работает в Админ-группе)
 const courierBot = new Telegraf(process.env.COURIER_BOT_TOKEN); // Курьерский
 
 // === НАСТРОЙКИ ===
-const ADMIN_ID = process.env.ADMIN_CHAT_ID; // Твой ID
+// ВАЖНО: В .env укажи ID группы со знаком минуса (например, -10023456789)
+const ADMIN_ID = process.env.ADMIN_CHAT_ID; 
 const DELIVERY_FEE = 150;
 const COMMISSION = 20;
 
-// База данных в оперативной памяти (после перезагрузки Render обнуляется)
+// База данных в оперативной памяти
 let couriers = {}; 
 let activeOrders = {}; 
 let orderCounter = 1;
@@ -39,7 +40,6 @@ app.post('/web-data', async (req, res) => {
     activeOrders[orderId] = { id: orderId, clientId: user?.id, address, restaurantName, totalPrice, comment, status: 'pending' };
 
     // Рассылка всем курьерам, кто ОДОБРЕН и НА ЛИНИИ
-    let couriersNotified = 0;
     for (let id in couriers) {
         if (couriers[id].status === 'online' && couriers[id].isApproved) {
             try {
@@ -50,11 +50,9 @@ app.post('/web-data', async (req, res) => {
                         ...Markup.inlineKeyboard([[Markup.button.callback('🤝 ПРИНЯТЬ', `accept_${orderId}`)]])
                     }
                 );
-                couriersNotified++;
             } catch (e) { console.log("Ошибка отправки курьеру:", id); }
         }
     }
-    console.log(`Заказ #${orderId} создан. Оповещено курьеров: ${couriersNotified}`);
     res.sendStatus(200);
 });
 
@@ -80,42 +78,59 @@ courierBot.start(async (ctx) => {
 
 courierBot.on('text', async (ctx) => {
     const id = ctx.from.id;
+    const msg = ctx.message.text;
     const c = couriers[id];
     if (!c) return;
 
     if (c.step === 'name') {
-        c.name = ctx.message.text;
+        c.name = msg;
         c.step = 'phone';
         return ctx.reply("Теперь введите ваш номер телефона:");
     }
     if (c.step === 'phone') {
-        c.phone = ctx.message.text;
+        c.phone = msg;
         c.step = 'idle';
-        ctx.reply("✅ Данные отправлены! Ожидайте одобрения админом.");
-        if(ADMIN_ID) bot.telegram.sendMessage(ADMIN_ID, `🆕 *НОВЫЙ КУРЬЕР:*\n👤 ${c.name}\n📱 ${c.phone}\n🆔 \`${id}\``, 
-            { parse_mode: 'Markdown', ...Markup.inlineKeyboard([[Markup.button.callback('✅ ОДОБРИТЬ', `approve_${id}`)]]) });
+        ctx.reply("✅ Данные отправлены! Ожидайте одобрения администраторами в группе.");
+        
+        // ОТПРАВЛЯЕМ В АДМИН-ГРУППУ ЧЕРЕЗ ОСНОВНОГО БОТА
+        if(ADMIN_ID) {
+            bot.telegram.sendMessage(ADMIN_ID, 
+                `🆕 *НОВЫЙ КУРЬЕР:*\n👤 Имя: ${c.name}\n📱 Тел: ${c.phone}\n🆔 ID: \`${id}\`\n\n_Кто из админов готов подтвердить?_`, 
+                { 
+                    parse_mode: 'Markdown', 
+                    ...Markup.inlineKeyboard([[Markup.button.callback('✅ ОДОБРИТЬ КАНДИДАТА', `approve_${id}`)]]) 
+                }
+            );
+        }
         return;
     }
 
     if (!c.isApproved) return ctx.reply("⏳ Ваш аккаунт еще не одобрен.");
 
-    switch (ctx.message.text) {
+    switch (msg) {
         case '🟢 Выйти на линию': c.status = 'online'; ctx.reply("📡 Вы на линии!", getCourierMenu(id)); break;
         case '🔴 Уйти с линии': c.status = 'offline'; ctx.reply("😴 Отдыхаете", getCourierMenu(id)); break;
         case '📊 Инфо': ctx.reply(`📊 Статистика:\nДоставок сегодня: ${c.dailyOrders}\nБаланс: ${c.balance} сом`); break;
-        case '💳 Баланс': ctx.reply(`Ваш баланс: ${c.balance} сом. Пополнение через @tamak_admin`); break;
+        case '💳 Баланс': ctx.reply(`Ваш баланс: ${c.balance} сом.\nПополнение через администрацию.`); break;
     }
 });
 
-// --- CALLBACK ACTIONS (КНОПКИ) ---
+// --- CALLBACK ACTIONS (КНОПКИ В АДМИНКЕ И У КУРЬЕРОВ) ---
 
-// Админ одобряет курьера
+// Админ в ГРУППЕ одобряет курьера
 bot.action(/approve_(.+)/, async (ctx) => {
     const id = ctx.match[1];
     if(couriers[id]) {
         couriers[id].isApproved = true;
-        await ctx.editMessageText(`✅ Курьер ${couriers[id].name} одобрен!`);
-        await courierBot.telegram.sendMessage(id, "🎉 Поздравляем! Вы одобрены. Выходите на линию!", getCourierMenu(id));
+        const adminName = ctx.from.first_name || "Админ";
+        
+        // Изменяем сообщение в группе
+        await ctx.editMessageText(`✅ Курьер ${couriers[id].name} одобрен админом ${adminName}!`);
+        
+        // Сообщаем курьеру в его боте
+        await courierBot.telegram.sendMessage(id, "🎉 Поздравляем! Ваш аккаунт одобрен. Теперь выходите на линию!", getCourierMenu(id));
+    } else {
+        await ctx.answerCbQuery("Ошибка: курьер не найден.");
     }
 });
 
@@ -155,7 +170,7 @@ courierBot.action(/deliver_(.+)/, async (ctx) => {
         couriers[id].balance -= COMMISSION;
     }
 
-    await ctx.editMessageText(`✅ Заказ #${orderId} завершен!\n💰 Заработок: +${DELIVERY_FEE} сом (в корзину)\n📉 Комиссия: -${COMMISSION} сом (с баланса)`);
+    await ctx.editMessageText(`✅ Заказ #${orderId} завершен!\n💰 Заработок: +${DELIVERY_FEE} сом\n📉 Комиссия: -${COMMISSION} сом`);
     
     if(order && order.clientId) {
         bot.telegram.sendMessage(order.clientId, "🌟 Ваш заказ доставлен! Приятного аппетита!");
