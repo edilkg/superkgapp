@@ -543,7 +543,7 @@
         tg.expand();
         
         let globalCity = "Бишкек";
-        let globalAddressText = "Бишкек"; 
+        let globalAddressText = ""; 
         let totalSum = 0;
         let baseDeliveryFee = 150;
         let currentDeliveryFee = baseDeliveryFee; 
@@ -616,7 +616,7 @@
             'bos1': { city: 'Бостери', title: 'Колесо Обозрения', logo: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=100', address: 'Бостери, Ярмарка', link2gis: 'https://2gis.kg', rating: 4.6, tags: ['pizza', 'fastfood'], img: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600', categories: ['Пицца', 'Бургеры', 'Напитки'], items: [...generateItems('Пицца', 'pizza', 'bos1'), ...generateItems('Бургеры', 'fastfood', 'bos1'), ...generateItems('Напитки', 'drinks', 'bos1')] }
         };
 
-        document.getElementById('checkout-address').value = globalAddressText;
+        document.getElementById('checkout-address').value = "";
         
         function openAddressModal() {
             closeAllModals(); 
@@ -1190,15 +1190,30 @@ function selectPay(el) {
 async function createOrder() {
     tg.HapticFeedback.notificationOccurred('success');
 
+    // 1. Берем основную улицу/город
     const addressInput = document.getElementById('checkout-address');
-    const address = addressInput ? addressInput.value : globalAddressText;
+    let finalAddress = addressInput ? addressInput.value : globalAddressText;
 
-    if (!address || address === "Бишкек") {
-        return alert('Пожалуйста, укажите точный адрес доставки!');
+    // 2. Собираем данные из мелких окошек
+    const dom = document.getElementById('chk-dom')?.value;
+    const pod = document.getElementById('chk-pod')?.value;
+    const etaj = document.getElementById('chk-etaj')?.value;
+    const kv = document.getElementById('chk-kv')?.value;
+
+    // 3. Склеиваем всё в одну красивую строку
+    if (dom) finalAddress += `, д. ${dom}`;
+    if (pod) finalAddress += `, под. ${pod}`;
+    if (etaj) finalAddress += `, эт. ${etaj}`;
+    if (kv) finalAddress += `, кв. ${kv}`;
+
+    // 4. Проверяем: если остался только голый "Бишкек" без дома и улицы
+    if (!finalAddress || finalAddress === "Бишкек") {
+        return alert('Пожалуйста, укажите улицу или номер дома!');
     }
 
+    // 5. Формируем данные для отправки на сервер
     const orderData = {
-        queryId: tg.initDataUnsafe?.query_id || "test_id",
+        queryId: tg.initDataUnsafe?.query_id,
         user: tg.initDataUnsafe?.user,
         products: Object.values(cartItems).map(c => ({
             name: c.item.name,
@@ -1207,8 +1222,8 @@ async function createOrder() {
             options: c.optionsData
         })),
         totalPrice: document.getElementById('pay-btn-sum').innerText,
-        address: address,
-        comment: document.getElementById('order-comment').value || "Нет комментария"
+        address: finalAddress, // Отправляем полный собранный адрес!
+        comment: document.getElementById('order-comment')?.value || "Нет комментария"
     };
 
     try {
