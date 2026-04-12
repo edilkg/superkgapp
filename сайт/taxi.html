@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TamakKG - Такси и Доставка</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-main: #F3F3F7;
+            --bg-sheet: #FFFFFF;
+            --text-dark: #000000;
+            --text-gray: #9E9E9E;
+            --text-light: #C4C4C4;
+            --yandex-yellow: #FCE000;
+            --line-gray: #F0F0F0;
+            --btn-gray: #F5F5F7;
+            --danger-red: #FF3B30;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background: var(--bg-main); margin: 0; padding: 0; user-select: none; color: var(--text-dark); overflow: hidden; height: 100vh; touch-action: manipulation; }
+        .hidden { display: none !important; }
+        input { font-family: inherit; }
+
+        /* --- КАРТА (ФОН) --- */
+        .map-bg { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: url('https://images.unsplash.com/photo-1524661135-423995f22d0b?w=1080') center/cover; z-index: 1; opacity: 0.8; }
+        .map-pin { position: fixed; top: 45%; left: 50%; transform: translate(-50%, -100%); z-index: 2; text-align: center; }
+        .map-pin-bubble { background: white; padding: 8px 12px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; white-space: nowrap;}
+        .map-pin-bubble .icon { background: var(--yandex-yellow); border-radius: 8px; padding: 4px; display: flex; align-items: center; justify-content: center; }
+        .map-pin-dot { width: 4px; height: 16px; background: var(--text-dark); margin: 0 auto; border-radius: 2px; position: relative; }
+        .map-pin-dot::after { content: ''; position: absolute; bottom: -4px; left: -4px; width: 12px; height: 4px; background: rgba(0,0,0,0.2); border-radius: 50%; }
+
+        /* --- ГЛАВНЫЙ ЭКРАН (UI ПОВЕРХ КАРТЫ) --- */
+        
+        /* Белая плашка адреса сверху */
+        .top-address-bar { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: white; color: var(--text-dark); padding: 10px 24px; border-radius: 24px; font-size: 15px; font-weight: 700; z-index: 10; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); cursor: pointer; white-space: nowrap; }
+        .top-address-bar span { display: block; font-size: 12px; color: var(--text-gray); margin-bottom: 2px; font-weight: 500; }
+
+        /* Бургер меню в левом верхнем углу */
+        .burger-btn { position: fixed; top: 20px; left: 16px; width: 44px; height: 44px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; z-index: 10; box-shadow: 0 4px 15px rgba(0,0,0,0.1); cursor: pointer; transition: 0.2s; }
+        .burger-btn:active { transform: scale(0.95); }
+
+        /* Плавающие кнопки внизу (над шторкой) */
+        .float-btn { position: fixed; bottom: 250px; width: 48px; height: 48px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; z-index: 10; box-shadow: 0 4px 15px rgba(0,0,0,0.1); cursor: pointer; transition: 0.2s; }
+        .float-btn:active { transform: scale(0.95); background: var(--line-gray); }
+        .float-btn.left { left: 16px; }
+        .float-btn.right { right: 16px; }
+
+        /* --- ОБЩИЕ СТИЛИ ШТОРОК (BOTTOM SHEETS) --- */
+        .bottom-sheet { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg-sheet); border-radius: 24px 24px 0 0; z-index: 100; display: flex; flex-direction: column; transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); max-height: 90vh; box-shadow: 0 -4px 24px rgba(0,0,0,0.1); padding-bottom: env(safe-area-inset-bottom); }
+        .bottom-sheet.closed { transform: translateY(105%); }
+        .drag-handle { width: 36px; height: 5px; background: #E0E0E0; border-radius: 3px; margin: 12px auto; flex-shrink: 0; }
+        .sheet-content { overflow-y: auto; scrollbar-width: none; flex-grow: 1; }
+        .sheet-content::-webkit-scrollbar { display: none; }
+
+        /* --- ЭКРАН 1: ГЛАВНАЯ ШТОРКА --- */
+        #sheet-main .sheet-content { padding: 0 16px 16px; }
+        .main-header-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+        .brand-logo { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, var(--yandex-yellow) 50%, #222 50%); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; color: white; border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.1);}
+        .brand-title { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+
+        .where-to-btn { background: var(--btn-gray); border-radius: 16px; padding: 18px 20px; font-size: 20px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; cursor: pointer; transition: background 0.2s;}
+        .where-to-btn:active { background: #E8E8EB; }
+        
+        .quick-address { display: flex; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--line-gray); cursor: pointer; }
+        .quick-address:last-child { border-bottom: none; }
+        .qa-icon { color: var(--text-gray); font-size: 20px; }
+        .qa-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+        .qa-sub { font-size: 13px; color: var(--text-gray); }
+
+        /* --- ЭКРАН 2: ВВОД АДРЕСА (Окно 85% высоты экрана) --- */
+        .address-sheet { position: fixed; bottom: 0; left: 0; right: 0; height: 85vh; background: var(--bg-main); border-radius: 24px 24px 0 0; z-index: 200; display: flex; flex-direction: column; transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); box-shadow: 0 -4px 24px rgba(0,0,0,0.15); padding-bottom: env(safe-area-inset-bottom); }
+        .address-sheet.closed { transform: translateY(105%); }
+        
+        .addr-header { background: white; padding: 16px 16px 24px; border-radius: 24px 24px 24px 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); position: relative; }
+        .addr-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; position: relative; }
+        
+        /* Визуализация пути (Точка А и Б) */
+        .addr-visual-line { position: absolute; left: 24px; top: 28px; bottom: -8px; width: 2px; background: var(--line-gray); z-index: 1;}
+        .dot-a { width: 10px; height: 10px; border-radius: 50%; background: var(--text-dark); border: 3px solid white; position: relative; z-index: 2; box-shadow: 0 0 0 1px var(--text-gray); margin-left: 4px;}
+        .dot-b { width: 10px; height: 10px; background: var(--yandex-yellow); position: relative; z-index: 2; margin-left: 4px; }
+        .addr-label { font-size: 11px; color: var(--text-gray); position: absolute; left: 40px; top: -14px; font-weight: 600;}
+
+        .addr-input { flex-grow: 1; background: var(--btn-gray); border-radius: 12px; padding: 16px; font-size: 16px; border: 2px solid transparent; outline: none; font-weight: 600; transition: 0.2s;}
+        .addr-input:focus { background: white; border-color: var(--yandex-yellow); box-shadow: 0 2px 8px rgba(252, 224, 0, 0.15); }
+
+        .btn-map-adaptive { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: white; padding: 16px 32px; border-radius: 24px; font-weight: 700; font-size: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 8px; cursor: pointer; transition: bottom 0.2s; z-index: 210;}
+
+        /* --- ЭКРАН 3: ТАРИФЫ (ТАКСИ И ДОСТАВКА) --- */
+        #sheet-tariffs .sheet-content { padding: 0; }
+        
+        .tariffs-nav { display: flex; gap: 24px; padding: 0 16px 12px; font-size: 15px; font-weight: 600; color: var(--text-gray); overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line-gray); margin-bottom: 16px;}
+        .tariffs-nav .active { color: var(--text-dark); position: relative; }
+        .tariffs-nav .active::after { content: ''; position: absolute; bottom: -13px; left: 0; right: 0; height: 2px; background: var(--text-dark); }
+
+        /* Карточки тарифов */
+        .tariffs-scroll { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 0 16px 16px; }
+        .tariff-card { min-width: 105px; background: var(--btn-gray); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; border: 2px solid transparent; transition: 0.2s; cursor: pointer; position: relative;}
+        .tariff-card.active { background: white; border-color: var(--yandex-yellow); box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .tariff-card.disabled { opacity: 0.5; pointer-events: none; background: #EAEAEA;}
+        
+        .t-eta { font-size: 11px; color: var(--text-gray); margin-bottom: 6px; font-weight: 600;}
+        .t-img { height: 38px; object-fit: contain; margin-bottom: 8px; align-self: center; font-size: 32px;}
+        .t-name { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+        .t-price { font-size: 14px; font-weight: 700; }
+        .t-dev { font-size: 10px; color: var(--text-gray); font-weight: normal; position: absolute; bottom: 8px; left: 12px;}
+
+        /* Адресный блок в тарифах */
+        .tariff-address-block { background: white; padding: 0 16px; margin-bottom: 16px; }
+        .ta-row { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line-gray); position: relative;}
+        .ta-row:last-child { border-bottom: none; }
+        .ta-icon { font-size: 18px; }
+        .ta-text { flex-grow: 1; font-size: 15px; font-weight: 600; }
+        .ta-sub { font-size: 12px; color: var(--text-gray); font-weight: normal;}
+
+        /* Опции под тарифами */
+        .options-list { padding: 0 16px; }
+        .option-item { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--line-gray); cursor: pointer; }
+        .option-item:last-child { border-bottom: none; }
+        .opt-left { display: flex; align-items: center; gap: 16px; }
+        .opt-icon { font-size: 20px; width: 24px; text-align: center; }
+        .opt-title { font-size: 16px; font-weight: 600; margin-bottom: 2px;}
+        .opt-sub { font-size: 13px; color: var(--text-gray); }
+        
+        .payment-row { display: flex; align-items: center; gap: 12px; padding: 16px; background: white;}
+        .pay-method { display: flex; align-items: center; gap: 8px; background: var(--btn-gray); padding: 10px 16px; border-radius: 16px; font-weight: 700; font-size: 14px; cursor: pointer; }
+        
+        .btn-order-c { padding: 0 16px 16px; background: white;}
+        .btn-order { background: var(--yandex-yellow); border: none; border-radius: 16px; width: 100%; padding: 18px; font-size: 18px; font-weight: 700; cursor: pointer; transition: 0.2s; display: flex; justify-content: center; align-items: center;}
+        .btn-order:active { background: #E5C900; }
+
+        /* --- ЭКРАН 4: ФОРМА ДОСТАВКИ --- */
+        .delivery-form-header { padding: 16px; font-size: 22px; font-weight: 800; border-bottom: 1px solid var(--line-gray); display: flex; align-items: center; gap: 16px;}
+        .df-section { padding: 16px; border-bottom: 8px solid var(--btn-gray); }
+        .df-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+        
+        .df-option-card { border: 2px solid var(--line-gray); border-radius: 16px; padding: 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; cursor: pointer;}
+        .df-option-card.active { border-color: var(--text-dark); }
+        .df-icon-bg { background: var(--btn-gray); width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px;}
+        
+        .df-input-group { margin-bottom: 16px; }
+        .df-label { font-size: 12px; color: var(--text-gray); margin-bottom: 8px; font-weight: 600;}
+        .df-input { width: 100%; border: none; border-bottom: 1px solid var(--line-gray); padding: 8px 0; font-size: 16px; font-weight: 600; outline: none; transition: 0.2s;}
+        .df-input:focus { border-bottom-color: var(--text-dark); }
+
+        .toggle-switch { width: 50px; height: 30px; background: #E0E0E0; border-radius: 15px; position: relative; cursor: pointer; transition: 0.3s; }
+        .toggle-switch.active { background: var(--yandex-yellow); }
+        .toggle-circle { width: 26px; height: 26px; background: white; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.2);}
+        .toggle-switch.active .toggle-circle { transform: translateX(20px); }
+
+        /* --- ЭКРАН 5: ПОИСК ВОДИТЕЛЯ --- */
+        .search-loader { width: 100%; height: 4px; background: var(--btn-gray); overflow: hidden; border-radius: 2px; margin-bottom: 24px;}
+        .search-bar-progress { width: 30%; height: 100%; background: var(--yandex-yellow); animation: load 1.5s infinite ease-in-out; }
+        @keyframes load { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }
+        
+        .status-title { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+        .status-sub { font-size: 15px; color: var(--text-gray); margin-bottom: 24px; font-weight: 500;}
+        
+        .st-btn-row { display: flex; gap: 12px; }
+        .st-btn { flex: 1; background: var(--btn-gray); padding: 16px; border-radius: 16px; text-align: center; font-weight: 700; font-size: 15px; cursor: pointer; transition: 0.2s;}
+        .st-btn:active { background: #E8E8EB; }
+
+        /* --- ЭКРАН 6: АКТИВНЫЙ ЗАКАЗ --- */
+        .driver-card { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .dr-name { font-size: 20px; font-weight: 800; margin-bottom: 4px; display: flex; align-items: center; gap: 8px;}
+        .dr-car { font-size: 14px; color: var(--text-gray); margin-bottom: 8px; font-weight: 500;}
+        .dr-plate { border: 1px solid var(--line-gray); padding: 4px 10px; border-radius: 8px; font-weight: 700; font-size: 16px; display: inline-block;}
+        .dr-img-wrap { position: relative; }
+        .dr-img { width: 90px; object-fit: contain; }
+        .dr-avatar { position: absolute; bottom: 0; right: -10px; width: 36px; height: 36px; background: var(--line-gray); border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; font-size: 18px;}
+
+        .timeline { margin-top: 24px; border-top: 1px solid var(--line-gray); padding-top: 16px; }
+        .tl-item { display: flex; align-items: flex-start; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line-gray); }
+        .tl-item:last-child { border-bottom: none; }
+        .tl-icon { font-size: 20px; width: 24px; text-align: center; }
+        .tl-text { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+        .tl-sub { font-size: 13px; color: var(--text-gray); }
+
+        /* --- ЭКРАН 7: МЕНЮ --- */
+        .fullscreen-sheet { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 200; display: flex; flex-direction: column; transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        .fullscreen-sheet.closed { transform: translateY(100%); }
+        
+        #sheet-menu { background: rgba(0,0,0,0.5); width: 100%; right: 0; transform: translateX(-100%); }
+        #sheet-menu.closed { transform: translateX(-100%); }
+        
+        .menu-profile { padding: 32px 16px 24px; border-bottom: 1px solid var(--line-gray); display: flex; align-items: center; gap: 16px;}
+        .menu-avatar { width: 56px; height: 56px; background: #1A237E; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800;}
+        .menu-name { font-size: 18px; font-weight: 800; margin-bottom: 4px;}
+        .menu-phone { font-size: 14px; color: var(--text-gray); }
+        
+        .menu-list { padding: 16px 0; }
+        .menu-item { padding: 16px 24px; display: flex; align-items: center; gap: 16px; font-size: 16px; font-weight: 500; cursor: pointer; transition: 0.2s;}
+        .menu-item:active { background: var(--btn-gray); }
+        .menu-icon { font-size: 22px; width: 24px; text-align: center; color: #555;}
+
+        /* --- ЭКРАН 8: ИСТОРИЯ ЗАКАЗОВ --- */
+        .history-screen { background: white; }
+        .hist-date { padding: 16px 16px 8px; font-size: 13px; color: var(--text-gray); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
+        .hist-card { margin: 0 16px 12px; background: white; border-radius: 16px; padding: 16px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); cursor: pointer;}
+        .hist-card-icon { font-size: 28px; }
+        .hist-card-info { flex-grow: 1; }
+        .hc-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+        .hc-route { font-size: 13px; color: var(--text-gray); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;}
+        .hc-price { font-size: 16px; font-weight: 800; }
+    </style>
+</head>
+<body>
+
+    <div class="map-bg"></div>
+    
+    <div class="top-address-bar" id="top-address-bar" onclick="openAddressInput('taxi')">
+        <span>Ваш адрес ›</span>
+        <div id="top-addr-text">мкр-н Тунгуч 57</div>
+    </div>
+    
+    <div class="map-pin" id="map-pin">
+        <div class="map-pin-bubble">
+            <div class="icon">🧍</div> Подача 5 мин
+        </div>
+        <div class="map-pin-dot"></div>
+    </div>
+
+    <div class="burger-btn" id="burger-btn" onclick="openMenu()">☰</div>
+
+    <div class="float-btn left" id="btn-back" onclick="onBackClick()">←</div>
+    <div class="float-btn right" id="btn-geo" onclick="tg.HapticFeedback.impactOccurred('light'); alert('Геолокация обновлена')">➤</div>
+
+    <div class="bottom-sheet" id="sheet-hub">
+        <div class="drag-handle"></div>
+        <div class="sheet-content">
+            <div class="main-header-brand">
+                <div class="brand-logo">T</div>
+                <div class="brand-title">Такси / Доставка</div>
+            </div>
+            
+            <div class="where-to-btn" onclick="openAddressInput('taxi')">
+                Куда едем? <span style="background: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">›</span>
+            </div>
+            
+            <div class="quick-address" onclick="mockSelectRoute('мкр-н Тунгуч 57', 'Азия Молл')">
+                <div class="qa-icon">📍</div>
+                <div>
+                    <div class="qa-title">Азия Молл</div>
+                    <div class="qa-sub">проспект Чынгыза Айтматова, 3</div>
+                </div>
+            </div>
+            <div class="quick-address" onclick="mockSelectRoute('мкр-н Тунгуч 57', 'Фрунзе 59А')">
+                <div class="qa-icon">📍</div>
+                <div>
+                    <div class="qa-title">Фрунзе 59А</div>
+                    <div class="qa-sub">село Новопокровка</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="address-sheet closed" id="screen-address">
+        <div class="drag-handle" style="margin-top: 16px;"></div>
+        <div class="addr-header">
+            <div class="addr-visual-line"></div>
+            
+            <div class="addr-row">
+                <div class="addr-label" style="top: -18px;">Точка посадки</div>
+                <div class="dot-a"></div>
+                <input type="text" class="addr-input" id="input-from" value="мкр-н Тунгуч 57">
+            </div>
+            <div class="addr-row" style="margin-bottom:0;">
+                <div class="addr-label">Пункт назначения</div>
+                <div class="dot-b"></div>
+                <input type="text" class="addr-input" id="input-to" placeholder="Куда поедете?" autofocus>
+            </div>
+        </div>
+        
+        <div style="padding: 16px; overflow-y: auto; background: var(--bg-main); flex-grow: 1;">
+            <div class="quick-address" onclick="mockSelectRoute('мкр-н Тунгуч 57', 'Азия Молл')">
+                <div class="qa-icon">📍</div>
+                <div>
+                    <div class="qa-title">Азия Молл</div>
+                    <div class="qa-sub">проспект Чынгыза Айтматова, 3</div>
+                </div>
+            </div>
+            <div class="quick-address" onclick="mockSelectRoute('мкр-н Тунгуч 57', 'Казанский пер. 10Б')">
+                <div class="qa-icon">📍</div>
+                <div>
+                    <div class="qa-title">Казанский пер. 10Б</div>
+                    <div class="qa-sub">Бишкек</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="btn-map-adaptive" id="btn-map-adapt" onclick="alert('Укажите на карте')">
+            🗺️ Указать на карте
+        </div>
+    </div>
+
+    <div class="bottom-sheet closed" id="sheet-tariffs">
+        <div class="drag-handle"></div>
+        <div class="sheet-content" style="padding: 0;">
+            
+            <div class="tariffs-nav">
+                <div>Навигатор</div>
+                <div>Транспорт</div>
+                <div class="active" id="tab-taxi" onclick="switchService('taxi')">Такси</div>
+                <div id="tab-delivery" onclick="switchService('delivery')">Доставка</div>
+            </div>
+
+            <div class="tariffs-scroll" id="tariffs-container"></div>
+
+            <div class="tariff-address-block">
+                <div class="ta-row" onclick="openAddressInput('taxi')">
+                    <div class="ta-icon">🧍</div>
+                    <div class="ta-text" id="t-addr-from">мкр-н Тунгуч 57</div>
+                    <div class="ta-sub">Подъезд</div>
+                </div>
+                <div class="ta-row" onclick="openAddressInput('taxi')">
+                    <div class="ta-icon">🏁</div>
+                    <div class="ta-text" id="t-addr-to">Казанский пер. 10Б</div>
+                    <div style="font-size: 20px; color: var(--text-light);">+</div>
+                </div>
+            </div>
+
+            <div class="options-list" id="options-container"></div>
+
+            <div class="payment-row">
+                <div class="pay-method">💵 Наличные</div>
+                <div style="flex-grow: 1;"></div>
+                <div style="font-size: 20px; color: var(--text-gray);">⚙️</div>
+            </div>
+
+            <div class="btn-order-c">
+                <button class="btn-order" id="btn-main-order" onclick="handleOrderAction()">Заказать</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="fullscreen-sheet closed" id="sheet-delivery-form" style="background: white;">
+        <div class="delivery-form-header">
+            <div style="cursor: pointer; padding-right: 16px;" onclick="onBackClick()">←</div>
+            <div>Создаём заказ</div>
+        </div>
+        
+        <div style="overflow-y: auto; flex-grow: 1;">
+            <div class="df-section">
+                <div class="df-title">Как удобнее?</div>
+                <div class="df-option-card active">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div class="df-icon-bg">🚪</div>
+                        <div>
+                            <div style="font-size: 16px; font-weight: 600;">От двери до двери</div>
+                            <div style="font-size: 13px; color: var(--text-gray);">Встретить на этаже</div>
+                        </div>
+                    </div>
+                    <div style="font-weight: 700;">Включено</div>
+                </div>
+            </div>
+
+            <div class="df-section">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                    <div style="display: flex; align-items: center; gap: 12px; font-size: 16px; font-weight: 600;">
+                        <div class="df-icon-bg" style="background: #FFE0E0;">🌡️</div> Термосумка
+                    </div>
+                    <div class="toggle-switch" id="thermo-toggle" onclick="toggleThermobag()">
+                        <div class="toggle-circle"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="df-section">
+                <div class="df-title">Отправитель</div>
+                <div class="df-input-group">
+                    <label class="df-label">Телефон для связи</label>
+                    <input type="tel" class="df-input" value="+996 500 402 002">
+                </div>
+            </div>
+
+            <div class="df-section">
+                <div class="df-title">Получатель</div>
+                <div class="df-input-group">
+                    <label class="df-label">Телефон для связи</label>
+                    <input type="tel" class="df-input" placeholder="+996 ___ ___ ___">
+                </div>
+                <div class="df-input-group">
+                    <label class="df-label">Квартира / Офис</label>
+                    <input type="text" class="df-input" placeholder="Укажите">
+                </div>
+            </div>
+        </div>
+
+        <div style="padding: 16px; border-top: 1px solid var(--line-gray); background: white;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div style="font-size: 18px; font-weight: 800;">Заберут через 20 мин</div>
+                <div style="font-size: 18px; font-weight: 800;" id="delivery-final-price">286 сом</div>
+            </div>
+            <button class="btn-order" onclick="openStatus()">Заказать доставку</button>
+        </div>
+    </div>
+
+    <div class="bottom-sheet closed" id="sheet-search">
+        <div class="sheet-content" style="padding: 24px 16px 16px;">
+            <div class="status-title">Ждём ответ</div>
+            <div class="status-sub">Займет несколько секунд</div>
+            <div class="search-loader"><div class="search-bar-progress"></div></div>
+            <div class="st-btn-row">
+                <div class="st-btn" style="background: white; border: 1px solid var(--line-gray);" onclick="onBackClick()">✕ Отменить</div>
+                <div class="st-btn" onclick="alert('Детали заказа')">Детали</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-sheet closed" id="sheet-active-order">
+        <div class="drag-handle"></div>
+        <div class="sheet-content">
+            <div class="status-title" style="margin-bottom: 20px;">Через ~2 мин приедет</div>
+            
+            <div class="driver-card">
+                <div>
+                    <div class="dr-name">Тургунбай ★4.69</div>
+                    <div class="dr-car">Серый BYD E2</div>
+                    <div class="dr-plate">01 KG 438 BX</div>
+                </div>
+                <div class="dr-img-wrap">
+                    <img src="https://img.icons8.com/color/120/car--v1.png" class="dr-img">
+                    <div class="dr-avatar">👤</div>
+                </div>
+            </div>
+
+            <div class="st-btn-row">
+                <div class="st-btn" style="background: #E8F5E9; color: #2E7D32;">📞 Связаться</div>
+                <div class="st-btn">↗ Поделиться</div>
+            </div>
+
+            <div class="timeline">
+                <div class="tl-item">
+                    <div class="tl-icon">🧍</div>
+                    <div>
+                        <div class="tl-text">Подача в ~06:28</div>
+                        <div class="tl-sub" id="act-addr-from">мкр-н Тунгуч 57</div>
+                    </div>
+                </div>
+                <div class="tl-item">
+                    <div class="tl-icon">🏁</div>
+                    <div>
+                        <div class="tl-text">Прибытие</div>
+                        <div class="tl-sub" id="act-addr-to">Казанский пер. 10Б</div>
+                    </div>
+                </div>
+                <div class="tl-item">
+                    <div class="tl-icon">💵</div>
+                    <div>
+                        <div class="tl-text">Наличными: <span id="act-price">98</span> сом</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 24px; text-align: center; color: var(--danger-red); font-weight: 700; padding: 16px; cursor: pointer;" onclick="onBackClick()">
+                ✕ Отменить поездку
+            </div>
+        </div>
+    </div>
+
+    <div class="fullscreen-sheet closed" id="sheet-menu" style="background: rgba(0,0,0,0.5); width: 100%; right: 0;">
+        <div style="background: white; width: 85%; height: 100%; display: flex; flex-direction: column;">
+            <div class="menu-profile">
+                <div class="menu-avatar">ЭС</div>
+                <div>
+                    <div class="menu-name">Эдиль Сулайманов</div>
+                    <div class="menu-phone">+996 (500) 402-002</div>
+                </div>
+            </div>
+            <div class="menu-list">
+                <div class="menu-item"><div class="menu-icon">💳</div> Способ оплаты</div>
+                <div class="menu-item"><div class="menu-icon">🎁</div> Акции</div>
+                <div class="menu-item"><div class="menu-icon">🏠</div> Семейный аккаунт</div>
+                <div class="menu-item" onclick="openHistory()"><div class="menu-icon">🕒</div> История заказов</div>
+                <div class="menu-item"><div class="menu-icon">💬</div> Служба поддержки</div>
+                <div class="menu-item"><div class="menu-icon">⚙️</div> Настройки</div>
+            </div>
+        </div>
+        <div style="position: absolute; top:0; right:0; bottom:0; width: 15%;" onclick="onBackClick()"></div>
+    </div>
+
+    <div class="fullscreen-sheet history-screen closed" id="sheet-history">
+        <div class="delivery-form-header">
+            <div style="cursor: pointer; padding-right: 16px;" onclick="onBackClick()">←</div>
+            <div style="flex-grow: 1; text-align: center; margin-right: 24px;">Мои заказы</div>
+        </div>
+        <div style="overflow-y: auto; flex-grow: 1; padding-bottom: 24px; background: var(--bg-main);">
+            
+            <div class="hist-date">Сегодня</div>
+            <div class="hist-card">
+                <div class="hist-card-icon">🚕</div>
+                <div class="hist-card-info">
+                    <div class="hc-title">Такси Комфорт, 21:20</div>
+                    <div class="hc-route">ул. Ахунбаева → ул. Фрунзе</div>
+                </div>
+                <div class="hc-price">335 с</div>
+            </div>
+            
+            <div class="hist-date">08 апреля, среда</div>
+            <div class="hist-card">
+                <div class="hist-card-icon">🚙</div>
+                <div class="hist-card-info">
+                    <div class="hc-title">Такси Эконом, 23:31</div>
+                    <div class="hc-route">мкр. Тунгуч → Азия Молл</div>
+                </div>
+                <div class="hc-price">283 с</div>
+            </div>
+            <div class="hist-card" style="opacity: 0.6;">
+                <div class="hist-card-icon">❌</div>
+                <div class="hist-card-info">
+                    <div class="hc-title">Такси Комфорт, 02:04</div>
+                    <div class="hc-route" style="color: var(--danger-red);">Отменено</div>
+                </div>
+                <div class="hc-price">0 с</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.setHeaderColor('#FFFFFF'); 
+
+        let currentMode = 'taxi';
+        let selectedTariff = null;
+        let thermobagActive = false;
+
+        // Данные тарифов
+        const tariffs = {
+            taxi: [
+                { id: 'poputchik', name: 'Попутчик', img: '👥', price: null, eta: null, disabled: true, dev: 'В разработке' },
+                { id: 'econom', name: 'Эконом', img: '🚕', price: 99, eta: '2 мин', active: true },
+                { id: 'comfort', name: 'Комфорт', img: '🚙', price: 120, eta: '4 мин' }
+            ],
+            delivery: [
+                { id: 'moto', name: 'Мото', img: '🛵', price: 151, eta: '6 мин', active: true },
+                { id: 'auto', name: 'Авто', img: '🚗', price: 185, eta: '12 мин' },
+                { id: 'cargo', name: 'Грузовой', img: '🚚', price: 604, eta: '16 мин' }
+            ]
+        };
+
+        // --- SPA Routing ---
+        let stateHistory = ['hub'];
+
+        function navigateTo(state) {
+            stateHistory.push(state);
+            renderState();
+        }
+
+        function onBackClick() {
+            tg.HapticFeedback.impactOccurred('light');
+            if (stateHistory.length > 1) {
+                stateHistory.pop();
+                renderState();
+            } else { tg.close(); }
+        }
+
+        tg.BackButton.onClick(() => { onBackClick(); });
+
+        function renderState() {
+            const state = stateHistory[stateHistory.length - 1];
+            
+            if(state === 'hub') tg.BackButton.hide();
+            else tg.BackButton.show();
+
+            // Скрываем всё
+            ['sheet-hub', 'screen-address', 'sheet-tariffs', 'sheet-delivery-form', 'sheet-search', 'sheet-active-order', 'sheet-menu', 'sheet-history'].forEach(id => {
+                document.getElementById(id).classList.add('closed');
+            });
+            document.getElementById('top-address-bar').classList.add('hidden');
+            
+            // Управляем плавающими кнопками навигации
+            if (state === 'hub') {
+                document.getElementById('btn-back').classList.remove('hidden');
+                document.getElementById('btn-geo').classList.remove('hidden');
+            } else {
+                document.getElementById('btn-back').classList.add('hidden');
+                document.getElementById('btn-geo').classList.add('hidden');
+            }
+
+            // Показываем нужное
+            if (state === 'hub') {
+                document.getElementById('sheet-hub').classList.remove('closed');
+                document.getElementById('top-address-bar').classList.remove('hidden');
+                document.getElementById('top-addr-text').innerText = document.getElementById('input-from').value;
+            } 
+            else if (state === 'address') document.getElementById('screen-address').classList.remove('closed');
+            else if (state === 'tariffs') {
+                document.getElementById('sheet-tariffs').classList.remove('closed');
+                document.getElementById('btn-back').classList.remove('hidden'); // показываем <- когда открыты тарифы
+                buildTariffs(); buildOptions();
+            }
+            else if (state === 'delivery_form') document.getElementById('sheet-delivery-form').classList.remove('closed');
+            else if (state === 'search') {
+                document.getElementById('sheet-search').classList.remove('closed');
+                setTimeout(() => {
+                    if(stateHistory[stateHistory.length-1] === 'search') {
+                        stateHistory.pop(); navigateTo('active_order');
+                    }
+                }, 3000);
+            }
+            else if (state === 'active_order') {
+                document.getElementById('sheet-active-order').classList.remove('closed');
+                document.getElementById('act-addr-from').innerText = document.getElementById('input-from').value;
+                document.getElementById('act-addr-to').innerText = document.getElementById('input-to').value;
+                document.getElementById('act-price').innerText = selectedTariff.price;
+            }
+            else if (state === 'menu') document.getElementById('sheet-menu').classList.remove('closed');
+            else if (state === 'history') document.getElementById('sheet-history').classList.remove('closed');
+        }
+
+        // --- Взаимодействия ---
+        function openAddressInput(mode) { currentMode = mode; navigateTo('address'); }
+        function openMenu() { tg.HapticFeedback.impactOccurred('light'); navigateTo('menu'); }
+        function openHistory() { tg.HapticFeedback.impactOccurred('light'); navigateTo('history'); }
+
+        function mockSelectRoute(from, to) {
+            document.getElementById('input-from').value = from;
+            document.getElementById('input-to').value = to;
+            document.getElementById('t-addr-from').innerText = from;
+            document.getElementById('t-addr-to').innerText = to;
+            setTimeout(() => { navigateTo('tariffs'); }, 100);
+        }
+
+        function switchService(mode) {
+            tg.HapticFeedback.impactOccurred('light');
+            currentMode = mode;
+            document.getElementById('tab-taxi').classList.remove('active');
+            document.getElementById('tab-delivery').classList.remove('active');
+            document.getElementById(`tab-${mode}`).classList.add('active');
+            buildTariffs(); buildOptions();
+        }
+
+        function buildTariffs() {
+            const list = tariffs[currentMode];
+            let html = '';
+            list.forEach(t => {
+                let cls = 'tariff-card';
+                if(t.active) { cls += ' active'; selectedTariff = t; }
+                if(t.disabled) cls += ' disabled';
+                let priceHtml = t.price ? `<div class="t-price">${t.price} сом</div>` : `<div class="t-dev">${t.dev}</div>`;
+                html += `<div class="${cls}" onclick="selectTariff('${t.id}')"><div class="t-eta">${t.eta || ''}</div><div class="t-img">${t.img}</div><div class="t-name">${t.name}</div>${priceHtml}</div>`;
+            });
+            document.getElementById('tariffs-container').innerHTML = html;
+
+            const btn = document.getElementById('btn-main-order');
+            if(currentMode === 'taxi') { btn.innerText = 'Заказать'; } 
+            else { btn.innerText = 'Перейти к форме заказа'; }
+        }
+
+        function selectTariff(id) {
+            tg.HapticFeedback.impactOccurred('light');
+            tariffs[currentMode].forEach(t => t.active = false);
+            selectedTariff = tariffs[currentMode].find(t => t.id === id);
+            selectedTariff.active = true;
+            buildTariffs();
+        }
+
+        function buildOptions() {
+            let html = '';
+            if(currentMode === 'taxi') {
+                html = `
+                <div class="option-item"><div class="opt-left"><div class="opt-icon">🐾</div><div><div class="opt-title">С питомцем</div></div></div><div class="opt-right">+ 50 сом</div></div>
+                <div class="option-item"><div class="opt-left"><div class="opt-icon">💬</div><div><div class="opt-title">Комментарий водителю</div></div></div><div class="opt-right">›</div></div>`;
+            } else {
+                html = `
+                <div class="option-item"><div class="opt-left"><div class="opt-icon">📦</div><div><div class="opt-title">Посылка</div><div class="opt-sub">До 20 кг</div></div></div><div class="opt-right">Включено</div></div>
+                <div class="option-item"><div class="opt-left"><div class="opt-icon">🚪</div><div><div class="opt-title">От двери до двери</div><div class="opt-sub">Курьер заберет и отдаст в руки</div></div></div><div class="opt-right" style="color:var(--yandex-yellow);">+ 50 сом</div></div>`;
+            }
+            document.getElementById('options-container').innerHTML = html;
+        }
+
+        function handleOrderAction() {
+            if(currentMode === 'taxi') {
+                tg.HapticFeedback.notificationOccurred('success');
+                navigateTo('search');
+            } else {
+                tg.HapticFeedback.impactOccurred('medium');
+                document.getElementById('delivery-final-price').innerText = selectedTariff.price + ' сом';
+                navigateTo('delivery_form');
+            }
+        }
+
+        function toggleThermobag() {
+            tg.HapticFeedback.impactOccurred('light');
+            thermobagActive = !thermobagActive;
+            const sw = document.getElementById('thermo-toggle');
+            if(thermobagActive) sw.classList.add('active');
+            else sw.classList.remove('active');
+        }
+
+        function openStatus() {
+            tg.HapticFeedback.notificationOccurred('success');
+            navigateTo('search');
+        }
+
+        // Адаптивная кнопка карты
+        const addrInput = document.getElementById('input-to');
+        const mapBtn = document.getElementById('btn-map-adapt');
+        addrInput.addEventListener('focus', () => { mapBtn.style.bottom = '320px'; });
+        addrInput.addEventListener('blur', () => { setTimeout(() => { mapBtn.style.bottom = '20px'; }, 100); });
+
+        // Запуск
+        renderState();
+    </script>
+</body>
+</html>

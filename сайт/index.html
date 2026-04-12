@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ТамакKG</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root { --bg-color: #F8F8F8; --card-bg: #FFFFFF; --main-yellow: #FCE000; --text-dark: #1A1A1A; --text-gray: #999999; }
+        body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); margin: 0; padding: 0; padding-bottom: 120px !important; user-select: none; color: var(--text-dark); scroll-behavior: smooth;}
+        .hidden { display: none !important; }
+        input, textarea, select { font-family: inherit; }
+
+        /* --- ШАПКА ГЛАВНОЙ --- */
+        .header-nav { display: flex; align-items: center; padding: 12px 16px; background: var(--card-bg); position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 3px rgba(0,0,0,0.05);}
+        .back-btn { font-size: 24px; margin-right: 16px; cursor: pointer; }
+        .logo-img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; margin-right: 12px; background: var(--main-yellow); padding: 2px;}
+        .header-address { flex-grow: 1; display: flex; flex-direction: column; cursor: pointer;}
+        .header-address span:first-child { font-size: 11px; color: var(--text-gray); }
+        .header-address span:last-child { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+
+        #active-order-banner { background: #E8F5E9; border: 1px solid #4CAF50; padding: 12px 16px; margin: 12px 16px 0; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .banner-info { display: flex; flex-direction: column; }
+        .banner-title { font-weight: 800; color: #2E7D32; font-size: 14px;}
+        .banner-status { font-size: 12px; color: #388E3C; font-weight: 600; margin-top: 2px;}
+
+        /* --- ГЛАВНАЯ: ПОИСК, КАТЕГОРИИ И ФИЛЬТРЫ --- */
+        .search-container { padding: 12px 16px; background-color: var(--card-bg); }
+        .search-bar { width: 100%; box-sizing: border-box; background-color: var(--bg-color); padding: 12px 16px; border-radius: 12px; color: var(--text-dark); font-size: 14px; border: none; outline: none;}
+        
+        .main-categories { display: flex; overflow-x: auto; padding: 0 16px 12px 16px; background-color: var(--card-bg); gap: 8px; scrollbar-width: none; align-items: flex-start;}
+        .main-categories::-webkit-scrollbar { display: none; }
+        
+        .cat-circle { width: 85px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: 0.2s;}
+        .cat-circle img { width: 64px; height: 64px; border-radius: 16px; object-fit: cover; margin-bottom: 6px; background: #eee; }
+        .cat-text { font-size: 11px; font-weight: 600; color: #333; padding: 4px 6px; border-radius: 12px; background: transparent; transition: 0.2s; white-space: normal; text-align: center; line-height: 1.2; width: 100%; box-sizing: border-box;}
+        .cat-circle.active .cat-text { background: var(--text-dark); color: white; }
+
+        .filters-row { display: flex; overflow-x: auto; padding: 0 16px 16px 16px; background: var(--card-bg); gap: 8px; scrollbar-width: none; border-bottom: 1px solid #eee; }
+        .filters-row::-webkit-scrollbar { display: none; }
+        .filter-btn { background: var(--bg-color); padding: 8px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: 0.2s; border: 1px solid transparent;}
+        .filter-btn.active { background: #fffde7; border: 1px solid var(--main-yellow); color: #bcaaa4; }
+
+        /* --- КАРТОЧКИ РЕСТОРАНОВ --- */
+        .restaurant-list { padding: 16px; }
+        .res-card { background: var(--card-bg); border-radius: 20px; overflow: hidden; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); cursor: pointer; }
+        .res-img { width: 100%; height: 160px; object-fit: cover; }
+        .res-info { padding: 14px; }
+        .res-name { font-size: 18px; font-weight: 700; margin-bottom: 6px; display: flex; justify-content: space-between;}
+        .res-desc { color: var(--text-gray); font-size: 13px; margin-bottom: 8px;}
+        .res-meta { font-size: 13px; font-weight: 600; display: flex; gap: 12px; align-items: center;}
+
+        .empty-state { text-align: center; padding: 60px 20px; }
+        .empty-state h3 { font-size: 20px; margin-bottom: 12px; color: var(--text-dark);}
+        .empty-state p { font-size: 14px; color: var(--text-gray); line-height: 1.5;}
+        .empty-state span { font-size: 48px; display: block; margin-bottom: 16px;}
+
+        /* --- НИЖНЯЯ НАВИГАЦИЯ --- */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card-bg); display: flex; justify-content: space-around; padding: 12px 0 20px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 1000; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--text-gray); cursor: pointer; }
+        .nav-item.active { color: var(--text-dark); }
+        .nav-item span { font-size: 22px; }
+
+        .cart-btn { position: fixed; bottom: 85px; left: 16px; right: 16px; background: var(--main-yellow); border-radius: 16px; padding: 18px; display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); z-index: 900; cursor: pointer; }
+
+        /* --- МЕНЮ РЕСТОРАНА --- */
+        .res-header-info { display: flex; align-items: center; gap: 12px; flex-grow: 1; justify-content: center; margin-right: 40px;}
+        .res-header-logo { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+        .menu-tabs { display: flex; overflow-x: auto; padding: 12px 16px; background: var(--card-bg); gap: 20px; position: sticky; top: 60px; z-index: 90; border-bottom: 1px solid #EEE; scrollbar-width: none; }
+        .menu-tabs::-webkit-scrollbar { display: none; }
+        .tab { white-space: nowrap; font-size: 14px; color: var(--text-gray); font-weight: 600; padding-bottom: 8px; cursor: pointer; border-bottom: 2px solid transparent; transition: 0.2s;}
+        .tab.active { color: var(--text-dark); border-bottom: 2px solid var(--text-dark); }
+        .tab-promo { color: #E65100; }
+        
+        .cat-section-title { font-size: 20px; font-weight: 800; padding: 10px 16px 0 16px; margin: 0; }
+        .products-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px; }
+        .item-card { background: var(--card-bg); border-radius: 16px; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.03);}
+        .img-wrap { position: relative; border-radius: 16px 16px 0 0; overflow: hidden; height: 140px; background: #eee; }
+        .item-img { width: 100%; height: 100%; object-fit: cover; }
+        .item-info { padding: 10px 12px; display: flex; flex-direction: column; flex-grow: 1; }
+        .item-price { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
+        .item-name { font-size: 13px; color: #333; margin-bottom: 4px; line-height: 1.3; font-weight: 600;}
+        .item-meta { font-size: 11px; color: var(--text-gray); }
+
+        /* --- СТИЛИ КНОПОК И СЧЕТЧИКОВ (КАК В YANDEX) --- */
+        .btn-add-img { position: absolute; bottom: 8px; right: 8px; width: 34px; height: 34px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: pointer; color: black; z-index: 2;}
+        .counter-inline { position: absolute; bottom: 8px; left: 8px; right: 8px; background: white; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.15); height: 34px; z-index: 2; padding: 0 4px; }
+        .counter-inline div { width: 34px; height: 100%; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 18px; cursor: pointer; color: var(--text-dark);}
+        .counter-inline .c-val { font-size: 14px; font-weight: 700; pointer-events: none; width: auto;}
+
+        /* ================= МОДАЛКИ ================= */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 2000; display: flex; flex-direction: column; justify-content: flex-end; opacity: 1; transition: opacity 0.3s; }
+        .modal-overlay.hidden { opacity: 0; pointer-events: none; }
+        .modal-content { background: white; border-radius: 24px 24px 0 0; overflow: hidden; transform: translateY(0); transition: transform 0.3s ease-out; max-height: 90vh; display: flex; flex-direction: column; position: relative;}
+        .modal-overlay.hidden .modal-content { transform: translateY(100%); }
+        
+        .modal-img-container { position: relative; }
+        .modal-img { width: 100%; height: 260px; object-fit: cover; }
+        .modal-body { padding: 20px; overflow-y: auto; flex-grow: 1; padding-bottom: 90px;}
+        
+        .modal-close { position: absolute; top: 16px; right: 16px; background: white; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); cursor: pointer; z-index: 5;}
+        .modal-back-btn { position: absolute; top: 16px; left: 16px; background: white; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); cursor: pointer; z-index: 5;}
+
+        .m-title-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; }
+        .m-title { font-size: 22px; font-weight: 800; margin: 0;}
+        .m-weight { font-size: 16px; color: var(--text-gray); font-weight: 600;}
+        .m-desc { font-size: 14px; color: #555; line-height: 1.4; margin-bottom: 16px; }
+        .m-nut-row { display: flex; gap: 16px; margin-bottom: 24px; }
+        .m-nut { display: flex; flex-direction: column; }
+        .m-nut span:first-child { font-weight: 800; font-size: 16px; }
+        .m-nut span:last-child { font-size: 11px; color: var(--text-gray); }
+
+        .options-section { margin-bottom: 24px; }
+        .option-group-title { font-size: 14px; font-weight: 600; color: var(--text-gray); margin-bottom: 8px; }
+        .option-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; cursor: pointer; }
+        .option-item:last-child { border-bottom: none; }
+        .option-label { font-size: 15px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+        .option-price { font-size: 13px; color: var(--text-gray); }
+        .option-radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ccc; display: flex; align-items: center; justify-content: center; }
+        .option-radio.selected { border-color: var(--main-yellow); }
+        .option-radio.selected::after { content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--main-yellow); }
+
+        .suggest-title { font-size: 18px; font-weight: 800; margin: 0 0 16px 0; }
+        .suggest-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-bottom: 20px; }
+        .suggest-card { border-radius: 12px; overflow: hidden; background: var(--bg-color); position: relative; box-shadow: 0 1px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; cursor: pointer;}
+        
+        /* --- ЛУЧШИЕ ПРЕДЛОЖЕНИЯ --- */
+        .s-img-wrap { position: relative; width: 100%; height: 110px; }
+        .s-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
+        .s-add-btn { position: absolute; bottom: 8px; right: 8px; width: 32px; height: 32px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: pointer; color: black; z-index: 2; transition: 0.2s; }
+        .s-counter { position: absolute; bottom: 8px; left: 8px; right: 8px; background: white; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.15); height: 32px; z-index: 2; padding: 0 4px; }
+        .s-counter div { width: 32px; height: 100%; display: flex; justify-content: center; align-items: center; cursor: pointer; font-weight: bold; font-size: 18px; color: var(--text-dark); }
+        .s-counter span { font-size: 14px; font-weight: 700; pointer-events: none; color: var(--text-dark); }
+        
+        .suggest-card .s-price { font-size: 14px; font-weight: 800; padding: 12px 8px 4px 8px; }
+        .suggest-card .s-name { font-size: 12px; padding: 0 8px 12px 8px; line-height: 1.3; color: #555; flex-grow: 1;}
+
+        .modal-bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; padding: 16px 20px; background: white; border-top: 1px solid #eee; display: flex; gap: 16px; align-items: center; z-index: 100;}
+        .m-counter { display: flex; align-items: center; background: #F0F0F0; border-radius: 16px; padding: 4px; }
+        .m-counter div.btn-pm { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 24px; cursor: pointer; color: var(--text-dark);}
+        .m-counter #m-count-val { width: 30px; text-align: center; font-size: 18px; font-weight: 700; pointer-events: none;}
+        
+        .btn-yellow { background: var(--main-yellow); border-radius: 16px; text-align: center; font-weight: 700; font-size: 16px; padding: 14px; flex-grow: 1; cursor: pointer; border: none; outline: none; display: block; width: 100%;}
+        .btn-yellow.disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* --- КОРЗИНА / ОФОРМЛЕНИЕ --- */
+        .address-modal-content { padding: 24px; }
+        .address-modal-title { font-size: 20px; font-weight: 800; margin: 0 0 16px 0; }
+        .input-group { display: flex; flex-direction: column; margin-bottom: 12px; }
+        .input-group label { font-size: 12px; color: var(--text-gray); margin-bottom: 4px; }
+        .input-group input, .input-group select { background: var(--bg-color); border: none; padding: 14px; border-radius: 12px; font-size: 14px; outline: none; -webkit-appearance: none;}
+        .select-wrap { position: relative; }
+        .select-wrap::after { content: '▾'; position: absolute; right: 16px; top: 12px; font-size: 16px; pointer-events: none;}
+        .inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+        .cart-list-header { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: var(--card-bg); position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 3px rgba(0,0,0,0.05);}
+        .cart-list-header h2 { margin: 0; font-size: 18px; }
+        .trash-btn { font-size: 20px; cursor: pointer; color: #d32f2f; }
+        .cart-restaurant-tabs { display: flex; overflow-x: auto; padding: 12px 16px; background: var(--card-bg); gap: 12px; scrollbar-width: none; border-bottom: 1px solid #eee; }
+        .cart-restaurant-tabs::-webkit-scrollbar { display: none; }
+        .cart-res-tab { padding: 8px 16px; border-radius: 16px; border: 1px solid #eee; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; display: flex; flex-direction: column; align-items: center;}
+        .cart-res-tab.active { border-color: var(--text-dark); background: var(--text-dark); color: white;}
+        .cart-res-tab span { font-size: 11px; font-weight: 400; opacity: 0.8; margin-top: 2px;}
+
+        .cart-items-container { padding: 0 16px 16px 16px; }
+        .cart-item-row { display: flex; gap: 12px; padding: 16px 0; border-bottom: 1px solid #eee; align-items: center;}
+        .cart-item-row img { width: 64px; height: 64px; border-radius: 12px; object-fit: cover;}
+        .cart-item-info { flex-grow: 1; }
+        .cart-item-title { font-size: 14px; font-weight: 700; margin-bottom: 4px;}
+        .cart-item-opts { font-size: 11px; color: var(--text-gray); margin-bottom: 4px; line-height: 1.2;}
+        .cart-item-price { font-size: 14px; font-weight: 800;}
+        .cart-item-counter { display: flex; align-items: center; background: var(--bg-color); border-radius: 12px;}
+        .cart-item-counter div { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer;}
+        
+        .cart-section { background: var(--card-bg); margin-top: 8px; padding: 16px; border-radius: 20px; }
+        .delivery-toggle { display: flex; background: var(--bg-color); border-radius: 12px; padding: 4px; margin-bottom: 20px; }
+        .toggle-btn { flex: 1; text-align: center; padding: 10px; font-size: 14px; font-weight: 600; border-radius: 10px; color: var(--text-gray); cursor: pointer; transition: 0.2s; }
+        .toggle-btn.active { background: white; color: var(--text-dark); box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        .input-w-icon { position: relative; margin-bottom: 12px; }
+        .input-w-icon input { width: 100%; background: var(--bg-color); border: none; padding: 14px 40px 14px 12px; border-radius: 12px; font-size: 14px; outline: none; box-sizing: border-box; }
+        .input-w-icon .icon { position: absolute; right: 12px; top: 12px; font-size: 18px; cursor: pointer; }
+        .full-width-input { width: 100%; background: var(--bg-color); border: none; padding: 14px 12px; border-radius: 12px; font-size: 14px; outline: none; box-sizing: border-box; margin-bottom: 12px; }
+        .pickup-chip { border: 1px solid #E0E0E0; display: inline-block; padding: 6px 12px; border-radius: 12px; margin-bottom: 20px; }
+        .pickup-address-box { display: flex; align-items: center; background: var(--bg-color); padding: 14px; border-radius: 16px; margin-bottom: 16px;}
+        .pickup-address-text { flex-grow: 1; margin-left: 10px; line-height: 1.4; }
+        .pickup-address-title { font-size: 14px; color: var(--text-dark); }
+        .pickup-actions { display: flex; gap: 12px; font-size: 13px; font-weight: 700; margin-top: 6px;}
+        .pickup-link { color: #d32f2f; cursor: pointer;}
+        .pickup-copy { color: #1976d2; cursor: pointer;}
+        .payment-methods { display: flex; gap: 10px; overflow-x: auto; margin-bottom: 10px; padding-bottom: 5px; scrollbar-width: none;}
+        .payment-methods::-webkit-scrollbar { display: none; }
+        .pay-card { min-width: 100px; border: 2px solid #eee; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; height: 50px; font-weight: 600; font-size: 14px; background: white; cursor: pointer;}
+        .pay-card.active { border: 2px solid var(--text-dark); background: #fafafa; }
+        .pay-card.disabled { opacity: 0.5; cursor: not-allowed; background: var(--bg-color); border: 1px solid #eee;}
+        .receipt-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 12px; color: #555; }
+        .receipt-total { display: flex; justify-content: space-between; font-size: 18px; font-weight: 800; margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee; color: black; }
+        .pay-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card-bg); padding: 16px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; z-index: 1000; padding-bottom: 20px;}
+        .pay-sum { display: flex; flex-direction: column; }
+        .pay-sum span:first-child { font-size: 20px; font-weight: 800; }
+        .pay-sum span:last-child { font-size: 12px; color: var(--text-gray); }
+
+        /* --- СТАТУС ЗАКАЗА И ПРОФИЛЬ --- */
+        .status-map-img { width: 100%; height: 200px; object-fit: cover; background: #eee;}
+        .status-box { background: var(--card-bg); border-radius: 20px; margin: 16px; padding: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-top: -30px; position: relative;}
+        .status-row { display: flex; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid #eee; padding-bottom: 16px;}
+        .status-meta h3 { margin: 0 0 4px 0; font-size: 16px; color: #1976d2; }
+        .status-meta p { margin: 0; color: var(--text-gray); font-size: 13px; }
+        .status-price { font-size: 18px; font-weight: 800; }
+        .status-actions { display: flex; justify-content: space-around; margin-bottom: 16px; }
+        .st-btn { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; color: var(--text-dark); font-size: 12px; font-weight: 600;}
+        .st-icon { width: 48px; height: 48px; border-radius: 50%; background: var(--bg-color); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .status-section { margin: 16px; background: var(--card-bg); border-radius: 16px; padding: 16px; }
+        .st-item { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; }
+        .st-item-meta { color: var(--text-gray); font-size: 12px;}
+        .edit-comment-btn { width: 100%; padding: 12px; background: #f0f0f0; border-radius: 12px; text-align: center; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 16px;}
+
+        .profile-modal-content { padding: 20px; }
+        .profile-header-t { font-size: 20px; font-weight: 800; margin-bottom: 24px; text-align: center; }
+        .profile-user-info-c { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; border: 1px solid #eee; padding: 16px; border-radius: 16px; }
+        .profile-u-avatar { width: 60px; height: 60px; border-radius: 50%; background: #eee; display: flex; align-items: center; justify-content: center; font-size: 32px; }
+        .profile-u-name { font-size: 18px; font-weight: 800; margin-bottom: 2px; }
+        .profile-u-phone { font-size: 14px; color: var(--text-gray); }
+        .profile-section-c { background: #fafafa; padding: 16px; border-radius: 16px; margin-bottom: 16px; }
+        .profile-s-header { display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 15px; margin-bottom: 10px; }
+        .profile-add-btn { background: var(--text-dark); color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .profile-s-body { font-size: 14px; color: var(--text-gray); }
+        .profile-history-list { display: flex; flex-direction: column; gap: 10px; }
+        .p-history-item { display: flex; justify-content: space-between; font-size: 14px; color: var(--text-gray); padding: 8px 0; border-bottom: 1px solid #eee; }
+        .p-history-item:last-child { border-bottom: none; }
+        .profile-menu-list-c { display: flex; flex-direction: column; gap: 4px; }
+        .p-menu-item { padding: 16px; background: #eee; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .profile-logout-b { color: #d32f2f; background: #ffebee; }
+    </style>
+</head>
+<body>
+
+    <div class="bottom-nav" id="bottom-nav">
+        <div class="nav-item active" id="nav-main" onclick="onNavClick('main')"><span>🏠</span>Главная</div>
+        <div class="nav-item" id="nav-cart" onclick="onNavClick('cart')"><span>🛒</span>Корзина</div>
+        <div class="nav-item" id="nav-profile" onclick="onNavClick('profile')"><span>👤</span>Профиль</div>
+    </div>
+
+    <div class="cart-btn" id="cart-float-btn" onclick="onNavClick('cart')" style="display:none;">
+        <span>Корзина • <span id="cart-items-count">0</span></span>
+        <span id="total-price-btn">0 сом</span>
+    </div>
+
+    <div id="screen-main">
+        <div class="header-nav">
+            <img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=100" class="logo-img">
+            <div class="header-address" onclick="openAddressModal()">
+                <span>Доставка по городу</span>
+                <span><span id="hdr-addr">Бишкек</span> ▾</span>
+            </div>
+        </div>
+
+        <div id="active-order-banner" class="hidden" onclick="showScreen('screen-status')">
+            <div class="banner-info">
+                <span class="banner-title">Активный заказ</span>
+                <span class="banner-status" id="banner-status-text">Обрабатывается...</span>
+            </div>
+            <span>›</span>
+        </div>
+
+        <div class="search-container">
+            <input type="text" id="search-input" class="search-bar" placeholder="🔍 Найти ресторан или блюдо..." oninput="handleSearch()">
+        </div>
+        
+        <div class="main-categories">
+            <div class="cat-circle" onclick="toggleFilter(this, 'fastfood')"><img src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=100"><span class="cat-text">Фастфуд</span></div>
+            <div class="cat-circle" onclick="toggleFilter(this, 'sushi')"><img src="https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=100"><span class="cat-text">Суши-роллы</span></div>
+            <div class="cat-circle" onclick="toggleFilter(this, 'national')"><img src="https://images.unsplash.com/photo-1529042410759-befb1204b468?w=100"><span class="cat-text">Национальная</span></div>
+            <div class="cat-circle" onclick="toggleFilter(this, 'pizza')"><img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?w=100"><span class="cat-text">Пиццы</span></div>
+            <div class="cat-circle" onclick="toggleFilter(this, 'chicken')"><img src="https://images.unsplash.com/photo-1562967914-608f82629710?w=100"><span class="cat-text">Курочки</span></div>
+            <div class="cat-circle" onclick="toggleFilter(this, 'mangal')"><img src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=100"><span class="cat-text">Шашлыки</span></div>
+        </div>
+
+        <div class="filters-row">
+            <div class="filter-btn" style="color: #E65100;" onclick="toggleTagFilter(this, 'promo')">🎁 Акции</div>
+            <div class="filter-btn" onclick="toggleTagFilter(this, 'top')">⭐ Топ рейтинг</div>
+        </div>
+        
+        <div class="restaurant-list" id="restaurant-list"></div>
+    </div>
+
+    <div id="screen-menu" class="hidden">
+        <div class="header-nav">
+            <div class="back-btn" onclick="onBackClick()">←</div>
+            <div class="res-header-info">
+                <img src="" id="menu-logo" class="res-header-logo">
+                <div class="header-title" id="menu-title" style="margin:0; text-align: left;">Ресторан</div>
+            </div>
+        </div>
+        
+        <div class="search-container" style="padding-bottom: 0;">
+            <input type="text" id="menu-search-input" class="search-bar" placeholder="🔍 Поиск по меню..." oninput="handleMenuSearch()">
+        </div>
+
+        <div class="menu-tabs" id="menu-tabs"></div>
+        <div id="all-products-container"></div>
+    </div>
+
+    <div id="screen-cart-list" class="hidden" style="padding-bottom: 120px;">
+        <div class="cart-list-header">
+            <div class="back-btn" onclick="onBackClick()" style="margin:0;">←</div>
+            <h2>Корзина</h2>
+            <div class="trash-btn" onclick="openClearCartModal()">🗑️</div>
+        </div>
+        
+        <div class="cart-restaurant-tabs" id="cart-res-tabs"></div>
+        <div class="cart-items-container" id="cart-list-container"></div>
+        
+        <div style="padding: 0 16px 16px 16px;">
+            <button class="btn-gray" style="width:100%; border:none; font-size: 16px; padding: 12px; border-radius: 12px;" onclick="openMenu(cartActiveTabResId)">Открыть меню ресторана</button>
+        </div>
+
+        <div style="padding: 0 16px 16px 16px;">
+            <h3 class="section-title">Что-то ещё?</h3>
+            <div class="suggest-grid" id="cart-suggests-container"></div>
+        </div>
+
+        <div class="pay-bar">
+            <div class="pay-sum"><span id="cart-list-total-sum">0 сом</span><span style="color:#2E7D32;">Тариф доставки: <span id="cart-list-delivery">0 сом</span></span></div>
+            <div class="btn-pay" onclick="goToCheckout()" style="background: var(--main-yellow); padding: 12px 20px; border-radius: 12px; font-weight: bold; cursor: pointer;">К оформлению ➔</div>
+        </div>
+    </div>
+
+    <div id="screen-checkout" class="hidden" style="padding-bottom: 100px;">
+        <div class="header-nav">
+            <div class="back-btn" onclick="onBackClick()">←</div>
+            <div class="header-title">Оформление заказа</div>
+        </div>
+
+        <div class="cart-section">
+            <div class="delivery-toggle">
+                <div class="toggle-btn active" id="tab-delivery" onclick="setDeliveryMode('delivery')">Доставка</div>
+                <div class="toggle-btn" id="tab-pickup" onclick="setDeliveryMode('pickup')">Самовывоз</div>
+            </div>
+
+            <div id="block-delivery">
+                <h3 class="section-title" style="margin-top: 0;">Куда</h3>
+                <div class="input-w-icon">
+                    <input type="text" id="checkout-address" placeholder="📍 Улица / Микрорайон">
+                    <div class="icon" onclick="openMapPicker()">🗺️</div>
+                </div>
+                <div class="inputs-grid">
+                    <div class="input-group"><label>Дом</label><input type="text" id="chk-dom" placeholder="57"></div>
+                    <div class="input-group"><label>Подъезд</label><input type="text" id="chk-pod" placeholder="1"></div>
+                    <div class="input-group"><label>Этаж</label><input type="number" id="chk-etaj" placeholder="2"></div>
+                    <div class="input-group"><label>Квартира</label><input type="number" id="chk-kv" placeholder="4"></div>
+                </div>
+                <input type="text" id="order-comment" class="full-width-input" placeholder="💬 Комментарий (код домофона, название места и др.)">
+            </div>
+
+            <div id="block-pickup" class="hidden">
+                <div class="pickup-chip" style="font-weight: 600;"><div class="pickup-chip-title" style="font-size:12px; color:gray;">Самовывоз</div><div class="pickup-chip-time" style="font-size:16px;">Готово через 20 мин</div></div>
+                <h3 class="section-title">Откуда забрать</h3>
+                <div class="pickup-address-box">
+                    <div style="font-size:24px;">📍</div>
+                    <div class="pickup-address-text">
+                        <div class="pickup-address-title" id="pickup-address" style="font-weight: bold;">Адрес...</div>
+                        <div class="pickup-actions">
+                            <span class="pickup-link" onclick="open2Gis()">↗ Открыть в 2ГИС</span>
+                            <span class="pickup-copy" onclick="copyAddress()">📄 Копировать</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="cart-section">
+            <h3 class="section-title" style="margin-top: 0;">Оплата</h3>
+            <div class="payment-methods">
+                <div class="pay-card active" onclick="selectPay(this)"><div>QR код</div><div>📱</div></div>
+                <div class="pay-card disabled"><div>Картой</div><div style="font-size:10px; font-weight:normal">В разработке</div></div>
+                <div class="pay-card" onclick="selectPay(this)"><div>Наличные</div><div>💵</div></div>
+            </div>
+        </div>
+
+        <div class="cart-section">
+            <h3 class="section-title" style="margin-top: 0;">Что в чеке</h3>
+            <div class="receipt-row"><span>Товары в заказе</span><span id="check-items">0 сом</span></div>
+            <div class="receipt-row"><span id="delivery-label">Тариф доставки</span><span id="check-delivery">150 сом</span></div>
+            <div class="receipt-total"><span>Итого</span><span id="check-total">0 сом</span></div>
+        </div>
+
+        <div class="pay-bar">
+            <div class="pay-sum"><span id="pay-btn-sum">0 сом</span><span>Сумма заказа</span></div>
+            <div class="btn-pay" onclick="createOrder()" style="background: var(--main-yellow); padding: 12px 20px; border-radius: 12px; font-weight: bold; cursor: pointer;">Оплатить</div>
+        </div>
+    </div>
+
+    <div id="screen-status" class="hidden" style="padding-bottom: 40px;">
+        <div class="header-nav">
+            <div class="back-btn" onclick="onBackClick()">←</div>
+            <div class="header-title" id="st-header-title">Создан</div>
+        </div>
+        <img src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800" class="status-map-img">
+        <div class="status-box">
+            <div class="status-row">
+                <div class="status-meta">
+                    <h3 id="st-current-status">Обрабатывается...</h3>
+                    <p id="st-res-name">Из ресторана</p>
+                </div>
+                <div class="status-price" id="st-total">0 сом</div>
+            </div>
+            <div class="status-actions">
+                <div class="st-btn" onclick="alert('Вызов поддержки...')"><div class="st-icon">📞</div>Поддержка</div>
+                <div class="st-btn" onclick="alert('Открытие карты курьера...')"><div class="st-icon">🗺️</div>На карте</div>
+                <div class="st-btn" onclick="alert('Запрос на отмену отправлен')"><div class="st-icon">✕</div>Отменить</div>
+            </div>
+        </div>
+        <div class="status-section">
+            <h3 class="section-title" style="margin-top: 0;">Состав заказа</h3>
+            <div id="st-items-list"></div>
+            <div class="edit-comment-btn" onclick="editOrderComment()">💬 Изменить комментарий к заказу</div>
+        </div>
+    </div>
+
+    <div id="modal-profile" class="modal-overlay hidden">
+        <div class="modal-content profile-modal-content">
+            <div class="modal-close" onclick="onBackClick()" style="box-shadow:none; background:#eee;">✕</div>
+            <div class="profile-header-t">Профиль</div>
+            
+            <div class="profile-user-info-c">
+                <div class="profile-u-avatar">👥</div>
+                <div class="profile-u-details">
+                    <div class="profile-u-name">Эман</div>
+                    <div class="profile-u-phone">+996 700 123 456</div>
+                </div>
+            </div>
+
+            <div class="profile-section-c">
+                <div class="profile-s-header">
+                    <span>📍 Мои адреса</span>
+                    <button class="profile-add-btn" onclick="openAddressModal()">Добавить</button>
+                </div>
+                <div class="profile-s-body">
+                    мкр. Тунгуч, д.57, кв.4
+                </div>
+            </div>
+
+            <div class="profile-section-c">
+                <div class="profile-s-header"><span>📜 История заказов</span></div>
+                <div class="profile-history-list">
+                    <div class="p-history-item">
+                        <div style="font-weight:600;">KFC • <span style="font-weight:normal;">11.04.2026</span></div>
+                        <div style="font-weight:bold;">850 сом</div>
+                    </div>
+                    <div class="p-history-item">
+                        <div style="font-weight:600;">Burger Spot • <span style="font-weight:normal;">10.04.2026</span></div>
+                        <div style="font-weight:bold;">620 сом</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="profile-menu-list-c">
+                <div class="p-menu-item" onclick="alert('Вызов поддержки')">🎧 Поддержка</div>
+                <div class="p-menu-item" onclick="alert('Условия использования')">📄 Условия использования</div>
+                <div class="p-menu-item profile-logout-b" onclick="alert('Выход')">✕ Выйти</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-product" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-img-container">
+                <div class="modal-back-btn hidden" id="m-back-btn" onclick="modalGoBack()">←</div>
+                <div class="modal-close" onclick="modalCloseAll()">✕</div>
+                <img src="" id="m-img" class="modal-img">
+            </div>
+            <div class="modal-body">
+                <div class="m-title-row">
+                    <h2 class="m-title" id="m-name">Название</h2>
+                    <span class="m-weight" id="m-weight">440 г</span>
+                </div>
+                <div class="m-desc" id="m-desc">Состав и описание...</div>
+                <div class="m-nut-row">
+                    <div class="m-nut"><span id="m-kcal">276</span><span>ккал</span></div>
+                    <div class="m-nut"><span>11</span><span>белки</span></div>
+                    <div class="m-nut"><span>16</span><span>жиры</span></div>
+                    <div class="m-nut"><span>22</span><span>углеводы</span></div>
+                </div>
+                <div id="m-options-container" class="options-section"></div>
+                <div class="suggest-title">Лучшие предложения</div>
+                <div class="suggest-grid" id="m-suggests"></div>
+            </div>
+            <div class="modal-bottom-bar">
+                <div class="m-counter">
+                    <div class="btn-pm" onclick="modalChangeCount(-1)">−</div>
+                    <div id="m-count-val">1</div>
+                    <div class="btn-pm" onclick="modalChangeCount(1)">+</div>
+                </div>
+                <button class="btn-yellow" id="m-add-btn" onclick="modalAddToCart()">Добавить</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-address" class="modal-overlay hidden">
+        <div class="modal-content address-modal-content">
+            <div class="modal-close" style="top:20px; right:20px; box-shadow:none; background:#eee;" onclick="onBackClick()">✕</div>
+            <h2 class="address-modal-title">Куда доставить?</h2>
+            
+            <div class="input-group">
+                <label>Выберите город</label>
+                <div class="select-wrap">
+                    <select id="modal-city-select" onchange="onCityChange()">
+                        <option value="Бишкек">Бишкек</option>
+                        <option value="Чолпон-Ата">Чолпон-Ата</option>
+                        <option value="Бостери">Бостери</option>
+                        <option value="Балыкчы">Балыкчы</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="address-fields-container">
+                <div class="input-group"><label>Улица / Микрорайон</label><input type="text" id="modal-addr-street" placeholder="мкр. Тунгуч"></div>
+                <div class="inputs-grid">
+                    <div class="input-group"><label>Дом</label><input type="text" id="modal-addr-dom" placeholder="57"></div>
+                    <div class="input-group"><label>Подъезд</label><input type="text" id="modal-addr-pod" placeholder="1"></div>
+                    <div class="input-group"><label>Этаж</label><input type="number" id="modal-addr-etaj" placeholder="2"></div>
+                    <div class="input-group"><label>Квартира</label><input type="number" id="modal-addr-kv" placeholder="4"></div>
+                </div>
+            </div>
+            
+            <button class="btn-yellow" style="margin-top: 12px;" onclick="saveAddressModal()">Готово</button>
+        </div>
+    </div>
+
+    <div id="modal-clear-cart" class="modal-overlay hidden" style="justify-content: center; align-items: center; padding: 20px;">
+        <div class="modal-content confirm-modal-content" style="border-radius: 24px; width: 100%; max-width: 340px; padding: 24px; text-align: center;">
+            <div style="font-size: 20px; font-weight: bold; margin-bottom: 12px;">Очистить корзину?</div>
+            <div style="color: gray; margin-bottom: 24px;">Все выбранные вами блюда из этого ресторана будут удалены.</div>
+            <div style="display: flex; gap: 12px;">
+                <div style="flex:1; padding: 14px; background: #eee; border-radius: 12px; font-weight: bold; cursor: pointer;" onclick="onBackClick()">Отмена</div>
+                <div style="flex:1; padding: 14px; background: #ffebee; color: #d32f2f; border-radius: 12px; font-weight: bold; cursor: pointer;" onclick="executeClearCart()">Да, удалить</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        
+        let globalCity = "Бишкек";
+        let globalAddressText = "Бишкек"; 
+        let totalSum = 0;
+        let baseDeliveryFee = 150;
+        let currentDeliveryFee = baseDeliveryFee; 
+        let currentRestaurantId = null;
+        let activeFilters = [];
+        let activeTag = null;
+        let cartItems = {}; 
+        let currentOrderComment = "";
+        let isOrderActive = false;
+        let cartActiveTabResId = null; 
+        
+        let modalStack = []; // Хранит историю: { itemId, cartSnapshot }
+
+        const imgs = {
+            asian: ['https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=300', 'https://images.unsplash.com/photo-1553621042-f6e147245754?w=300', 'https://images.unsplash.com/photo-1583623025817-d180a2221d0a?w=300'],
+            national: ['https://images.unsplash.com/photo-1547592180-85f173990554?w=300', 'https://images.unsplash.com/photo-1552611052-33e04de081de?w=300', 'https://images.unsplash.com/photo-1529042410759-befb1204b468?w=300'],
+            fastfood: ['https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=100', 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=300', 'https://images.unsplash.com/photo-1562967914-608f82629710?w=300'],
+            pizza: ['https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=300', 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=300'],
+            drinks: ['https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=300', 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=300', 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=300'],
+            mangal: ['https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', 'https://images.unsplash.com/photo-1599839619722-39751411ea63?w=300'],
+            fish: ['https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=300', 'https://images.unsplash.com/photo-1580476262798-bddd9f4b7369?w=300']
+        };
+
+        const nameTemplates = {
+            'Холодные роллы': ['Филадельфия', 'Калифорния', 'Дракон', 'Аляска'], 'Горячие роллы': ['Темпура Лосось', 'Вулкан Темпура'], 'Запеченные роллы': ['Сырный Лосось', 'Запеченный Краб'],
+            'Супы': ['Шорпо из баранины', 'Мастава', 'Лагман', 'Том Ям'], 'Салаты': ['Цезарь с курицей', 'Ачичук', 'Греческий'], 'Напитки': ['Кока-Кола 0.5', 'Спрайт 0.5', 'Айран', 'Морс'],
+            'Мангал': ['Шашлык из баранины', 'Люля-кебаб', 'Куриный шашлык', 'Овощи на гриле'], 'Горячие блюда': ['Плов Праздничный', 'Манты с мясом', 'Куурдак'],
+            'Бургеры': ['Чизбургер', 'Двойной Чизбургер', 'Блэк Бургер', 'Чикенбургер'], 'Шаурма': ['Шаурма Классик', 'Шаурма Сырная'], 'Курочка': ['Стрипсы 5 шт', 'Крылышки Баффало', 'Наггетсы'],
+            'Пицца': ['Маргарита 30см', 'Пепперони 30см', 'Мясная 30см', '4 Сыра'], 'Комбо': ['Комбо на двоих', 'Семейный сет', 'Чизбургер Комбо M'], 'Акции': ['Сет по акции', '2 пиццы по цене 1'],
+            'Рыба на гриле': ['Иссык-Кульская форель', 'Стейк из семги', 'Рыбное ассорти'], 'Коктейли': ['Мохито', 'Пина Колада', 'Санрайз']
+        };
+
+        const comboOptions = [
+            { title: 'Выберите соус', required: true, options: [{name: 'Кисло-Сладкий', price: 0}, {name: 'Кетчуп', price: 0}, {name: 'Сырный', price: 15}] },
+            { title: 'Выберите напиток 0.5', required: true, options: [{name: 'Pepsi', price: 0}, {name: 'Mirinda', price: 0}, {name: 'Чай Липтон', price: 20}] }
+        ];
+
+        function generateItems(categoryName, defaultImgType, idPrefix) {
+            const names = nameTemplates[categoryName] || ['Блюдо'];
+            let imgType = defaultImgType;
+            if(categoryName.includes('Напитки') || categoryName.includes('Коктейли')) imgType = 'drinks';
+            if(categoryName.includes('Мангал')) imgType = 'mangal';
+            if(categoryName.includes('Пицца')) imgType = 'pizza';
+            if(categoryName.includes('Бургеры') || categoryName.includes('Шаурма') || categoryName.includes('Курочка')) imgType = 'fastfood';
+            if(categoryName.includes('роллы')) imgType = 'asian';
+            if(categoryName.includes('Рыба')) imgType = 'fish';
+
+            return names.map((name, index) => {
+                let item = {
+                    id: `${idPrefix}-${categoryName}-${index}`.replace(/\s+/g, ''),
+                    resId: idPrefix, 
+                    cat: categoryName, name: name, price: 250 + (index * 60),
+                    img: imgs[imgType][index % imgs[imgType].length],
+                    weight: categoryName.includes('Напитки') ? 500 : 250 + (index*30), 
+                    kcal: categoryName.includes('Напитки') ? 45 : 300 + (index*50),
+                    desc: `Вкуснейшее блюдо "${name}". Идеально подойдет для вашего обеда или ужина.`
+                };
+                if(categoryName === 'Комбо') item.optionsGroups = comboOptions;
+                return item;
+            });
+        }
+
+        const database = {
+            'asian1': { city: 'Бишкек', title: 'Дракон Суши & Вок', logo: 'https://images.unsplash.com/photo-1553621042-f6e147245754?w=100', address: 'Бишкек, пр. Шабдана баатыра, 11К', link2gis: 'https://2gis.kg', rating: 4.7, tags: ['sushi', 'promo', 'top'], img: 'https://images.unsplash.com/photo-1553621042-f6e147245754?w=600', categories: ['Акции', 'Холодные роллы', 'Горячие роллы', 'Запеченные роллы', 'Напитки'], items: [...generateItems('Акции', 'asian', 'asian1'), ...generateItems('Холодные роллы', 'asian', 'asian1'), ...generateItems('Горячие роллы', 'asian', 'asian1'), ...generateItems('Запеченные роллы', 'asian', 'asian1'), ...generateItems('Напитки', 'asian', 'asian1')] },
+            'nat1': { city: 'Бишкек', title: 'Чайхана "Мурас"', logo: 'https://images.unsplash.com/photo-1529042410759-befb1204b468?w=100', address: 'Бишкек, пр. Чуй, 114', link2gis: 'https://2gis.kg', rating: 4.9, tags: ['national', 'mangal', 'top'], img: 'https://images.unsplash.com/photo-1529042410759-befb1204b468?w=600', categories: ['Комбо', 'Мангал', 'Горячие блюда', 'Супы', 'Напитки'], items: [...generateItems('Комбо', 'national', 'nat1'), ...generateItems('Мангал', 'national', 'nat1'), ...generateItems('Горячие блюда', 'national', 'nat1'), ...generateItems('Супы', 'national', 'nat1'), ...generateItems('Напитки', 'national', 'nat1')] },
+            'fast1': { city: 'Бишкек', title: 'Burger Spot', logo: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=100', address: 'Бишкек, ул. Ахунбаева, 94', link2gis: 'https://2gis.kg', rating: 4.2, tags: ['fastfood', 'chicken', 'pizza'], img: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=600', categories: ['Комбо', 'Акции', 'Бургеры', 'Пицца', 'Курочка', 'Шаурма', 'Напитки'], items: [...generateItems('Комбо', 'fastfood', 'fast1'), ...generateItems('Акции', 'fastfood', 'fast1'), ...generateItems('Бургеры', 'fastfood', 'fast1'), ...generateItems('Пицца', 'pizza', 'fast1'), ...generateItems('Курочка', 'fastfood', 'fast1'), ...generateItems('Шаурма', 'fastfood', 'fast1'), ...generateItems('Напитки', 'fastfood', 'fast1')] },
+            'piz1': { city: 'Бишкек', title: 'Roma Pizza', logo: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=100', address: 'Бишкек, ул. Токтогула, 125', link2gis: 'https://2gis.kg', rating: 4.8, tags: ['pizza', 'fastfood', 'top'], img: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600', categories: ['Комбо', 'Пицца', 'Бургеры', 'Салаты', 'Напитки'], items: [...generateItems('Комбо', 'pizza', 'piz1'), ...generateItems('Пицца', 'pizza', 'piz1'), ...generateItems('Бургеры', 'fastfood', 'piz1'), ...generateItems('Салаты', 'pizza', 'piz1'), ...generateItems('Напитки', 'pizza', 'piz1')] },
+            'nat2': { city: 'Бишкек', title: 'Navat', logo: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=100', address: 'Бишкек, ул. Ибраимова, 42', link2gis: 'https://2gis.kg', rating: 4.9, tags: ['national', 'sushi', 'top'], img: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=600', categories: ['Акции', 'Горячие блюда', 'Холодные роллы', 'Супы', 'Напитки'], items: [...generateItems('Акции', 'national', 'nat2'), ...generateItems('Горячие блюда', 'national', 'nat2'), ...generateItems('Холодные роллы', 'asian', 'nat2'), ...generateItems('Супы', 'national', 'nat2'), ...generateItems('Напитки', 'national', 'nat2')] },
+            'ik1': { city: 'Чолпон-Ата', title: 'Каприз Лаунж', logo: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=100', address: 'Чолпон-Ата, ЦР Каприз', link2gis: 'https://2gis.kg', rating: 4.8, tags: ['national', 'top'], img: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=600', categories: ['Рыба на гриле', 'Мангал', 'Коктейли'], items: [...generateItems('Рыба на гриле', 'fish', 'ik1'), ...generateItems('Мангал', 'national', 'ik1'), ...generateItems('Коктейли', 'drinks', 'ik1')] },
+            'bos1': { city: 'Бостери', title: 'Колесо Обозрения', logo: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=100', address: 'Бостери, Ярмарка', link2gis: 'https://2gis.kg', rating: 4.6, tags: ['pizza', 'fastfood'], img: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600', categories: ['Пицца', 'Бургеры', 'Напитки'], items: [...generateItems('Пицца', 'pizza', 'bos1'), ...generateItems('Бургеры', 'fastfood', 'bos1'), ...generateItems('Напитки', 'drinks', 'bos1')] }
+        };
+
+        document.getElementById('checkout-address').value = globalAddressText;
+        
+        function openAddressModal() {
+            closeAllModals(); 
+            document.getElementById('modal-city-select').value = globalCity;
+            onCityChange();
+            document.getElementById('modal-address').classList.remove('hidden');
+            history.pushState({modal: 'address'}, '');
+        }
+
+        function onCityChange() {
+            let city = document.getElementById('modal-city-select').value;
+            let fields = document.getElementById('address-fields-container');
+            if(city === 'Балыкчы') { fields.style.display = 'none'; } 
+            else { fields.style.display = 'block'; }
+        }
+
+        function saveAddressModal() {
+            let city = document.getElementById('modal-city-select').value;
+            let street = document.getElementById('modal-addr-street').value;
+            let dom = document.getElementById('modal-addr-dom').value;
+
+            // Сохраняем выбранный город глобально
+            globalCity = city;
+
+            // Формируем текст адреса в зависимости от того, что заполнил юзер
+            if (city === 'Балыкчы') {
+                globalAddressText = city;
+            } else if (street) {
+                globalAddressText = city + ', ' + street + (dom ? `, д.${dom}` : '');
+            } else {
+                globalAddressText = city; // Если улицу не указали, оставляем только город
+            }
+
+            // Обновляем шапку и инпуты в чекауте
+            document.getElementById('hdr-addr').innerText = globalAddressText;
+            document.getElementById('checkout-address').value = globalAddressText;
+            document.getElementById('chk-dom').value = dom;
+            document.getElementById('chk-pod').value = document.getElementById('modal-addr-pod').value;
+            document.getElementById('chk-etaj').value = document.getElementById('modal-addr-etaj').value;
+            document.getElementById('chk-kv').value = document.getElementById('modal-addr-kv').value;
+            
+            // Закрываем модалку и обновляем рестораны
+            onBackClick();
+            tg.HapticFeedback.notificationOccurred('success');
+            renderRestaurants(); 
+        }
+
+        function openMapPicker() { alert("Открытие карты для выбора точки 📍"); }
+        function copyAddress() { navigator.clipboard.writeText(document.getElementById('pickup-address').innerText); tg.HapticFeedback.notificationOccurred('success'); alert("Адрес скопирован!"); }
+
+        history.replaceState({screen: 'main'}, '');
+
+        function showScreen(screenId) {
+            ['screen-main', 'screen-menu', 'screen-cart-list', 'screen-checkout', 'screen-status'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            document.getElementById('screen-'+screenId).classList.remove('hidden');
+            updateGlobalCartBtnState(screenId);
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            if(['main', 'menu'].includes(screenId)) document.getElementById('nav-main').classList.add('active');
+            if(screenId === 'cart-list') document.getElementById('nav-cart').classList.add('active');
+        }
+
+        function onNavClick(type) {
+            tg.HapticFeedback.impactOccurred('light');
+            if (type === 'main') {
+                if (!document.getElementById('screen-main').classList.contains('hidden')) return;
+                closeAllModals(); history.go(-(history.length - 1)); showScreen('main');
+            }
+            if (type === 'cart') {
+                if(totalSum === 0) { alert("Корзина пуста"); return; }
+                if (!document.getElementById('screen-cart-list').classList.contains('hidden')) return;
+                openCartList();
+            }
+            if (type === 'profile') {
+                if (!document.getElementById('modal-profile').classList.contains('hidden')) return;
+                openProfileModal();
+            }
+        }
+
+        function onBackClick() { history.back(); }
+
+        window.addEventListener('popstate', function(event) {
+            closeAllModals();
+            if (!event.state) { showScreen('main'); return; }
+            const state = event.state;
+            if (state.screen) {
+                showScreen(state.screen);
+                if (state.page === 'menu' && state.resId) { currentRestaurantId = state.resId; renderRestaurantMenu(); }
+            } else if (state.modal) { reOpenModal(state.modal, state.itemId); }
+        });
+
+        function closeAllModals() {
+            ['modal-product', 'modal-profile', 'modal-address', 'modal-clear-cart'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            if(!document.getElementById('screen-main').classList.contains('hidden') || !document.getElementById('screen-menu').classList.contains('hidden')) document.getElementById('nav-main').classList.add('active');
+            if(!document.getElementById('screen-cart-list').classList.contains('hidden')) document.getElementById('nav-cart').classList.add('active');
+        }
+
+        function reOpenModal(modalType, itemId) {
+            if (modalType === 'profile') { document.getElementById('modal-profile').classList.remove('hidden'); document.getElementById('nav-profile').classList.add('active'); }
+            if (modalType === 'product' && itemId) { /* Логика восстановления модалок обрабатывается через modalStack */ }
+            if (modalType === 'address') { onCityChange(); document.getElementById('modal-address').classList.remove('hidden'); }
+        }
+
+        function handleSearch() { renderRestaurants(document.getElementById('search-input').value.toLowerCase()); }
+        function toggleFilter(el, tag) {
+            tg.HapticFeedback.impactOccurred('light');
+            if(activeFilters.includes(tag)) { activeFilters = activeFilters.filter(t => t !== tag); el.classList.remove('active'); } 
+            else { activeFilters.push(tag); el.classList.add('active'); }
+            renderRestaurants(document.getElementById('search-input').value.toLowerCase());
+        }
+        function toggleTagFilter(el, tag) {
+            tg.HapticFeedback.impactOccurred('light');
+            if(activeTag === tag) { activeTag = null; el.classList.remove('active'); } 
+            else { document.querySelectorAll('.filters-row .filter-btn').forEach(b => b.classList.remove('active')); activeTag = tag; el.classList.add('active'); }
+            renderRestaurants(document.getElementById('search-input').value.toLowerCase());
+        }
+
+        function renderRestaurants(searchQuery = '') {
+            const list = document.getElementById('restaurant-list');
+            if (globalCity === 'Балыкчы') {
+                list.innerHTML = `<div class="empty-state"><span>🚀</span><h3>Мы в процессе добавления сервиса</h3><p>Совсем скоро мы появимся и в Балыкчы.</p></div>`;
+                return;
+            }
+            let html = '';
+            Object.keys(database).forEach(key => {
+                const res = database[key];
+                if(res.city !== globalCity) return;
+                const passCategory = activeFilters.length === 0 || activeFilters.some(f => res.tags.includes(f));
+                const passTag = !activeTag || res.tags.includes(activeTag);
+                const passSearch = searchQuery === '' || res.title.toLowerCase().includes(searchQuery) || res.items.some(i => i.name.toLowerCase().includes(searchQuery));
+                if(passCategory && passTag && passSearch) {
+                    html += `<div class="res-card" onclick="openMenu('${key}')"><img src="${res.img}" class="res-img"><div class="res-info"><div class="res-name"><span>${res.title}</span><span>★ ${res.rating}</span></div><div class="res-desc">${res.address}</div><div class="res-meta"><span>🛵 30-40 мин</span></div></div></div>`;
+                }
+            });
+            list.innerHTML = html || '<p style="text-align:center; color:gray; margin-top:40px;">Ничего не найдено 😔</p>';
+        }
+        renderRestaurants();
+
+        function updateGlobalCartBtnState(currentScreen) {
+            let cartBtn = document.getElementById('cart-float-btn');
+            let showOnScreens = ['main', 'menu'];
+            cartBtn.style.display = (totalSum > 0 && showOnScreens.includes(currentScreen)) ? 'flex' : 'none';
+        }
+
+        function handleMenuSearch() { renderRestaurantMenu(); }
+
+        function openMenu(resId) {
+            currentRestaurantId = resId;
+            const res = database[resId];
+            document.getElementById('menu-title').innerText = res.title;
+            document.getElementById('menu-logo').src = res.logo;
+            document.getElementById('pickup-address').innerText = res.address;
+            document.getElementById('menu-search-input').value = ''; 
+            
+            renderRestaurantMenu();
+            history.pushState({screen: 'menu', page: 'menu', resId: resId}, '');
+            showScreen('menu');
+        }
+
+        function renderRestaurantMenu() {
+            const res = database[currentRestaurantId];
+            const query = document.getElementById('menu-search-input').value.toLowerCase();
+            let tabsHtml = '';
+            let allHtml = '';
+            res.categories.forEach((cat, index) => {
+                const items = res.items.filter(item => item.cat === cat && (query === '' || item.name.toLowerCase().includes(query)));
+                if(items.length > 0) {
+                    let cl = tabsHtml === '' ? 'active ' : '';
+                    if(cat === 'Акции' || cat === 'Комбо') cl += 'tab-promo';
+                    tabsHtml += `<div class="tab ${cl}" id="tab-${cat.replace(/\s+/g, '')}" onclick="scrollToCat('${cat}')">${cat}</div>`;
+                    allHtml += `<h3 class="cat-section-title" id="cat-${cat.replace(/\s+/g, '')}">${cat}</h3>`;
+                    allHtml += `<div class="products-grid">` + items.map(item => {
+                        let countInCart = 0;
+                        for(let k in cartItems) { if(cartItems[k].item.id === item.id) countInCart += cartItems[k].count; }
+                        return `
+                        <div class="item-card" onclick="openModal('${item.id}')">
+                            <div class="img-wrap">
+                                <img src="${item.img}" class="item-img">
+                                ${countInCart > 0 && !item.optionsGroups
+                                    ? `<div class="counter-inline" onclick="event.stopPropagation()">
+                                        <div onclick="updateInlineCart('${item.id}', -1)">−</div>
+                                        <div class="c-val">${countInCart}</div>
+                                        <div onclick="updateInlineCart('${item.id}', 1)">+</div>
+                                       </div>` 
+                                    : `<div class="btn-add-img" onclick="addToCartEvent(event, '${item.id}')">+</div>`}
+                            </div>
+                            <div class="item-info">
+                                <div class="item-price">${item.price} сом</div>
+                                <div class="item-name">${item.name}</div>
+                                <div class="item-meta">${item.weight} г · ${item.kcal} ккал</div>
+                            </div>
+                        </div>`;
+                    }).join('') + `</div>`;
+                }
+            });
+            document.getElementById('menu-tabs').innerHTML = tabsHtml;
+            document.getElementById('all-products-container').innerHTML = allHtml || '<p style="text-align:center; color:gray; margin-top:20px;">Блюдо не найдено 😔</p>';
+        }
+
+        function scrollToCat(cat) { tg.HapticFeedback.impactOccurred('light'); const el = document.getElementById(`cat-${cat.replace(/\s+/g, '')}`); if(el) { const y = el.getBoundingClientRect().top + window.scrollY - 110; window.scrollTo({top: y, behavior: 'smooth'}); } }
+        function refreshMenuRender() { if(currentRestaurantId) renderRestaurantMenu(); }
+
+        /* --- ИСПРАВЛЕННЫЕ ФУНКЦИИ ДОБАВЛЕНИЯ В МЕНЮ И КОРЗИНЕ --- */
+        function addToCartEvent(event, itemId) {
+            event.stopPropagation(); tg.HapticFeedback.impactOccurred('light');
+            const item = database[currentRestaurantId].items.find(i => i.id === itemId);
+            if(item.optionsGroups) { openModal(itemId); return; } 
+            
+            if(cartItems[itemId]) cartItems[itemId].count++;
+            else cartItems[itemId] = { count: 1, item: item, optionsData: null, pricePerUnit: item.price, resId: currentRestaurantId };
+            
+            recalcTotal(); refreshMenuRender();
+        }
+
+        function updateInlineCart(itemId, delta) {
+            tg.HapticFeedback.impactOccurred('light'); 
+            if(!cartItems[itemId]) return; // Защита от ошибок
+            
+            cartItems[itemId].count += delta; 
+            if(cartItems[itemId].count <= 0) delete cartItems[itemId]; 
+            
+            recalcTotal(); refreshMenuRender();
+        }
+        
+        function recalcTotal() {
+            totalSum = 0; let totalItemsCount = 0;
+            for(let key in cartItems) { totalSum += (cartItems[key].pricePerUnit * cartItems[key].count); totalItemsCount += cartItems[key].count; }
+            document.getElementById('total-price-btn').innerText = totalSum + " сом";
+            document.getElementById('cart-items-count').innerText = totalItemsCount;
+            updateGlobalCartBtnState(document.getElementById('screen-main').classList.contains('hidden') ? 'menu' : 'main');
+        }
+
+        // --- МАГИЯ: СТЕК МОДАЛОК И ОТКАТ КОРЗИНЫ ---
+        let currentModalItem = null; let currentModalCount = 1; let selectedOptions = {};
+
+        function openModal(itemId, isDeepLink = false) {
+            tg.HapticFeedback.impactOccurred('medium');
+            const res = database[currentRestaurantId];
+            const item = res.items.find(i => i.id === itemId);
+            
+            if(item) {
+                const cartSnapshot = JSON.parse(JSON.stringify(cartItems));
+                if (!isDeepLink) { modalStack = []; }
+                modalStack.push({ itemId: item.id, cartSnapshot: cartSnapshot });
+                
+                renderModalContent(item);
+                document.getElementById('modal-product').classList.remove('hidden');
+                if(!isDeepLink) history.pushState({modal: 'product'}, '');
+            }
+        }
+
+        function renderModalContent(item) {
+            const res = database[currentRestaurantId];
+            currentModalItem = item; 
+            
+            // ИСПРАВЛЕНИЕ: Проверяем, есть ли уже этот товар в корзине
+            let existingCount = cartItems[item.id] ? cartItems[item.id].count : 0;
+            currentModalCount = existingCount > 0 ? existingCount : 1; 
+            
+            selectedOptions = {};
+            
+            document.getElementById('m-img').src = item.img;
+            document.getElementById('m-name').innerText = item.name;
+            document.getElementById('m-weight').innerText = item.weight + " г";
+            document.getElementById('m-desc').innerText = item.desc;
+            document.getElementById('m-kcal').innerText = item.kcal;
+            
+            if (modalStack.length > 1) { document.getElementById('m-back-btn').classList.remove('hidden'); } 
+            else { document.getElementById('m-back-btn').classList.add('hidden'); }
+
+            let optionsHtml = '';
+            if(item.optionsGroups) {
+                item.optionsGroups.forEach((group, gIndex) => {
+                    optionsHtml += `<div class="option-group-title">${group.title}</div>`;
+                    group.options.forEach((opt, oIndex) => {
+                        optionsHtml += `<div class="option-item" onclick="selectOption(${gIndex}, ${oIndex}, ${opt.price}, '${opt.name}')"><div class="option-label"><div class="option-radio" id="radio-${gIndex}-${oIndex}"></div>${opt.name}</div><div class="option-price">+${opt.price} сом</div></div>`;
+                    });
+                });
+            }
+            document.getElementById('m-options-container').innerHTML = optionsHtml;
+            renderSuggests(res, item); updateModalBtn();
+        }
+
+        function selectOption(gIndex, oIndex, price, name) {
+            tg.HapticFeedback.impactOccurred('light');
+            document.querySelectorAll(`[id^="radio-${gIndex}-"]`).forEach(el => el.classList.remove('selected'));
+            document.getElementById(`radio-${gIndex}-${oIndex}`).classList.add('selected');
+            selectedOptions[gIndex] = { index: oIndex, price: price, name: name };
+            updateModalBtn();
+        }
+
+        /* --- ИСПРАВЛЕННАЯ ФУНКЦИЯ ПРЕДЛОЖЕНИЙ (БЕЗОПАСНЫЙ КЛИК) --- */
+        function renderSuggests(res, item) {
+            let suggests = [...res.items.filter(i => i.id !== item.id)];
+            suggests.sort((a, b) => {
+                const aPrio = (a.cat.includes('Напитки') || a.cat.includes('Акции') || a.cat.includes('Комбо') || a.cat.includes('Сладкое')) ? 1 : 0;
+                const bPrio = (b.cat.includes('Напитки') || b.cat.includes('Акции') || b.cat.includes('Комбо') || b.cat.includes('Сладкое')) ? 1 : 0;
+                return bPrio - aPrio;
+            });
+            
+            document.getElementById('m-suggests').innerHTML = suggests.map(s => {
+                let countInCart = 0;
+                for(let k in cartItems) { if(cartItems[k].item.id === s.id) countInCart += cartItems[k].count; }
+                
+                return `<div class="suggest-card" onclick="openModal('${s.id}', true)">
+                    <div class="s-img-wrap">
+                        <img src="${s.img}">
+                        ${countInCart > 0 && !s.optionsGroups
+                            ? `<div class="s-counter" onclick="event.stopPropagation()">
+                                <div onclick="updateInlineCartInsideModal('${s.id}', -1)">−</div>
+                                <span>${countInCart}</span>
+                                <div onclick="updateInlineCartInsideModal('${s.id}', 1)">+</div>
+                               </div>` 
+                            : `<div class="s-add-btn" onclick="addToCartInsideModal(event, '${s.id}')">+</div>`}
+                    </div>
+                    <div class="s-price">${s.price} сом</div>
+                    <div class="s-name">${s.name}</div>
+                </div>`;
+            }).slice(0,6).join('');
+        }
+        
+        // Вспомогательные функции для обновления модалки "на лету"
+        function addToCartInsideModal(event, itemId) {
+            addToCartEvent(event, itemId);
+            renderSuggests(database[currentRestaurantId], currentModalItem);
+            updateModalBtn();
+        }
+        
+        function updateInlineCartInsideModal(itemId, delta) {
+            updateInlineCart(itemId, delta);
+            renderSuggests(database[currentRestaurantId], currentModalItem);
+            updateModalBtn();
+        }
+        
+        function modalChangeCount(delta) { tg.HapticFeedback.impactOccurred('light'); if(currentModalCount + delta >= 1) { currentModalCount += delta; updateModalBtn(); } }
+        
+        function updateModalBtn() {
+            document.getElementById('m-count-val').innerText = currentModalCount;
+            let optionsSum = 0; let allRequiredSelected = true;
+            
+            if(currentModalItem.optionsGroups) { currentModalItem.optionsGroups.forEach((g, i) => { if(g.required && !selectedOptions[i]) allRequiredSelected = false; if(selectedOptions[i]) optionsSum += selectedOptions[i].price; }); }
+            
+            // Считаем общую сумму всех добавленных товаров в этом "сеансе" модалки
+            let addonsTotal = 0;
+            // Берем текущий снимок корзины, чтобы понять, сколько было ДО открытия модалок
+            let initialSnapshot = modalStack.length > 0 ? modalStack[0].cartSnapshot : {};
+            
+            for(let key in cartItems) {
+                let currentCount = cartItems[key].count;
+                let initialCount = initialSnapshot[key] ? initialSnapshot[key].count : 0;
+                if (currentCount > initialCount) {
+                    addonsTotal += (currentCount - initialCount) * cartItems[key].pricePerUnit;
+                }
+            }
+            
+            let baseItemTotal = (currentModalItem.price + optionsSum) * currentModalCount;
+            let totalModalPrice = baseItemTotal + addonsTotal;
+            
+            let btn = document.getElementById('m-add-btn'); btn.innerText = allRequiredSelected ? `Добавить ${totalModalPrice} сом` : `Выберите опции`;
+            if(!allRequiredSelected) btn.classList.add('disabled'); else btn.classList.remove('disabled');
+        }
+
+        function modalGoBack() {
+            tg.HapticFeedback.impactOccurred('light');
+            if (modalStack.length > 1) {
+                const poppedLevel = modalStack.pop();
+                cartItems = poppedLevel.cartSnapshot; 
+                const previousLevel = modalStack[modalStack.length - 1];
+                const prevItem = database[currentRestaurantId].items.find(i => i.id === previousLevel.itemId);
+                renderModalContent(prevItem);
+                recalcTotal(); refreshMenuRender();
+            }
+        }
+
+        function modalCloseAll() {
+            tg.HapticFeedback.impactOccurred('light');
+            if (modalStack.length > 0) {
+                cartItems = modalStack[0].cartSnapshot;
+                modalStack = [];
+            }
+            document.getElementById('modal-product').classList.add('hidden');
+            recalcTotal(); refreshMenuRender(); onBackClick(); 
+        }
+
+        function modalAddToCart() {
+            if(document.getElementById('m-add-btn').classList.contains('disabled')) return;
+            tg.HapticFeedback.notificationOccurred('success');
+            
+            let optionsSum = 0; let optsNames = []; 
+            for(let key in selectedOptions) { optionsSum += selectedOptions[key].price; optsNames.push(selectedOptions[key].name); }
+            
+            let pricePerUnit = currentModalItem.price + optionsSum;
+            let cartKey = currentModalItem.id + (optsNames.length > 0 ? '-' + optsNames.join('-') : '');
+            
+            // ИСПРАВЛЕНИЕ: Если мы добавили опции к товару, который уже был в корзине без опций, 
+            // удаляем старую версию (чтобы не дублировалось)
+            if (optsNames.length > 0 && cartItems[currentModalItem.id]) {
+                delete cartItems[currentModalItem.id];
+            }
+
+            // ИСПРАВЛЕНИЕ: Перезаписываем количество (счетчик теперь показывает общее число)
+            if(cartItems[cartKey]) {
+                cartItems[cartKey].count = currentModalCount; 
+                cartItems[cartKey].pricePerUnit = pricePerUnit; 
+            } else {
+                cartItems[cartKey] = { count: currentModalCount, item: currentModalItem, optionsData: optsNames.join(', '), pricePerUnit: pricePerUnit, resId: currentRestaurantId };
+            }
+            
+            modalStack = [];
+            document.getElementById('modal-product').classList.add('hidden');
+            recalcTotal(); refreshMenuRender(); onBackClick();
+        }
+
+        function openCartList() {
+            closeAllModals(); 
+            let resIdsInCart = [...new Set(Object.values(cartItems).map(c => c.resId))];
+            if(!cartActiveTabResId || !resIdsInCart.includes(cartActiveTabResId)) cartActiveTabResId = resIdsInCart[0];
+            renderCartListTabs(resIdsInCart); renderCartListItems(); renderCartSuggestions();
+            history.pushState({screen: 'cart-list'}, '');
+            showScreen('cart-list');
+        }
+
+        function renderCartListTabs(resIds) {
+            let tabsHtml = ''; resIds.forEach(resId => { let isActive = resId === cartActiveTabResId ? 'active' : ''; let sum = 0; for(let k in cartItems) { if(cartItems[k].resId === resId) sum += (cartItems[k].pricePerUnit * cartItems[k].count); } tabsHtml += `<div class="cart-res-tab ${isActive}" onclick="switchCartTab('${resId}')">${database[resId].title}<span>${sum} сом • 30-40 мин</span></div>`; });
+            document.getElementById('cart-res-tabs').innerHTML = tabsHtml; document.getElementById('cart-res-tabs').style.display = resIds.length > 1 ? 'flex' : 'none';
+        }
+
+        function switchCartTab(resId) { tg.HapticFeedback.impactOccurred('light'); cartActiveTabResId = resId; renderCartListTabs([...new Set(Object.values(cartItems).map(c => c.resId))]); renderCartListItems(); renderCartSuggestions(); }
+
+        function renderCartListItems() {
+            let html = ''; let tabTotalSum = 0;
+            for(let key in cartItems) { let c = cartItems[key]; if(c.resId === cartActiveTabResId) { tabTotalSum += (c.pricePerUnit * c.count); html += `<div class="cart-item-row"><img src="${c.item.img}"><div class="cart-item-info"><div class="cart-item-title">${c.item.name}</div>${c.optionsData ? `<div class="cart-item-opts">${c.optionsData}</div>` : ''}<div class="cart-item-price">${c.pricePerUnit} сом</div></div><div class="cart-item-counter"><div onclick="updateCartListCount('${key}', -1)">−</div><div style="cursor:default; width:20px; text-align:center;">${c.count}</div><div onclick="updateCartListCount('${key}', 1)">+</div></div></div>`; } }
+            document.getElementById('cart-list-container').innerHTML = html; document.getElementById('cart-list-total-sum').innerText = tabTotalSum + " сом"; document.getElementById('cart-list-delivery').innerText = (tabTotalSum > 0 ? currentDeliveryFee : 0) + " сом";
+        }
+
+        /* --- ИСПРАВЛЕННАЯ ОЧИСТКА И ОБНОВЛЕНИЕ КОРЗИНЫ --- */
+        function updateCartListCount(key, delta) {
+            tg.HapticFeedback.impactOccurred('light'); 
+            if(!cartItems[key]) return;
+            
+            cartItems[key].count += delta; 
+            if(cartItems[key].count <= 0) delete cartItems[key]; 
+            
+            recalcTotal();
+            
+            if(totalSum === 0) { 
+                closeAllModals();
+                showScreen('main'); 
+                return; 
+            }
+            
+            let resIdsInCart = [...new Set(Object.values(cartItems).map(c => c.resId))]; 
+            if(!resIdsInCart.includes(cartActiveTabResId)) cartActiveTabResId = resIdsInCart[0];
+            
+            renderCartListTabs(resIdsInCart); renderCartListItems(); renderCartSuggestions(); refreshMenuRender();
+        }
+
+        function renderCartSuggestions() {
+            const res = database[cartActiveTabResId]; let itemsInCartIds = []; for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) itemsInCartIds.push(cartItems[k].item.id); }
+            let suggests = res.items.filter(i => !itemsInCartIds.includes(i.id)); suggests.sort((a, b) => { const aPrio = (a.cat.includes('Напитки') || a.cat.includes('Акции')) ? 1 : 0; const bPrio = (b.cat.includes('Напитки') || b.cat.includes('Акции')) ? 1 : 0; return bPrio - aPrio; });
+            document.getElementById('cart-suggests-container').innerHTML = suggests.slice(0, 4).map(s => `
+                <div class="suggest-card" onclick="openMenu('${cartActiveTabResId}'); openModal('${s.id}')">
+                    <div class="s-img-wrap">
+                        <img src="${s.img}">
+                        <div class="s-add-btn" onclick="event.stopPropagation(); addSuggestFromCart(event, '${s.id}')">+</div>
+                    </div>
+                    <div class="s-price">${s.price} сом</div>
+                    <div class="s-name">${s.name}</div>
+                </div>`).join('');
+        }
+
+        function addSuggestFromCart(e, itemId) { 
+            e.stopPropagation(); tg.HapticFeedback.impactOccurred('light'); 
+            const item = database[cartActiveTabResId].items.find(i => i.id === itemId); 
+            if(item.optionsGroups) { openMenu(cartActiveTabResId); openModal(itemId); return; } 
+            
+            if(cartItems[itemId]) cartItems[itemId].count++; 
+            else cartItems[itemId] = { count: 1, item: item, optionsData: null, pricePerUnit: item.price, resId: cartActiveTabResId };
+            
+            recalcTotal(); renderCartListTabs([...new Set(Object.values(cartItems).map(c => c.resId))]); renderCartListItems(); renderCartSuggestions(); refreshMenuRender(); 
+        }
+
+        function openClearCartModal() { document.getElementById('modal-clear-cart').classList.remove('hidden'); history.pushState({modal: 'clear-cart'}, ''); }
+        
+        function executeClearCart() { 
+            tg.HapticFeedback.impactOccurred('medium'); 
+            for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; } 
+            
+            recalcTotal(); refreshMenuRender(); 
+            
+            // ИСПРАВЛЕНИЕ: Скрываем модалку без слома истории
+            document.getElementById('modal-clear-cart').classList.add('hidden');
+            
+            if(totalSum === 0) { 
+                closeAllModals();
+                showScreen('main'); 
+            } else { 
+                let resIdsInCart = [...new Set(Object.values(cartItems).map(c => c.resId))]; 
+                cartActiveTabResId = resIdsInCart[0]; 
+                renderCartListTabs(resIdsInCart); renderCartListItems(); renderCartSuggestions(); 
+            } 
+        }
+
+        function goToCheckout() {
+            let tabTotalSum = 0; for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) tabTotalSum += (cartItems[k].pricePerUnit * cartItems[k].count); } if(tabTotalSum === 0) return;
+            setDeliveryMode('delivery'); document.getElementById('pickup-address').innerText = database[cartActiveTabResId].address; updateReceipt();
+            history.pushState({screen: 'checkout'}, '');
+            showScreen('checkout');
+        }
+
+        async function createOrder() {
+            tg.HapticFeedback.notificationOccurred('success');
+            
+            // Собираем данные
+            const orderData = {
+                queryId: tg.initDataUnsafe.query_id,
+                user: tg.initDataUnsafe.user,
+                products: Object.values(cartItems).map(c => ({
+                    name: c.item.name,
+                    count: c.count,
+                    price: c.pricePerUnit,
+                    options: c.optionsData
+                })),
+                totalPrice: document.getElementById('pay-btn-sum').innerText,
+                comment: document.getElementById('order-comment').value || "Нет комментария",
+                address: globalAddressText
+            };
+
+            // ОТПРАВКА НА ТВОЙ СЕРВЕР (Порт 3000)
+            try {
+                const response = await fetch('https://tamak-backend.onrender.com/web-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(orderData)
+                });
+
+                if (response.ok) {
+                    // Если сервер ответил "ОК", показываем экран статуса
+                    currentOrderComment = orderData.comment;
+                    document.getElementById('st-res-name').innerText = database[cartActiveTabResId].title;
+                    
+                    // Очистка и переход
+                    isOrderActive = true;
+                    document.getElementById('active-order-banner').classList.remove('hidden');
+                    for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
+                    recalcTotal();
+                    
+                    history.pushState({screen: 'status'}, '');
+                    showScreen('status');
+                    startStatusProgression();
+                } else {
+                    alert('Ошибка сервера при приеме заказа');
+                }
+            } catch (e) {
+                console.error(e);
+                // Если мы тестируем просто в браузере (не в ТГ), 
+                // то просто имитируем заказ, чтобы не ломать логику
+                alert('Локальный тест: Заказ сформирован (в Telegram улетит только при работе через туннель)');
+            }
+        }
+    </script>
+</body>
+</html>
