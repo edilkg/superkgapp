@@ -14,15 +14,12 @@ const WEBAPP_URL = 'https://superkgapp.vercel.app';
 bot.start((ctx) => {
     ctx.reply(
         `Привет, ${ctx.from.first_name}! 👋\nМы рады видеть тебя здесь. 🍕🚕\n\nПожалуйста, выбери один из пунктов:`,
-        {
-            ...Markup.inlineKeyboard([
-                [Markup.button.webApp('Заказать еду 🍔', WEBAPP_URL)],
-                [Markup.button.webApp('Оформить доставку 🚀', `${WEBAPP_URL}/taxi.html`)],
-                [Markup.button.callback('Профиль 👤', 'user_profile')],
-                [Markup.button.callback('Наши контакты 📞', 'our_contacts')]
-            ]),
-            ...Markup.removeKeyboard() // Это навсегда удалит серые кнопки снизу
-        }
+        Markup.inlineKeyboard([
+            [Markup.button.webApp('🍕 ЗАКАЗАТЬ ЕДУ (ONLINE)', WEBAPP_URL)],
+            [Markup.button.webApp('🚀 ОФОРМИТЬ ДОСТАВКУ', `${WEBAPP_URL}/taxi.html`)],
+            [Markup.button.callback('👤 МОЙ ПРОФИЛЬ', 'user_profile')],
+            [Markup.button.callback('📞 КОНТАКТЫ', 'our_contacts')]
+        ])
     );
 });
 
