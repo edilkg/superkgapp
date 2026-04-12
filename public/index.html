@@ -1128,55 +1128,33 @@
         }
 
         async function createOrder() {
-            tg.HapticFeedback.notificationOccurred('success');
-            
-            // Собираем данные
-            const orderData = {
-                queryId: tg.initDataUnsafe.query_id,
-                user: tg.initDataUnsafe.user,
-                products: Object.values(cartItems).map(c => ({
-                    name: c.item.name,
-                    count: c.count,
-                    price: c.pricePerUnit,
-                    options: c.optionsData
-                })),
-                totalPrice: document.getElementById('pay-btn-sum').innerText,
-                comment: document.getElementById('order-comment').value || "Нет комментария",
-                address: globalAddressText
-            };
+    const address = document.getElementById('order-address').value; // Проверь ID инпута!
+    if (!address) return alert('Введите адрес доставки!');
 
-            // ОТПРАВКА НА ТВОЙ СЕРВЕР (Порт 3000)
-            try {
-                const response = await fetch('https://tamak-backend.onrender.com/web-data', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(orderData)
-                });
+    const orderData = {
+        queryId: tg.initDataUnsafe?.query_id,
+        products: cart, // Твоя переменная с товарами
+        totalPrice: document.getElementById('final-price').innerText, // Твоя цена
+        address: address,
+        comment: document.getElementById('order-comment').value
+    };
 
-                if (response.ok) {
-                    // Если сервер ответил "ОК", показываем экран статуса
-                    currentOrderComment = orderData.comment;
-                    document.getElementById('st-res-name').innerText = database[cartActiveTabResId].title;
-                    
-                    // Очистка и переход
-                    isOrderActive = true;
-                    document.getElementById('active-order-banner').classList.remove('hidden');
-                    for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
-                    recalcTotal();
-                    
-                    history.pushState({screen: 'status'}, '');
-                    showScreen('status');
-                    startStatusProgression();
-                } else {
-                    alert('Ошибка сервера при приеме заказа');
-                }
-            } catch (e) {
-                console.error(e);
-                // Если мы тестируем просто в браузере (не в ТГ), 
-                // то просто имитируем заказ, чтобы не ломать логику
-                alert('Локальный тест: Заказ сформирован (в Telegram улетит только при работе через туннель)');
-            }
+    try {
+        const response = await fetch('https://tamak-backend.onrender.com/web-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(orderData)
+        });
+
+        if (response.ok) {
+            tg.close(); // Закрываем приложение, чтобы увидеть чек в боте
+        } else {
+            alert('Ошибка сервера. Попробуйте позже.');
         }
+    } catch (e) {
+        alert('Сбой сети. Проверьте интернет.');
+    }
+}
     </script>
 </body>
 </html>
