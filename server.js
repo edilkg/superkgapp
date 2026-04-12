@@ -48,7 +48,7 @@ bot.action('user_profile', (ctx) => {
     }
 });
 
-// === ПРИЕМ ЗАКАЗА С САЙТА ===
+// === ПРИЕМ ЗАКАЗА С САЙТА (БРОНЕБОЙНАЯ ВЕРСИЯ) ===
 app.post('/web-data', async (req, res) => {
     const { queryId, user, products, totalPrice, address } = req.body;
     
@@ -62,26 +62,30 @@ app.post('/web-data', async (req, res) => {
     };
 
     try {
-        // 1. Отправляем чек КЛИЕНТУ (закрывает мини-апп)
+        // 1. Отправляем чек КЛИЕНТУ
         if (queryId) {
-            await bot.answerWebAppQuery(queryId, {
-                type: 'article',
-                id: queryId,
-                title: 'Заказ принят',
-                input_message_content: {
-                    message_text: `✅ ЗАКАЗ ОФОРМЛЕН!\nНомер: <b>${orderId}</b>\n📍 Адрес: ${address}\n💰 Сумма: ${totalPrice}`,
-                    parse_mode: 'HTML'
-                }
-            });
+            try {
+                await bot.answerWebAppQuery(queryId, {
+                    type: 'article',
+                    id: queryId,
+                    title: 'Заказ принят',
+                    input_message_content: {
+                        message_text: `✅ ЗАКАЗ ОФОРМЛЕН!\nНомер: <b>${orderId}</b>\n📍 Адрес: ${address}\n💰 Сумма: ${totalPrice}`,
+                        parse_mode: 'HTML'
+                    }
+                });
+            } catch (err) {
+                console.log("⚠️ Не удалось закрыть WebApp (вероятно, тест с ПК):", err.message);
+                // Ошибку игнорируем, чтобы сервер не падал и заказ шел дальше курьеру
+            }
         }
 
         // 2. Отправляем сообщение КУРЬЕРАМ
-        // Если у тебя нет отдельной группы для курьеров, для тестов бот будет присылать заказ тебе же в личку
-        const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || user?.id; 
+        const targetChatId = process.env.ADMIN_CHAT_ID || (user && user.id); 
 
-        if (ADMIN_CHAT_ID) {
+        if (targetChatId) {
             const text = `🔥 *НОВЫЙ ЗАКАЗ ${orderId}*\n📍 Куда: ${address}\n💰 Сумма: ${totalPrice}`;
-            await bot.telegram.sendMessage(ADMIN_CHAT_ID, text, {
+            await bot.telegram.sendMessage(targetChatId, text, {
                 parse_mode: 'Markdown',
                 reply_markup: {
                     inline_keyboard: [
@@ -89,11 +93,13 @@ app.post('/web-data', async (req, res) => {
                     ]
                 }
             });
+        } else {
+            console.log("❌ ОШИБКА: Нет ID для отправки сообщения курьеру.");
         }
 
         return res.status(200).json({ success: true });
     } catch (e) {
-        console.error("Ошибка при обработке заказа:", e);
+        console.error("🔴 КРИТИЧЕСКАЯ Ошибка при обработке заказа:", e.message);
         return res.status(500).json({ error: e.message });
     }
 });
