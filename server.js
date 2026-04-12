@@ -14,24 +14,22 @@ bot.start((ctx) => {
     ctx.reply(
         `Привет! 👋\nВыбери нужный раздел:`,
         Markup.inlineKeyboard([
-            [Markup.button.webApp('🍕 ЗАКАЗАТЬ ЕДУ', WEBAPP_URL)],
+            [Markup.button.webApp('🍕 ЗАКАЗАТЬ ЕДУ (ONLINE)', WEBAPP_URL)],
             [Markup.button.webApp('🚀 ОФОРМИТЬ ДОСТАВКУ', `${WEBAPP_URL}/taxi.html`)],
             [Markup.button.callback('👤 МОЙ ПРОФИЛЬ', 'user_profile')],
-            [Markup.button.callback('📞 КОНТАКТЫ', 'our_contacts')]
+            [Markup.button.callback('📞 КОНТАКТЫ И ПОДДЕРЖКА', 'our_contacts')]
         ])
     );
 });
 
-// Ответы на обычные кнопки
 bot.action('our_contacts', (ctx) => {
     ctx.reply('📞 Наш телефон: +996 (XXX) XX-XX-XX\n📍 Адрес: г. Бишкек');
 });
 
 bot.action('user_profile', (ctx) => {
-    ctx.reply(`👤 Профиль:\nИмя: ${ctx.from.first_name}\nID: ${ctx.from.id}\nСтатус: Клиент`);
+    ctx.reply(`👤 Профиль пользователя:\nИмя: ${ctx.from.first_name}\nID: ${ctx.from.id}`);
 });
 
-// Прием заказов
 app.post('/web-data', async (req, res) => {
     const { queryId, products, totalPrice, address } = req.body;
     try {
@@ -41,7 +39,7 @@ app.post('/web-data', async (req, res) => {
                 id: queryId,
                 title: 'Заказ принят',
                 input_message_content: {
-                    message_text: `✅ ЗАКАЗ ПРИНЯТ!\n📍 Адрес: ${address}\n💰 Сумма: ${totalPrice} сом`,
+                    message_text: `✅ ЗАКАЗ ОФОРМЛЕН!\n📍 Адрес: ${address}\n💰 Сумма: ${totalPrice} сом`,
                     parse_mode: 'HTML'
                 }
             });
