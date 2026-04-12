@@ -39,7 +39,6 @@ bot.action('our_contacts', (ctx) => {
 });
 
 bot.action('user_profile', (ctx) => {
-    // Если это курьер, покажем его баланс, если клиент - обычный профиль
     const courierData = couriers[ctx.from.id];
     if (courierData) {
         ctx.reply(`👤 Профиль Курьера:\nИмя: ${ctx.from.first_name}\nID: ${ctx.from.id}\n💰 Баланс: ${courierData.balance} сом\n📊 Доставок: ${courierData.dailyOrders}`);
@@ -48,17 +47,19 @@ bot.action('user_profile', (ctx) => {
     }
 });
 
-// === ПРИЕМ ЗАКАЗА С САЙТА (БРОНЕБОЙНАЯ ВЕРСИЯ) ===
+// === ПРИЕМ ЗАКАЗА С САЙТА ===
 app.post('/web-data', async (req, res) => {
     const { queryId, user, products, totalPrice, address } = req.body;
     
-    // Создаем заказ в памяти
     const orderId = `ORD-${orderCounter++}`;
+    
+    // 💡 ВАЖНО: Запоминаем ID клиента (user.id), чтобы потом присылать ему статусы!
     activeOrders[orderId] = {
         id: orderId,
         status: 'pending',
         address: address || "Адрес не указан",
-        price: totalPrice
+        price: totalPrice,
+        clientId: user?.id // <--- Сохранили ID клиента
     };
 
     try {
@@ -70,13 +71,12 @@ app.post('/web-data', async (req, res) => {
                     id: queryId,
                     title: 'Заказ принят',
                     input_message_content: {
-                        message_text: `✅ ЗАКАЗ ОФОРМЛЕН!\nНомер: <b>${orderId}</b>\n📍 Адрес: ${address}\n💰 Сумма: ${totalPrice}`,
+                        message_text: `✅ ЗАКАЗ ОФОРМЛЕН!\nНомер: <b>${orderId}</b>\n📍 Адрес: ${address}\n💰 Сумма: ${totalPrice}\n\n<i>Мы сообщим, когда курьер возьмет заказ!</i>`,
                         parse_mode: 'HTML'
                     }
                 });
             } catch (err) {
-                console.log("⚠️ Не удалось закрыть WebApp (вероятно, тест с ПК):", err.message);
-                // Ошибку игнорируем, чтобы сервер не падал и заказ шел дальше курьеру
+                console.log("⚠️ Не удалось закрыть WebApp (тест с ПК):", err.message);
             }
         }
 
@@ -93,69 +93,87 @@ app.post('/web-data', async (req, res) => {
                     ]
                 }
             });
-        } else {
-            console.log("❌ ОШИБКА: Нет ID для отправки сообщения курьеру.");
         }
 
         return res.status(200).json({ success: true });
     } catch (e) {
-        console.error("🔴 КРИТИЧЕСКАЯ Ошибка при обработке заказа:", e.message);
+        console.error("🔴 Ошибка при обработке заказа:", e.message);
         return res.status(500).json({ error: e.message });
     }
 });
 
-// === ЛОГИКА РАБОТЫ КУРЬЕРА (КНОПКИ) ===
+// === ЛОГИКА РАБОТЫ КУРЬЕРА (И УВЕДОМЛЕНИЯ КЛИЕНТУ) ===
 
 // 1. Курьер нажал "Принять"
 bot.action(/accept_(.+)/, async (ctx) => {
     const orderId = ctx.match[1];
     const courierId = ctx.from.id;
     const courierName = ctx.from.first_name;
+    const order = activeOrders[orderId];
 
-    if (!activeOrders[orderId] || activeOrders[orderId].status !== 'pending') {
+    if (!order || order.status !== 'pending') {
         return ctx.answerCbQuery("Заказ уже забрали или отменен!", { show_alert: true });
     }
 
-    // Регистрация курьера (даем 1000 сом на старте)
     if (!couriers[courierId]) {
         couriers[courierId] = { name: courierName, balance: 1000, dailyOrders: 0 };
     }
 
-    activeOrders[orderId].status = 'accepted';
-    activeOrders[orderId].courierId = courierId;
+    order.status = 'accepted';
+    order.courierId = courierId;
 
-    // Меняем кнопку в общей группе на текст
     await ctx.editMessageText(`✅ Заказ ${orderId} забрал(а) курьер ${courierName}`);
     
-    // Отправляем личное сообщение курьеру с новой кнопкой
     await ctx.telegram.sendMessage(courierId, `📦 Заказ ${orderId} твой!\n📍 Едь в ресторан.`, {
         reply_markup: {
             inline_keyboard: [[{ text: "📍 Я на месте (у ресторана)", callback_data: `arrive_${orderId}` }]]
         }
     });
+
+    // 🔔 УВЕДОМЛЯЕМ КЛИЕНТА
+    if (order.clientId) {
+        await ctx.telegram.sendMessage(order.clientId, `🚴 <b>Ваш заказ ${orderId} передан курьеру!</b>\nКурьер (${courierName}) уже направляется в ресторан.`, { parse_mode: 'HTML' });
+    }
+
     ctx.answerCbQuery();
 });
 
 // 2. Курьер нажал "На месте"
 bot.action(/arrive_(.+)/, async (ctx) => {
     const orderId = ctx.match[1];
+    const order = activeOrders[orderId];
+
     await ctx.editMessageText(`📍 Заказ ${orderId}:\nОжидай выдачи блюд в ресторане.`, {
         reply_markup: {
             inline_keyboard: [[{ text: "🛍 Забрал заказ", callback_data: `pickup_${orderId}` }]]
         }
     });
+
+    // 🔔 УВЕДОМЛЯЕМ КЛИЕНТА
+    if (order && order.clientId) {
+        await ctx.telegram.sendMessage(order.clientId, `⏳ Курьер прибыл в ресторан и ожидает выдачи вашего заказа.`);
+    }
+
     ctx.answerCbQuery();
 });
 
 // 3. Курьер нажал "Забрал"
 bot.action(/pickup_(.+)/, async (ctx) => {
     const orderId = ctx.match[1];
-    const address = activeOrders[orderId] ? activeOrders[orderId].address : "Адрес неизвестен";
+    const order = activeOrders[orderId];
+    const address = order ? order.address : "Адрес неизвестен";
+
     await ctx.editMessageText(`🛍 Заказ ${orderId} у тебя!\n📍 Вези по адресу: ${address}`, {
         reply_markup: {
             inline_keyboard: [[{ text: "✅ ДОСТАВИЛ (Завершить)", callback_data: `deliver_${orderId}` }]]
         }
     });
+
+    // 🔔 УВЕДОМЛЯЕМ КЛИЕНТА
+    if (order && order.clientId) {
+        await ctx.telegram.sendMessage(order.clientId, `🚀 <b>Курьер забрал ваш заказ!</b>\nОн уже в пути и скоро будет у вас по адресу: ${address}.`, { parse_mode: 'HTML' });
+    }
+
     ctx.answerCbQuery();
 });
 
@@ -163,29 +181,3 @@ bot.action(/pickup_(.+)/, async (ctx) => {
 bot.action(/deliver_(.+)/, async (ctx) => {
     const orderId = ctx.match[1];
     const courierId = ctx.from.id;
-    
-    const commission = DELIVERY_FEE * COMMISSION_RATE; // 150 * 0.10 = 15
-    
-    if (couriers[courierId]) {
-        couriers[courierId].balance -= commission;
-        couriers[courierId].dailyOrders += 1;
-    }
-
-    await ctx.editMessageText(
-        `🎉 *Заказ ${orderId} доставлен!*\n\n💸 Списана комиссия: ${commission} сом.\n💰 Твой баланс: ${couriers[courierId]?.balance} сом.\n📊 Доставок сегодня: ${couriers[courierId]?.dailyOrders}`, 
-        { parse_mode: 'Markdown' }
-    );
-    
-    delete activeOrders[orderId]; // Удаляем заказ из памяти
-    ctx.answerCbQuery();
-});
-
-// ======================================
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🌐 Сервер работает на порту ${PORT}`));
-bot.launch();
-
-// Остановка бота при выключении сервера
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
