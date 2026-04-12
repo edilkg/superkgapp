@@ -12,37 +12,36 @@ const WEBAPP_URL = 'https://superkgapp.vercel.app';
 
 bot.start((ctx) => {
     ctx.reply(
-        `Привет! 👋\nВыбери пункт меню:`,
-        {
-            ...Markup.inlineKeyboard([
-                [Markup.button.webApp('Заказать еду 🍔', WEBAPP_URL)],
-                [Markup.button.webApp('Оформить доставку 🚀', `${WEBAPP_URL}/taxi.html`)],
-                [Markup.button.callback('Профиль 👤', 'user_profile')],
-                [Markup.button.callback('Наши контакты 📞', 'our_contacts')]
-            ]),
-            ...Markup.removeKeyboard() 
-        }
+        `Привет! 👋\nВыбери нужный раздел:`,
+        Markup.inlineKeyboard([
+            [Markup.button.webApp('🍕 ЗАКАЗАТЬ ЕДУ', WEBAPP_URL)],
+            [Markup.button.webApp('🚀 ОФОРМИТЬ ДОСТАВКУ', `${WEBAPP_URL}/taxi.html`)],
+            [Markup.button.callback('👤 МОЙ ПРОФИЛЬ', 'user_profile')],
+            [Markup.button.callback('📞 КОНТАКТЫ', 'our_contacts')]
+        ])
     );
 });
 
-// Обработка контактов
+// Ответы на обычные кнопки
 bot.action('our_contacts', (ctx) => {
-    ctx.reply('📞 Наш телефон: +996 (XXX) XX-XX-XX');
+    ctx.reply('📞 Наш телефон: +996 (XXX) XX-XX-XX\n📍 Адрес: г. Бишкек');
 });
 
-// Обработка профиля
 bot.action('user_profile', (ctx) => {
-    ctx.reply(`👤 Ваш профиль:\nИмя: ${ctx.from.first_name}\nID: ${ctx.from.id}\nСтатус: Пользователь`);
+    ctx.reply(`👤 Профиль:\nИмя: ${ctx.from.first_name}\nID: ${ctx.from.id}\nСтатус: Клиент`);
 });
 
+// Прием заказов
 app.post('/web-data', async (req, res) => {
-    const { queryId, products, totalPrice, comment, address } = req.body;
+    const { queryId, products, totalPrice, address } = req.body;
     try {
         if (queryId) {
             await bot.answerWebAppQuery(queryId, {
-                type: 'article', id: queryId, title: 'Заказ принят',
+                type: 'article',
+                id: queryId,
+                title: 'Заказ принят',
                 input_message_content: {
-                    message_text: `✅ <b>Новый заказ!</b>\n\n📍 Адрес: ${address}\n💰 Сумма: ${totalPrice} сом`,
+                    message_text: `✅ ЗАКАЗ ПРИНЯТ!\n📍 Адрес: ${address}\n💰 Сумма: ${totalPrice} сом`,
                     parse_mode: 'HTML'
                 }
             });
