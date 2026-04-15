@@ -78,7 +78,7 @@ bot.start((ctx) => {
     ctx.reply('Добро пожаловать в ТамакKG! 🍔', 
         Markup.inlineKeyboard([
             // ЗАМЕНИ НА ССЫЛКУ ТИПА https://edilkg.github.io/superkgapp/
-            [Markup.button.webApp('Открыть меню', 'https://edilkg.github.io/superkgapp/?v=6')] 
+            [Markup.button.webApp('Открыть меню', 'https://edilkg.github.io/superkgapp/?v=20')] 
         ])
     );
 });
@@ -172,6 +172,12 @@ const startBots = async () => {
 
 startBots();
 
-// Остановка для безопасности
-process.once('SIGINT', () => { bot.stop('SIGINT'); courierBot.stop('SIGINT'); });
-process.once('SIGTERM', () => { bot.stop('SIGTERM'); courierBot.stop('SIGTERM'); });
+// --- БЕЗОПАСНАЯ ОСТАНОВКА СЕРВЕРА ---
+process.once('SIGINT', () => {
+    try { bot.stop('SIGINT'); } catch(e) { console.log('Бот 1 уже остановлен'); }
+    try { courierBot.stop('SIGINT'); } catch(e) { console.log('Бот 2 уже остановлен'); }
+});
+process.once('SIGTERM', () => {
+    try { bot.stop('SIGTERM'); } catch(e) { console.log('Бот 1 уже остановлен'); }
+    try { courierBot.stop('SIGTERM'); } catch(e) { console.log('Бот 2 уже остановлен'); }
+});
