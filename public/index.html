@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            alert("КРАШ КОДА! Ошибка: " + msg + "\nСтрока: " + line);
+            return false;
+        };
+    </script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
