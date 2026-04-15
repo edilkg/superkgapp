@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+    #map { height: 250px; border-radius: 16px; margin: 16px; z-index: 1; }
+</style>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ТамакKG</title>
@@ -395,7 +400,7 @@
             <div class="back-btn" onclick="onBackClick()">←</div>
             <div class="header-title" id="st-header-title">Создан</div>
         </div>
-        <img src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800" class="status-map-img">
+        <div id="map"></div>
         <div class="status-box">
             <div class="status-row">
                 <div class="status-meta">
@@ -539,6 +544,34 @@
     </div>
 
     <script>
+        let map;
+let courierMarker;
+
+function initMap(resLat, resLng, userLat, userLng) {
+    if (map) return; // Чтобы не создавать карту дважды
+
+    map = L.map('map').setView([resLat, resLng], 14);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    // Маркер ресторана (красный)
+    L.marker([resLat, resLng]).addTo(map).bindPopup('Ресторан').openPopup();
+
+    // Маркер клиента (синий)
+    L.marker([userLat, userLng]).addTo(map).bindPopup('Вы здесь');
+
+    // Маркер курьера (будет двигаться)
+    courierMarker = L.marker([resLat, resLng], {
+        icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/2972/2972185.png', iconSize: [30, 30] })
+    }).addTo(map).bindPopup('Курьер едет!');
+}
+
+// Функция для имитации движения курьера (для вайба!)
+function updateCourierLocation(lat, lng) {
+    if (courierMarker) {
+        courierMarker.setLatLng([lat, lng]);
+    }
+}
         const tg = window.Telegram.WebApp;
         tg.expand();
         
@@ -1214,7 +1247,7 @@ async function createOrder() {
 
         if (response.ok) {
             // Переходим на экран статуса
-            showScreen('status');
+            showStatusScreen();
             startStatusProgression();
             
             // Очищаем корзину для этого ресторана
@@ -1230,8 +1263,49 @@ async function createOrder() {
         }
     } catch (e) {
         console.error("Ошибка сети:", e);
-        alert("Сервер недоступен. Проверьте, включен ли Render (статус Live).");
+       alert("Критическая ошибка: " + e.message);
     }
+}
+// Функция имитации движения статусов заказа
+function startStatusProgression() {
+    const statuses = [
+        { text: "Обрабатывается рестораном...", status: "pending" },
+        { text: "Повар начал готовить 👨‍🍳", status: "cooking" },
+        { text: "Курьер уже в пути к вам! 🚴", status: "delivery" }
+    ];
+    
+    let step = 0;
+    const interval = setInterval(() => {
+        if (step < statuses.length) {
+            document.getElementById('st-current-status').innerText = statuses[step].text;
+            
+            // Если курьер "поехал", инициализируем карту
+            if (statuses[step].status === "delivery") {
+                // Пример координат: Бишкек (Ресторан) -> Твой адрес
+                initMap(42.8746, 74.5698, 42.8800, 74.5800);
+            }
+            step++;
+        } else {
+            clearInterval(interval);
+        }
+    }, 5000); // Каждые 5 секунд меняем статус
+}
+
+// Показ экрана статуса
+function showStatusScreen() {
+    showScreen('status');
+    // Обновляем данные на экране
+    document.getElementById('st-res-name').innerText = "Из: " + (database[cartActiveTabResId]?.title || "Ресторана");
+    document.getElementById('st-total').innerText = (totalSum + currentDeliveryFee) + " сом";
+    
+    // Заполняем список блюд
+    let itemsHtml = '';
+    for (let k in cartItems) {
+        if (cartItems[k].resId === cartActiveTabResId) {
+            itemsHtml += `<div class="st-item"><span>${cartItems[k].count}x ${cartItems[k].item.name}</span><span>${cartItems[k].pricePerUnit * cartItems[k].count} сом</span></div>`;
+        }
+    }
+    document.getElementById('st-items-list').innerHTML = itemsHtml;
 }
     </script>
 </body>
