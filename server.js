@@ -78,7 +78,7 @@ bot.start((ctx) => {
     ctx.reply('Добро пожаловать в ТамакKG! 🍔', 
         Markup.inlineKeyboard([
             // ЗАМЕНИ НА ССЫЛКУ ТИПА https://edilkg.github.io/superkgapp/
-            [Markup.button.webApp('Открыть меню', 'https://edilkg.github.io/superkgapp/')] 
+            [Markup.button.webApp('Открыть меню', 'https://edilkg.github.io/superkgapp/?v=2')] 
         ])
     );
 });
