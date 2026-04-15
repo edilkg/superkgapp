@@ -141,18 +141,78 @@ bot.action(/approve_(.+)/, async (ctx) => {
 });
 
 // Принятие заказа курьером
+// --- ЛОГИКА КУРЬЕРА (СТАТУСЫ) ---
+
+// 1. Курьер нажимает "Принять заказ"
 courierBot.action(/accept_(.+)/, async (ctx) => {
     const orderId = ctx.match[1];
     const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).single();
 
-    if (!order || order.status !== 'pending') return ctx.answerCbQuery("Заказ уже занят или отменен.");
+    if (!order || order.status !== 'pending') return ctx.answerCbQuery("Заказ уже занят.");
 
     await supabase.from('orders').update({ status: 'accepted', courier_id: ctx.from.id }).eq('id', orderId);
-    ctx.editMessageText(`✅ Вы приняли заказ #${orderId}\n🏬 ${order.restaurant}\n📍 ${order.address}`);
     
+    // Уведомляем клиента
     if (order.client_id) {
-        bot.telegram.sendMessage(order.client_id, `🚴 Курьер принял ваш заказ #${orderId}! Ожидайте доставку.`);
+        bot.telegram.sendMessage(order.client_id, `🚴 Курьер принял ваш заказ #${orderId}!\nСкоро он будет в ресторане.`);
     }
+
+    // Обновляем сообщение у курьера (даем кнопку "Я в ресторане")
+    ctx.editMessageText(`✅ Вы приняли заказ #${orderId}\n📍 Адрес: ${order.address}`, 
+        Markup.inlineKeyboard([
+            [Markup.button.callback('📍 Я в ресторане', `at_restaurant_${orderId}`)]
+        ])
+    );
+});
+
+// 2. Курьер нажимает "Я в ресторане"
+courierBot.action(/at_restaurant_(.+)/, async (ctx) => {
+    const orderId = ctx.match[1];
+    const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).single();
+
+    await supabase.from('orders').update({ status: 'at_restaurant' }).eq('id', orderId);
+
+    if (order.client_id) {
+        bot.telegram.sendMessage(order.client_id, `🏢 Курьер прибыл в ресторан.\nВаш заказ упаковывают!`);
+    }
+
+    ctx.editMessageText(`✅ Вы в ресторане\n📦 Ждите готовности заказа.`, 
+        Markup.inlineKeyboard([
+            [Markup.button.callback('🥡 Заказ забрал, еду!', `on_my_way_${orderId}`)]
+        ])
+    );
+});
+
+// 3. Курьер нажимает "Заказ забрал"
+courierBot.action(/on_my_way_(.+)/, async (ctx) => {
+    const orderId = ctx.match[1];
+    const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).single();
+
+    await supabase.from('orders').update({ status: 'delivering' }).eq('id', orderId);
+
+    if (order.client_id) {
+        bot.telegram.sendMessage(order.client_id, `🚀 Курьер забрал заказ и уже едет к вам!\nПриготовьтесь встречать.`);
+    }
+
+    ctx.editMessageText(`🚴 Вы в пути к клиенту\n🏠 Адрес: ${order.address}`, 
+        Markup.inlineKeyboard([
+            [Markup.button.callback('🏁 Доставлено', `delivered_${orderId}`)]
+        ])
+    );
+});
+
+// 4. Курьер нажимает "Доставлено"
+courierBot.action(/delivered_(.+)/, async (ctx) => {
+    const orderId = ctx.match[1];
+    const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).single();
+
+    await supabase.from('orders').update({ status: 'delivered' }).eq('id', orderId);
+
+    if (order.client_id) {
+        bot.telegram.sendMessage(order.client_id, `✅ Заказ доставлен! Приятного аппетита! 🍽`);
+    }
+
+    ctx.editMessageText(`🏁 Заказ #${orderId} успешно завершен! Ты лучший!`);
 });
 
 // --- ЗАПУСК ---
