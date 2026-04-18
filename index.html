@@ -106,8 +106,9 @@
         .m-counter { display: flex; align-items: center; background: #F0F0F0; border-radius: 16px; padding: 4px; }
         .m-counter div.btn-pm { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 24px; cursor: pointer; color: var(--text-dark);}
         .m-counter #m-count-val { width: 30px; text-align: center; font-size: 18px; font-weight: 700; pointer-events: none;}
-        .btn-yellow { background: var(--main-yellow); border-radius: 16px; text-align: center; font-weight: 700; font-size: 16px; padding: 14px; flex-grow: 1; cursor: pointer; border: none; outline: none; display: block; width: 100%;}
+        .btn-yellow { background: var(--main-yellow); border-radius: 16px; text-align: center; font-weight: 700; font-size: 16px; padding: 14px; flex-grow: 1; cursor: pointer; border: none; outline: none; display: block; width: 100%; transition: 0.2s;}
         .btn-yellow.disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-yellow:active { transform: scale(0.98); }
 
         /* ОФОРМЛЕНИЕ ЗАКАЗА */
         .cart-section { background: var(--card-bg); margin-top: 8px; padding: 16px; border-radius: 20px; }
@@ -155,6 +156,10 @@
         #fullscreen-map { flex-grow: 1; width: 100%; z-index: 1; }
         .map-floating-panel { position: absolute; bottom: 0; left: 0; right: 0; background: white; padding: 20px; border-radius: 24px 24px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.1); z-index: 3000; max-height: 70vh; overflow-y: auto;}
         
+        /* КНОПКА ГЕОЛОКАЦИИ */
+        .btn-locate { position: absolute; top: 80px; right: 16px; width: 44px; height: 44px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 3000; cursor: pointer; border: 2px solid #eee;}
+        .btn-locate:active { background: #eee; transform: scale(0.95); }
+
         .full-width-input { width: 100%; background: #eee; border: none; padding: 14px; border-radius: 12px; font-size: 14px; box-sizing: border-box; margin-bottom: 12px; }
         .inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;}
         .grid-input { background: #eee; border: none; padding: 14px; border-radius: 12px; font-size: 14px; width: 100%; box-sizing: border-box; }
@@ -282,7 +287,7 @@
 
         <div class="pay-bar">
             <div class="pay-sum"><span id="pay-btn-sum">0 сом</span><span>Сумма заказа</span></div>
-            <div class="btn-pay" onclick="createOrder()" style="background: var(--main-yellow); padding: 12px 20px; border-radius: 12px; font-weight: bold; cursor: pointer;">Оплатить</div>
+            <div class="btn-pay" id="main-pay-btn" onclick="createOrder()" style="background: var(--main-yellow); padding: 12px 20px; border-radius: 12px; font-weight: bold; cursor: pointer;">Оплатить</div>
         </div>
     </div>
 
@@ -293,6 +298,8 @@
         </div>
         <div style="position: relative; flex-grow: 1; display: flex; flex-direction: column;">
             <div id="fullscreen-map"></div>
+            
+            <div class="btn-locate" onclick="locateUser()" title="Мое местоположение">🎯</div>
             
             <div class="map-floating-panel">
                 <input type="text" id="map-search-input" placeholder="🔍 Поиск (напр. Советская 10)" onchange="geocodeMapSearch()" class="full-width-input" style="background: #f0f0f0;">
@@ -328,6 +335,81 @@
             <h3 id="st-current-status" style="color: #1976d2; text-align: center; margin-bottom: 20px;">Обрабатывается...</h3>
             <div class="receipt-row"><span>Ресторан:</span><span id="st-res-name">...</span></div>
             <div class="receipt-row"><span>Сумма:</span><span id="st-total" style="font-weight: bold;">0 сом</span></div>
+        </div>
+    </div>
+
+    <div id="modal-profile" class="modal-overlay hidden">
+        <div class="modal-content profile-modal-content">
+            <div class="modal-close" onclick="onBackClick()" style="box-shadow:none; background:#eee;">✕</div>
+            <div class="profile-header-t">Профиль</div>
+            <div class="profile-user-info-c">
+                <div class="profile-u-avatar">👥</div>
+                <div class="profile-u-details">
+                    <div class="profile-u-name">Гость</div>
+                    <div class="profile-u-phone">+996 700 000 000</div>
+                </div>
+            </div>
+            <div class="profile-section-c">
+                <div class="profile-s-header"><span>📍 Мои адреса</span></div>
+                <div class="profile-s-body" id="profile-address-text">Не указан</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-product" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-img-container">
+                <div class="modal-back-btn hidden" id="m-back-btn" onclick="modalGoBack()">←</div>
+                <div class="modal-close" onclick="modalCloseAll()">✕</div>
+                <img src="" id="m-img" class="modal-img">
+            </div>
+            <div class="modal-body">
+                <div class="m-title-row">
+                    <h2 class="m-title" id="m-name">Название</h2>
+                    <span class="m-weight" id="m-weight">440 г</span>
+                </div>
+                <div class="m-desc" id="m-desc">Состав и описание...</div>
+                <div class="m-nut-row">
+                    <div class="m-nut"><span id="m-kcal">276</span><span>ккал</span></div>
+                    <div class="m-nut"><span>11</span><span>белки</span></div>
+                </div>
+                <div id="m-options-container" class="options-section"></div>
+                <div class="suggest-title">Лучшие предложения</div>
+                <div class="suggest-grid" id="m-suggests"></div>
+            </div>
+            <div class="modal-bottom-bar">
+                <div class="m-counter">
+                    <div class="btn-pm" onclick="modalChangeCount(-1)">−</div>
+                    <div id="m-count-val">1</div>
+                    <div class="btn-pm" onclick="modalChangeCount(1)">+</div>
+                </div>
+                <button class="btn-yellow" id="m-add-btn" onclick="modalAddToCart()">Добавить</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-address" class="modal-overlay hidden">
+        <div class="modal-content address-modal-content">
+            <div class="modal-close" style="top:20px; right:20px; box-shadow:none; background:#eee;" onclick="onBackClick()">✕</div>
+            <h2 class="address-modal-title">Ваш город</h2>
+            <div class="input-group">
+                <label>Выберите город</label>
+                <select id="modal-city-select">
+                    <option value="Бишкек">Бишкек</option>
+                    <option value="Чолпон-Ата">Чолпон-Ата</option>
+                </select>
+            </div>
+            <button class="btn-yellow" style="margin-top: 12px;" onclick="saveAddressModal()">Готово</button>
+        </div>
+    </div>
+
+    <div id="modal-clear-cart" class="modal-overlay hidden" style="justify-content: center; align-items: center; padding: 20px;">
+        <div class="modal-content confirm-modal-content" style="border-radius: 24px; width: 100%; max-width: 340px; padding: 24px; text-align: center;">
+            <div style="font-size: 20px; font-weight: bold; margin-bottom: 12px;">Очистить корзину?</div>
+            <div style="display: flex; gap: 12px;">
+                <div style="flex:1; padding: 14px; background: #eee; border-radius: 12px; font-weight: bold; cursor: pointer;" onclick="onBackClick()">Отмена</div>
+                <div style="flex:1; padding: 14px; background: #ffebee; color: #d32f2f; border-radius: 12px; font-weight: bold; cursor: pointer;" onclick="executeClearCart()">Да, удалить</div>
+            </div>
         </div>
     </div>
 
@@ -505,7 +587,7 @@
             if(totalSum === 0) return;
             const activeRes = database[cartActiveTabResId];
             
-            // Если клиент еще не выбирал адрес, ставим дефолт (Чолпон-Ата центр)
+            // Если клиент еще не выбирал адрес, ставим дефолт (Чолпон-Ата)
             if (!clientLat) {
                 let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
                 if (saved.length > 0) {
@@ -572,6 +654,49 @@
             document.getElementById('checkout-summary-details').innerText = details;
         }
 
+        // --- ГЕОЛОКАЦИЯ (Кнопка "Мое местоположение") ---
+        function locateUser() {
+            if (!navigator.geolocation) {
+                alert("Ваш браузер не поддерживает геолокацию.");
+                return;
+            }
+
+            tg.HapticFeedback.impactOccurred('medium');
+            
+            // Меняем иконку временно, чтобы показать процесс
+            const btn = document.querySelector('.btn-locate');
+            const originalIcon = btn.innerText;
+            btn.innerText = '⏳';
+
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    btn.innerText = originalIcon;
+                    clientLat = position.coords.latitude;
+                    clientLon = position.coords.longitude;
+
+                    if (checkoutMap && checkoutClientMarker) {
+                        checkoutMap.setView([clientLat, clientLon], 16);
+                        checkoutClientMarker.setLatLng([clientLat, clientLon]);
+                    }
+
+                    const activeRes = database[cartActiveTabResId];
+                    if (activeRes) recalcCheckoutDelivery(activeRes.lat, activeRes.lon);
+                    
+                    await reverseGeocode(clientLat, clientLon);
+                },
+                (error) => {
+                    btn.innerText = originalIcon;
+                    console.error("Ошибка геолокации:", error);
+                    if (error.code === 1) {
+                        alert("Доступ к геолокации запрещен. Пожалуйста, разрешите доступ в настройках телефона или Telegram.");
+                    } else {
+                        alert("Не удалось определить местоположение.");
+                    }
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        }
+
         // --- Геокодирование на Карте ---
         async function geocodeMapSearch() {
             const query = document.getElementById('map-search-input').value;
@@ -583,7 +708,7 @@
                 if (data && data.length > 0) {
                     clientLat = parseFloat(data[0].lat);
                     clientLon = parseFloat(data[0].lon);
-                    if (checkoutMap) { checkoutMap.setView([clientLat, clientLon], 15); checkoutClientMarker.setLatLng([clientLat, clientLon]); }
+                    if (checkoutMap) { checkoutMap.setView([clientLat, clientLon], 16); checkoutClientMarker.setLatLng([clientLat, clientLon]); }
                     reverseGeocode(clientLat, clientLon);
                 }
             } catch (err) {}
@@ -720,6 +845,12 @@
         async function createOrder() {
             if (!orderAddressData.street && currentDeliveryFee > 0) return alert("Пожалуйста, укажите адрес доставки!");
             
+            const payBtn = document.getElementById('main-pay-btn');
+            const originalBtnText = payBtn.innerText;
+            payBtn.innerText = '⏳ Обработка...';
+            payBtn.style.pointerEvents = 'none';
+            payBtn.style.opacity = '0.7';
+
             const fullAddress = `${orderAddressData.street} ${orderAddressData.dom}, кв.${orderAddressData.kv} (Под:${orderAddressData.pod}, Эт:${orderAddressData.etaj})`;
             
             const orderData = {
@@ -746,8 +877,16 @@
                     showScreen('status');
                     document.getElementById('st-res-name').innerText = database[cartActiveTabResId]?.title;
                     document.getElementById('st-total').innerText = (totalSum + currentDeliveryFee) + " сом";
+                    for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
+                    recalcTotal();
                 }
-            } catch (e) { alert("Ошибка сети"); }
+            } catch (e) { 
+                alert("Ошибка сети"); 
+            } finally {
+                payBtn.innerText = originalBtnText;
+                payBtn.style.pointerEvents = 'auto';
+                payBtn.style.opacity = '1';
+            }
         }
     </script>
 </body>
