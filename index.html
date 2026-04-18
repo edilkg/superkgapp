@@ -190,6 +190,12 @@
         .profile-s-header { display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 15px; margin-bottom: 10px; }
         .profile-add-btn { background: var(--text-dark); color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
         .profile-s-body { font-size: 14px; color: var(--text-gray); }
+
+        /* ПОЛНОЭКРАННАЯ КАРТА */
+        #modal-map { background: var(--bg-color); z-index: 2500; position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; }
+        #modal-map.hidden { display: none !important; }
+        #fullscreen-map { flex-grow: 1; width: 100%; z-index: 1; }
+        .map-floating-panel { position: absolute; bottom: 20px; left: 16px; right: 16px; background: white; padding: 20px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); z-index: 3000; }
     </style>
 </head>
 <body>
@@ -294,10 +300,8 @@
                 
                 <div class="input-w-icon">
                     <input type="text" id="checkout-address" placeholder="📍 Улица (напр. Чуй)" onchange="geocodeAddress()">
-                    <div class="map-toggle-btn" onclick="toggleCheckoutMap()">🗺️</div>
+                    <div class="map-toggle-btn" onclick="openMapModal()">🗺️</div>
                 </div>
-                
-                <div id="checkout-map" class="hidden" style="height: 220px; border-radius: 12px; margin-bottom: 8px; z-index: 1;"></div>
                 
                 <button class="btn-save-address" onclick="saveCurrentAddress()">⭐ Сохранить этот адрес</button>
 
@@ -331,6 +335,28 @@
         <div class="pay-bar">
             <div class="pay-sum"><span id="pay-btn-sum">0 сом</span><span>Сумма заказа</span></div>
             <div class="btn-pay" onclick="createOrder()" style="background: var(--main-yellow); padding: 12px 20px; border-radius: 12px; font-weight: bold; cursor: pointer;">Оплатить</div>
+        </div>
+    </div>
+
+    <div id="modal-map" class="hidden">
+        <div class="header-nav">
+            <div class="back-btn" onclick="onBackClick()">←</div>
+            <div class="header-title">Укажите адрес доставки</div>
+        </div>
+        <div style="position: relative; flex-grow: 1; display: flex; flex-direction: column;">
+            <div id="fullscreen-map"></div>
+            
+            <div class="map-floating-panel">
+                <div style="font-size: 12px; color: var(--text-gray); margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">Доставка по адресу:</div>
+                <div id="modal-map-address" style="font-weight: 800; margin-bottom: 16px; font-size: 16px; line-height: 1.3;">Ищем адрес...</div>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 16px; margin-bottom: 16px;">
+                    <span style="color: #555; font-size: 14px; font-weight: 600;">Стоимость доставки</span>
+                    <span id="modal-map-price" style="font-weight: 800; font-size: 18px; color: #E65100;">100 сом</span>
+                </div>
+                
+                <button class="btn-yellow" style="width: 100%;" onclick="onBackClick()">Готово</button>
+            </div>
         </div>
     </div>
 
@@ -461,7 +487,7 @@
         let cartActiveTabResId = null; 
         let modalStack = [];
 
-        // Переменные для новой карты оформления
+        // Переменные для карты
         let checkoutMap;
         let checkoutClientMarker;
         let checkoutResMarker; 
@@ -534,7 +560,7 @@
         history.replaceState({screen: 'main'}, '');
 
         function showScreen(screenId) {
-            ['screen-main', 'screen-menu', 'screen-cart-list', 'screen-checkout', 'screen-status'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            ['screen-main', 'screen-menu', 'screen-cart-list', 'screen-checkout', 'screen-status', 'modal-map'].forEach(id => document.getElementById(id).classList.add('hidden'));
             document.getElementById('screen-'+screenId).classList.remove('hidden');
             updateGlobalCartBtnState(screenId);
             document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
@@ -563,11 +589,15 @@
                 if (state.modal === 'profile') document.getElementById('modal-profile').classList.remove('hidden');
                 if (state.modal === 'address') document.getElementById('modal-address').classList.remove('hidden');
                 if (state.modal === 'product') document.getElementById('modal-product').classList.remove('hidden');
+                if (state.modal === 'map') {
+                    document.getElementById('modal-map').classList.remove('hidden');
+                    setTimeout(() => checkoutMap.invalidateSize(), 50);
+                }
             }
         });
 
         function closeAllModals() {
-            ['modal-product', 'modal-profile', 'modal-address', 'modal-clear-cart'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            ['modal-product', 'modal-profile', 'modal-address', 'modal-clear-cart', 'modal-map'].forEach(id => document.getElementById(id).classList.add('hidden'));
         }
 
         function openProfileModal() {
@@ -870,14 +900,14 @@
                 clientLon = activeRes.lon + 0.005;
             }
 
-            document.getElementById('checkout-map').classList.add('hidden');
             setDeliveryMode('delivery'); 
             document.getElementById('pickup-address').innerText = activeRes.address; 
             
-            renderSavedAddressesUI(); // Рисуем блок Мои Адреса
+            renderSavedAddressesUI(); 
 
             history.pushState({screen: 'checkout'}, ''); showScreen('checkout');
 
+            // Подготавливаем карту в фоне
             setTimeout(() => { initCheckoutMap(activeRes.lat, activeRes.lon); }, 100);
         }
 
@@ -890,12 +920,10 @@
             const fullText = street + (dom ? ", " + dom : "");
             let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
 
-            // Проверка на дубликаты
             if (saved.find(a => a.text === fullText)) {
                 return alert("Этот адрес уже сохранен!");
             }
 
-            // Добавляем в начало списка
             saved.unshift({
                 text: fullText,
                 street: street,
@@ -966,15 +994,14 @@
         }
         // --------------------------------
 
-        function toggleCheckoutMap() {
-            const mapDiv = document.getElementById('checkout-map');
-            mapDiv.classList.toggle('hidden');
-            if (!mapDiv.classList.contains('hidden') && checkoutMap) {
-                setTimeout(() => { checkoutMap.invalidateSize(); }, 100);
-            }
+        function openMapModal() {
+            document.getElementById('modal-map').classList.remove('hidden');
+            history.pushState({modal: 'map'}, '');
+            setTimeout(() => { 
+                if (checkoutMap) checkoutMap.invalidateSize(); 
+            }, 50);
         }
 
-        // Поиск с принудительным РУССКИМ языком
         async function geocodeAddress() {
             const street = document.getElementById('checkout-address').value;
             const dom = document.getElementById('chk-dom').value;
@@ -999,14 +1026,12 @@
             } catch (err) { console.error("Ошибка поиска", err); }
         }
 
-        // Обратное геокодирование с принудительным РУССКИМ языком и умным объединением
         async function reverseGeocode(lat, lon) {
             try {
                 const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=ru`);
                 const data = await response.json();
                 
                 if (data && data.address) {
-                    // Достаем улицу и номер дома (учитывая разные форматы OSM)
                     let street = data.address.road || data.address.pedestrian || data.address.residential || "";
                     let house = data.address.house_number || data.address.building || "";
                     
@@ -1014,10 +1039,10 @@
                     if (street && house) fullAddress += ", " + house;
                     else if (house) fullAddress = house;
                     
-                    // Вписываем всё в главную строку
-                    if (fullAddress) document.getElementById('checkout-address').value = fullAddress;
-                    
-                    // Дублируем в Дом для надежности
+                    if (fullAddress) {
+                        document.getElementById('checkout-address').value = fullAddress;
+                        document.getElementById('modal-map-address').innerText = fullAddress;
+                    }
                     if (house) document.getElementById('chk-dom').value = house;
                 }
             } catch(e) { console.error("Ошибка обратного геокодирования", e); }
@@ -1025,7 +1050,7 @@
 
         function initCheckoutMap(resLat, resLon) {
             if (!checkoutMap) {
-                checkoutMap = L.map('checkout-map').setView([clientLat, clientLon], 14);
+                checkoutMap = L.map('fullscreen-map').setView([clientLat, clientLon], 14);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(checkoutMap);
                 
                 const resIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180209.png', iconSize: [32, 32] });
@@ -1054,11 +1079,14 @@
                 checkoutResMarker.setLatLng([resLat, resLon]);
             }
             recalcCheckoutDelivery(resLat, resLon);
+            reverseGeocode(clientLat, clientLon); // Чтобы сразу в модалке был текст
         }
 
         function recalcCheckoutDelivery(resLat, resLon) {
             currentDeliveryFee = calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon);
             updateReceipt();
+            // Обновляем цену в модалке карты
+            document.getElementById('modal-map-price').innerText = currentDeliveryFee + ' сом';
         }
 
         function setDeliveryMode(mode) {
@@ -1099,7 +1127,7 @@
             const dom = document.getElementById('chk-dom').value;
             if (!street && currentDeliveryFee > 0) return alert("Пожалуйста, укажите улицу!");
 
-            const fullAddress = street; // Улица и дом теперь склеены в одном поле
+            const fullAddress = street; 
             
             const orderData = {
                 type: 'food', 
