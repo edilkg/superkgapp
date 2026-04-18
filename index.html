@@ -287,7 +287,10 @@
             </div>
 
             <div id="block-delivery">
-                <h3 class="section-title" style="margin-top: 0;">Куда</h3>
+                <h3 class="section-title" style="margin-top: 0;">Куда везти? Укажите на карте</h3>
+                
+                <div id="checkout-map" style="height: 200px; border-radius: 12px; margin-bottom: 16px; z-index: 1;"></div>
+                
                 <div class="input-w-icon">
                     <input type="text" id="checkout-address" placeholder="📍 Улица / Микрорайон">
                 </div>
@@ -419,18 +422,21 @@
     </div>
 
     <script>
-        let map;
-        let courierMarker;
+        // === МАТЕМАТИКА ДЛЯ ДОСТАВКИ ===
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; 
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
 
-        function initMap(resLat, resLng, userLat, userLng) {
-            if (map) return;
-            map = L.map('map').setView([resLat, resLng], 14);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-            L.marker([resLat, resLng]).addTo(map).bindPopup('Ресторан').openPopup();
-            L.marker([userLat, userLng]).addTo(map).bindPopup('Вы здесь');
-            courierMarker = L.marker([resLat, resLng], {
-                icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/2972/2972185.png', iconSize: [30, 30] })
-            }).addTo(map).bindPopup('Курьер едет!');
+        function calculateDynamicDeliveryFee(resLat, resLon, cLat, cLon) {
+            const straightDist = getDistance(resLat, resLon, cLat, cLon);
+            const realDist = straightDist * 1.3; 
+            let baseFee = 100;
+            if (realDist > 1) baseFee += (realDist - 1) * 20; 
+            return Math.round(baseFee);
         }
 
         const tg = window.Telegram.WebApp;
@@ -438,14 +444,19 @@
         
         let globalCity = "Бишкек";
         let totalSum = 0;
-        let baseDeliveryFee = 150;
-        let currentDeliveryFee = baseDeliveryFee; 
+        let currentDeliveryFee = 100; 
         let currentRestaurantId = null;
         let activeFilters = [];
         let activeTag = null;
         let cartItems = {}; 
         let cartActiveTabResId = null; 
         let modalStack = [];
+
+        // Переменные для новой карты оформления
+        let checkoutMap;
+        let checkoutClientMarker;
+        let clientLat = null;
+        let clientLon = null;
 
         const imgs = {
             asian: ['https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=300'],
@@ -489,10 +500,11 @@
             });
         }
 
+        // ДОБАВЛЕНЫ КООРДИНАТЫ РЕСТОРАНОВ ДЛЯ РАСЧЕТА
         const database = {
-            'asian1': { city: 'Бишкек', title: 'Дракон Суши', logo: 'https://images.unsplash.com/photo-1553621042-f6e147245754?w=100', address: 'пр. Шабдана баатыра 11К', rating: 4.7, tags: ['sushi', 'promo'], img: 'https://images.unsplash.com/photo-1553621042-f6e147245754?w=600', categories: ['Акции', 'Холодные роллы', 'Напитки'], items: [...generateItems('Акции', 'asian', 'asian1'), ...generateItems('Холодные роллы', 'asian', 'asian1'), ...generateItems('Напитки', 'asian', 'asian1')] },
-            'fast1': { city: 'Бишкек', title: 'Burger Spot', logo: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=100', address: 'ул. Ахунбаева 94', rating: 4.2, tags: ['fastfood'], img: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=600', categories: ['Бургеры', 'Напитки'], items: [...generateItems('Бургеры', 'fastfood', 'fast1'), ...generateItems('Напитки', 'fastfood', 'fast1')] },
-            'piz1': { city: 'Бишкек', title: 'Roma Pizza', logo: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=100', address: 'ул. Токтогула 125', rating: 4.8, tags: ['pizza', 'top'], img: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600', categories: ['Пицца', 'Напитки'], items: [...generateItems('Пицца', 'pizza', 'piz1'), ...generateItems('Напитки', 'pizza', 'piz1')] }
+            'asian1': { lat: 42.8746, lon: 74.5698, city: 'Бишкек', title: 'Дракон Суши', logo: 'https://images.unsplash.com/photo-1553621042-f6e147245754?w=100', address: 'пр. Шабдана баатыра 11К', rating: 4.7, tags: ['sushi', 'promo'], img: 'https://images.unsplash.com/photo-1553621042-f6e147245754?w=600', categories: ['Акции', 'Холодные роллы', 'Напитки'], items: [...generateItems('Акции', 'asian', 'asian1'), ...generateItems('Холодные роллы', 'asian', 'asian1'), ...generateItems('Напитки', 'asian', 'asian1')] },
+            'fast1': { lat: 42.8800, lon: 74.5800, city: 'Бишкек', title: 'Burger Spot', logo: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=100', address: 'ул. Ахунбаева 94', rating: 4.2, tags: ['fastfood'], img: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=600', categories: ['Бургеры', 'Напитки'], items: [...generateItems('Бургеры', 'fastfood', 'fast1'), ...generateItems('Напитки', 'fastfood', 'fast1')] },
+            'piz1': { lat: 42.8600, lon: 74.6000, city: 'Бишкек', title: 'Roma Pizza', logo: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=100', address: 'ул. Токтогула 125', rating: 4.8, tags: ['pizza', 'top'], img: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600', categories: ['Пицца', 'Напитки'], items: [...generateItems('Пицца', 'pizza', 'piz1'), ...generateItems('Напитки', 'pizza', 'piz1')] }
         };
 
         // НАВИГАЦИЯ
@@ -796,7 +808,9 @@
         function renderCartListItems() {
             let html = ''; let tabTotalSum = 0;
             for(let key in cartItems) { let c = cartItems[key]; if(c.resId === cartActiveTabResId) { tabTotalSum += (c.pricePerUnit * c.count); html += `<div class="cart-item-row"><img src="${c.item.img}"><div class="cart-item-info"><div class="cart-item-title">${c.item.name}</div>${c.optionsData ? `<div class="cart-item-opts">${c.optionsData}</div>` : ''}<div class="cart-item-price">${c.pricePerUnit} сом</div></div><div class="cart-item-counter"><div onclick="updateCartListCount('${key}', -1)">−</div><div style="cursor:default; width:20px; text-align:center;">${c.count}</div><div onclick="updateCartListCount('${key}', 1)">+</div></div></div>`; } }
-            document.getElementById('cart-list-container').innerHTML = html; document.getElementById('cart-list-total-sum').innerText = tabTotalSum + " сом"; document.getElementById('cart-list-delivery').innerText = (tabTotalSum > 0 ? currentDeliveryFee : 0) + " сом";
+            document.getElementById('cart-list-container').innerHTML = html; 
+            document.getElementById('cart-list-total-sum').innerText = tabTotalSum + " сом"; 
+            document.getElementById('cart-list-delivery').innerText = (tabTotalSum > 0 ? currentDeliveryFee : 0) + " сом";
         }
 
         function updateCartListCount(key, delta) {
@@ -818,14 +832,62 @@
             else { let resIdsInCart = [...new Set(Object.values(cartItems).map(c => c.resId))]; cartActiveTabResId = resIdsInCart[0]; renderCartListTabs(resIdsInCart); renderCartListItems(); } 
         }
 
+        // ПЕРЕХОД К ОФОРМЛЕНИЮ + КАРТА
         function goToCheckout() {
             let tabTotalSum = 0; 
             for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) tabTotalSum += (cartItems[k].pricePerUnit * cartItems[k].count); } 
             if(tabTotalSum === 0) return;
+            
+            const activeRes = database[cartActiveTabResId];
+            
+            // Задаем начальную точку клиента чуть в стороне от ресторана
+            clientLat = activeRes.lat + 0.005;
+            clientLon = activeRes.lon + 0.005;
+
             setDeliveryMode('delivery'); 
-            document.getElementById('pickup-address').innerText = database[cartActiveTabResId].address; 
-            updateReceipt();
+            document.getElementById('pickup-address').innerText = activeRes.address; 
+            
             history.pushState({screen: 'checkout'}, ''); showScreen('checkout');
+
+            // Инициализируем карту через 100мс, чтобы HTML успел отобразиться
+            setTimeout(() => {
+                initCheckoutMap(activeRes.lat, activeRes.lon);
+            }, 100);
+        }
+
+        function initCheckoutMap(resLat, resLon) {
+            if (!checkoutMap) {
+                checkoutMap = L.map('checkout-map').setView([clientLat, clientLon], 14);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(checkoutMap);
+                
+                const clientIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/149/149059.png', iconSize: [36, 36], iconAnchor: [18, 36] });
+                checkoutClientMarker = L.marker([clientLat, clientLon], {icon: clientIcon, draggable: true}).addTo(checkoutMap).bindPopup("Доставить сюда").openPopup();
+                
+                // Пересчет при перетаскивании маркера
+                checkoutClientMarker.on('dragend', function (e) {
+                    clientLat = e.target.getLatLng().lat;
+                    clientLon = e.target.getLatLng().lng;
+                    recalcCheckoutDelivery(resLat, resLon);
+                });
+
+                // Пересчет при клике по карте
+                checkoutMap.on('click', function(e) {
+                    clientLat = e.latlng.lat;
+                    clientLon = e.latlng.lng;
+                    checkoutClientMarker.setLatLng([clientLat, clientLon]);
+                    recalcCheckoutDelivery(resLat, resLon);
+                });
+            } else {
+                checkoutMap.setView([clientLat, clientLon], 14);
+                checkoutClientMarker.setLatLng([clientLat, clientLon]);
+                checkoutMap.invalidateSize(); // Помогает, если карта "сломалась" внутри скрытого div
+            }
+            recalcCheckoutDelivery(resLat, resLon);
+        }
+
+        function recalcCheckoutDelivery(resLat, resLon) {
+            currentDeliveryFee = calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon);
+            updateReceipt();
         }
 
         function setDeliveryMode(mode) {
@@ -835,7 +897,13 @@
                 document.getElementById('tab-delivery').classList.add('active');
                 document.getElementById('block-delivery').classList.remove('hidden');
                 document.getElementById('block-pickup').classList.add('hidden');
-                currentDeliveryFee = baseDeliveryFee;
+                
+                const activeRes = database[cartActiveTabResId];
+                if(activeRes && clientLat && clientLon) {
+                    currentDeliveryFee = calculateDynamicDeliveryFee(activeRes.lat, activeRes.lon, clientLat, clientLon);
+                } else {
+                    currentDeliveryFee = 100;
+                }
             } else {
                 document.getElementById('tab-pickup').classList.add('active');
                 document.getElementById('block-delivery').classList.add('hidden');
@@ -858,12 +926,17 @@
         async function createOrder() {
             const street = document.getElementById('checkout-address').value;
             const dom = document.getElementById('chk-dom').value;
-            if (!street) return alert("Пожалуйста, укажите улицу!");
+            if (!street && currentDeliveryFee > 0) return alert("Пожалуйста, укажите улицу!");
 
             const fullAddress = `${globalCity}, ${street}, д.${dom || '-'}`;
+            
+            // ДАННЫЕ ЛЕТЯТ НА СЕРВЕР
             const orderData = {
-                user: tg.initDataUnsafe?.user,
+                type: 'food', // Сообщаем серверу, что это еда
+                user: tg.initDataUnsafe?.user || { id: 111, first_name: "Тест Юзер" }, // Заглушка, если открыли не в телеграме
                 address: fullAddress, 
+                dest_lat: clientLat, // Координаты доставки
+                dest_lon: clientLon, // Координаты доставки
                 restaurantName: database[cartActiveTabResId]?.title || "Ресторан",
                 totalPrice: totalSum + currentDeliveryFee,
                 comment: document.getElementById('order-comment')?.value || "",
@@ -892,6 +965,10 @@
             }
         }
 
+        // ЭКРАН СТАТУСА 
+        let statusMap;
+        let statusCourierMarker;
+
         function showStatusScreen() {
             showScreen('status');
             document.getElementById('st-res-name').innerText = "Из: " + (database[cartActiveTabResId]?.title || "Ресторана");
@@ -905,6 +982,17 @@
             document.getElementById('st-items-list').innerHTML = itemsHtml;
         }
 
+        function initStatusMap(resLat, resLng, userLat, userLng) {
+            if (statusMap) return;
+            statusMap = L.map('map').setView([resLat, resLng], 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(statusMap);
+            L.marker([resLat, resLng]).addTo(statusMap).bindPopup('Ресторан').openPopup();
+            L.marker([userLat, userLng]).addTo(statusMap).bindPopup('Ваш дом');
+            statusCourierMarker = L.marker([resLat, resLng], {
+                icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/2972/2972185.png', iconSize: [30, 30] })
+            }).addTo(statusMap).bindPopup('Курьер едет!');
+        }
+
         function startStatusProgression() {
             const statuses = [
                 { text: "Обрабатывается...", status: "pending" },
@@ -912,10 +1000,15 @@
                 { text: "Курьер в пути! 🚴", status: "delivery" }
             ];
             let step = 0;
+            const activeRes = database[cartActiveTabResId] || database['asian1'];
+
             const interval = setInterval(() => {
                 if (step < statuses.length) {
                     document.getElementById('st-current-status').innerText = statuses[step].text;
-                    if (statuses[step].status === "delivery") initMap(42.8746, 74.5698, 42.8800, 74.5800);
+                    if (statuses[step].status === "delivery") {
+                        // Инициализируем карту со статусом
+                        initStatusMap(activeRes.lat, activeRes.lon, clientLat, clientLon);
+                    }
                     step++;
                 } else clearInterval(interval);
             }, 5000); 
