@@ -882,15 +882,38 @@
         }
 
         // Поиск улицы по перемещению маркера (Обратное геокодирование)
+        // Поиск улицы по перемещению маркера (Обратное геокодирование)
         async function reverseGeocode(lat, lon) {
             try {
                 const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
                 const data = await response.json();
+                
                 if (data && data.address) {
-                    if (data.address.road) document.getElementById('checkout-address').value = data.address.road;
-                    if (data.address.house_number) document.getElementById('chk-dom').value = data.address.house_number;
+                    // Пытаемся достать улицу и номер дома (учитывая разные форматы OSM)
+                    let street = data.address.road || data.address.pedestrian || data.address.residential || "";
+                    let house = data.address.house_number || data.address.building || "";
+                    
+                    // Склеиваем "Улица, Дом"
+                    let fullAddress = street;
+                    if (street && house) {
+                        fullAddress += ", " + house;
+                    } else if (house) {
+                        fullAddress = house;
+                    }
+                    
+                    // Вписываем всё в главную строку "Улица"
+                    if (fullAddress) {
+                        document.getElementById('checkout-address').value = fullAddress;
+                    }
+                    
+                    // Для надежности также вписываем номер в поле "Дом", чтобы он точно улетел в чек
+                    if (house) {
+                        document.getElementById('chk-dom').value = house;
+                    }
                 }
-            } catch(e) {}
+            } catch(e) {
+                console.error("Ошибка обратного геокодирования", e);
+            }
         }
 
         function initCheckoutMap(resLat, resLon) {
