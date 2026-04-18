@@ -13,7 +13,7 @@
         :root { --bg-color: #F8F8F8; --card-bg: #FFFFFF; --main-yellow: #FCE000; --text-dark: #1A1A1A; --text-gray: #999999; }
         body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); margin: 0; padding: 0; padding-bottom: 120px !important; user-select: none; color: var(--text-dark); scroll-behavior: smooth;}
         .hidden { display: none !important; }
-        input, textarea, select { font-family: inherit; }
+        input, textarea, select { font-family: inherit; outline: none; }
         #map { height: 250px; border-radius: 16px; margin: 16px; z-index: 1; border: 1px solid #eee; }
 
         .header-nav { display: flex; align-items: center; padding: 12px 16px; background: var(--card-bg); position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 3px rgba(0,0,0,0.05);}
@@ -24,7 +24,7 @@
         .header-address span:last-child { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 4px; }
 
         .search-container { padding: 12px 16px; background-color: var(--card-bg); }
-        .search-bar { width: 100%; box-sizing: border-box; background-color: var(--bg-color); padding: 12px 16px; border-radius: 12px; color: var(--text-dark); font-size: 14px; border: none; outline: none;}
+        .search-bar { width: 100%; box-sizing: border-box; background-color: var(--bg-color); padding: 12px 16px; border-radius: 12px; color: var(--text-dark); font-size: 14px; border: none; }
         
         .main-categories { display: flex; overflow-x: auto; padding: 0 16px 12px 16px; background-color: var(--card-bg); gap: 8px; scrollbar-width: none; align-items: flex-start;}
         .main-categories::-webkit-scrollbar { display: none; }
@@ -59,7 +59,6 @@
         .menu-tabs::-webkit-scrollbar { display: none; }
         .tab { white-space: nowrap; font-size: 14px; color: var(--text-gray); font-weight: 600; padding-bottom: 8px; cursor: pointer; border-bottom: 2px solid transparent; transition: 0.2s;}
         .tab.active { color: var(--text-dark); border-bottom: 2px solid var(--text-dark); }
-        .tab-promo { color: #E65100; }
         
         .cat-section-title { font-size: 20px; font-weight: 800; padding: 10px 16px 0 16px; margin: 0; }
         .products-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px; }
@@ -69,7 +68,6 @@
         .item-info { padding: 10px 12px; display: flex; flex-direction: column; flex-grow: 1; }
         .item-price { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
         .item-name { font-size: 13px; color: #333; margin-bottom: 4px; line-height: 1.3; font-weight: 600;}
-        .item-meta { font-size: 11px; color: var(--text-gray); }
 
         .btn-add-img { position: absolute; bottom: 8px; right: 8px; width: 34px; height: 34px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: pointer; color: black; z-index: 2;}
         .counter-inline { position: absolute; bottom: 8px; left: 8px; right: 8px; background: white; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.15); height: 34px; z-index: 2; padding: 0 4px; }
@@ -103,17 +101,7 @@
         .option-radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ccc; display: flex; align-items: center; justify-content: center; }
         .option-radio.selected { border-color: var(--main-yellow); }
         .option-radio.selected::after { content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--main-yellow); }
-        .suggest-title { font-size: 18px; font-weight: 800; margin: 0 0 16px 0; }
-        .suggest-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-bottom: 20px; }
-        .suggest-card { border-radius: 12px; overflow: hidden; background: var(--bg-color); position: relative; box-shadow: 0 1px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; cursor: pointer;}
-        .s-img-wrap { position: relative; width: 100%; height: 110px; }
-        .s-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
-        .s-add-btn { position: absolute; bottom: 8px; right: 8px; width: 32px; height: 32px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 22px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: pointer; color: black; z-index: 2; transition: 0.2s; }
-        .s-counter { position: absolute; bottom: 8px; left: 8px; right: 8px; background: white; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.15); height: 32px; z-index: 2; padding: 0 4px; }
-        .s-counter div { width: 32px; height: 100%; display: flex; justify-content: center; align-items: center; cursor: pointer; font-weight: bold; font-size: 18px; color: var(--text-dark); }
-        .s-counter span { font-size: 14px; font-weight: 700; pointer-events: none; color: var(--text-dark); }
-        .suggest-card .s-price { font-size: 14px; font-weight: 800; padding: 12px 8px 4px 8px; }
-        .suggest-card .s-name { font-size: 12px; padding: 0 8px 12px 8px; line-height: 1.3; color: #555; flex-grow: 1;}
+        
         .modal-bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; padding: 16px 20px; background: white; border-top: 1px solid #eee; display: flex; gap: 16px; align-items: center; z-index: 100;}
         .m-counter { display: flex; align-items: center; background: #F0F0F0; border-radius: 16px; padding: 4px; }
         .m-counter div.btn-pm { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 24px; cursor: pointer; color: var(--text-dark);}
@@ -126,27 +114,16 @@
         .delivery-toggle { display: flex; background: var(--bg-color); border-radius: 12px; padding: 4px; margin-bottom: 20px; }
         .toggle-btn { flex: 1; text-align: center; padding: 10px; font-size: 14px; font-weight: 600; border-radius: 10px; color: var(--text-gray); cursor: pointer; transition: 0.2s; }
         .toggle-btn.active { background: white; color: var(--text-dark); box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
-        .input-w-icon { position: relative; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-        .input-w-icon input { flex-grow: 1; background: var(--bg-color); border: none; padding: 14px; border-radius: 12px; font-size: 14px; outline: none; box-sizing: border-box; }
-        .map-toggle-btn { width: 44px; height: 44px; background: var(--bg-color); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; border: 1px solid #eee; transition: 0.2s; }
-        .map-toggle-btn:active { background: #eee; }
         
-        .full-width-input { width: 100%; background: var(--bg-color); border: none; padding: 14px 12px; border-radius: 12px; font-size: 14px; outline: none; box-sizing: border-box; margin-bottom: 12px; }
-        .inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .input-group { display: flex; flex-direction: column; margin-bottom: 12px; }
-        .input-group label { font-size: 12px; color: var(--text-gray); margin-bottom: 4px; }
-        .input-group input, .input-group select { background: var(--bg-color); border: none; padding: 14px; border-radius: 12px; font-size: 14px; outline: none; -webkit-appearance: none; appearance: none;}
-        
+        .address-summary-card { display: flex; align-items: center; background: #fdfdfd; padding: 16px; border-radius: 16px; cursor: pointer; border: 1px solid #eaeaea; margin-bottom: 12px; transition: 0.2s; }
+        .address-summary-card:active { transform: scale(0.98); background: #f5f5f5; }
+
         /* Блок сохраненных адресов */
         .saved-addr-card { display: flex; align-items: center; justify-content: space-between; background: var(--card-bg); border: 1px solid #eee; padding: 12px; border-radius: 12px; margin-bottom: 8px; }
         .saved-addr-info { flex-grow: 1; font-size: 14px; font-weight: 600; cursor:pointer; }
         .saved-addr-del { width: 30px; height: 30px; display:flex; align-items:center; justify-content:center; color: #d32f2f; background: #ffebee; border-radius: 8px; cursor: pointer; font-size: 16px;}
         .btn-save-address { background: var(--bg-color); border: 1px dashed #ccc; padding: 12px; border-radius: 12px; font-weight: bold; width: 100%; margin-top: 8px; margin-bottom: 16px; cursor: pointer; color: #555; transition: 0.2s; }
-        .btn-save-address:active { background: #eee; }
 
-        .pickup-address-box { display: flex; align-items: center; background: var(--bg-color); padding: 14px; border-radius: 16px; margin-bottom: 16px;}
-        .pickup-address-text { flex-grow: 1; margin-left: 10px; line-height: 1.4; }
-        .pickup-address-title { font-size: 14px; color: var(--text-dark); }
         .receipt-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 12px; color: #555; }
         .receipt-total { display: flex; justify-content: space-between; font-size: 18px; font-weight: 800; margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee; color: black; }
         .pay-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card-bg); padding: 16px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; z-index: 1000; padding-bottom: 20px;}
@@ -172,13 +149,16 @@
         .cart-item-counter { display: flex; align-items: center; background: var(--bg-color); border-radius: 12px;}
         .cart-item-counter div { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer;}
 
-        .status-box { background: var(--card-bg); border-radius: 20px; margin: 16px; padding: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-top: -30px; position: relative;}
-        .status-row { display: flex; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid #eee; padding-bottom: 16px;}
-        .status-meta h3 { margin: 0 0 4px 0; font-size: 16px; color: #1976d2; }
-        .status-meta p { margin: 0; color: var(--text-gray); font-size: 13px; }
-        .status-price { font-size: 18px; font-weight: 800; }
-        .st-item { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; }
+        /* ПОЛНОЭКРАННАЯ КАРТА ДЛЯ ВЫБОРА АДРЕСА */
+        #modal-map { background: var(--bg-color); z-index: 2500; position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; }
+        #modal-map.hidden { display: none !important; }
+        #fullscreen-map { flex-grow: 1; width: 100%; z-index: 1; }
+        .map-floating-panel { position: absolute; bottom: 0; left: 0; right: 0; background: white; padding: 20px; border-radius: 24px 24px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.1); z-index: 3000; max-height: 70vh; overflow-y: auto;}
         
+        .full-width-input { width: 100%; background: #eee; border: none; padding: 14px; border-radius: 12px; font-size: 14px; box-sizing: border-box; margin-bottom: 12px; }
+        .inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;}
+        .grid-input { background: #eee; border: none; padding: 14px; border-radius: 12px; font-size: 14px; width: 100%; box-sizing: border-box; }
+
         /* ПРОФИЛЬ */
         .profile-modal-content { padding: 20px; }
         .profile-header-t { font-size: 20px; font-weight: 800; margin-bottom: 24px; text-align: center; }
@@ -188,14 +168,6 @@
         .profile-u-phone { font-size: 14px; color: var(--text-gray); }
         .profile-section-c { background: #fafafa; padding: 16px; border-radius: 16px; margin-bottom: 16px; }
         .profile-s-header { display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 15px; margin-bottom: 10px; }
-        .profile-add-btn { background: var(--text-dark); color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
-        .profile-s-body { font-size: 14px; color: var(--text-gray); }
-
-        /* ПОЛНОЭКРАННАЯ КАРТА */
-        #modal-map { background: var(--bg-color); z-index: 2500; position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; }
-        #modal-map.hidden { display: none !important; }
-        #fullscreen-map { flex-grow: 1; width: 100%; z-index: 1; }
-        .map-floating-panel { position: absolute; bottom: 20px; left: 16px; right: 16px; background: white; padding: 20px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); z-index: 3000; }
     </style>
 </head>
 <body>
@@ -216,7 +188,7 @@
             <img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=100" class="logo-img">
             <div class="header-address" onclick="openAddressModal()">
                 <span>Доставка по городу</span>
-                <span><span id="hdr-addr">Бишкек</span> ▾</span>
+                <span><span id="hdr-addr">Чолпон-Ата</span> ▾</span>
             </div>
         </div>
 
@@ -229,13 +201,6 @@
             <div class="cat-circle" onclick="toggleFilter(this, 'sushi')"><img src="https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=100"><span class="cat-text">Суши-роллы</span></div>
             <div class="cat-circle" onclick="toggleFilter(this, 'national')"><img src="https://images.unsplash.com/photo-1529042410759-befb1204b468?w=100"><span class="cat-text">Национальная</span></div>
             <div class="cat-circle" onclick="toggleFilter(this, 'pizza')"><img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?w=100"><span class="cat-text">Пиццы</span></div>
-            <div class="cat-circle" onclick="toggleFilter(this, 'chicken')"><img src="https://images.unsplash.com/photo-1562967914-608f82629710?w=100"><span class="cat-text">Курочки</span></div>
-            <div class="cat-circle" onclick="toggleFilter(this, 'mangal')"><img src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=100"><span class="cat-text">Шашлыки</span></div>
-        </div>
-
-        <div class="filters-row">
-            <div class="filter-btn" style="color: #E65100;" onclick="toggleTagFilter(this, 'promo')">🎁 Акции</div>
-            <div class="filter-btn" onclick="toggleTagFilter(this, 'top')">⭐ Топ рейтинг</div>
         </div>
         
         <div class="restaurant-list" id="restaurant-list"></div>
@@ -249,11 +214,6 @@
                 <div class="header-title" id="menu-title" style="margin:0; text-align: left;">Ресторан</div>
             </div>
         </div>
-        
-        <div class="search-container" style="padding-bottom: 0;">
-            <input type="text" id="menu-search-input" class="search-bar" placeholder="🔍 Поиск по меню..." oninput="handleMenuSearch()">
-        </div>
-
         <div class="menu-tabs" id="menu-tabs"></div>
         <div id="all-products-container"></div>
     </div>
@@ -264,16 +224,11 @@
             <h2>Корзина</h2>
             <div class="trash-btn" onclick="openClearCartModal()">🗑️</div>
         </div>
-        
         <div class="cart-restaurant-tabs" id="cart-res-tabs"></div>
         <div class="cart-items-container" id="cart-list-container"></div>
         
-        <div style="padding: 0 16px 16px 16px;">
-            <button class="btn-gray" style="width:100%; border:none; font-size: 16px; padding: 12px; border-radius: 12px;" onclick="openMenu(cartActiveTabResId)">Открыть меню ресторана</button>
-        </div>
-
         <div class="pay-bar">
-            <div class="pay-sum"><span id="cart-list-total-sum">0 сом</span><span style="color:#2E7D32;">Тариф доставки: <span id="cart-list-delivery">0 сом</span></span></div>
+            <div class="pay-sum"><span id="cart-list-total-sum">0 сом</span><span style="color:#2E7D32;">Доставка: <span id="cart-list-delivery">0 сом</span></span></div>
             <div class="btn-pay" onclick="goToCheckout()" style="background: var(--main-yellow); padding: 12px 20px; border-radius: 12px; font-weight: bold; cursor: pointer;">К оформлению ➔</div>
         </div>
     </div>
@@ -291,36 +246,29 @@
             </div>
 
             <div id="block-delivery">
-                <h3 class="section-title" style="margin-top: 0;">Куда везти?</h3>
+                <h3 class="section-title" style="margin-top: 0;">Адрес доставки</h3>
 
                 <div id="saved-addresses-wrapper" class="hidden">
-                    <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px;">Мои адреса</div>
                     <div id="saved-addresses-list"></div>
                 </div>
-                
-                <div class="input-w-icon">
-                    <input type="text" id="checkout-address" placeholder="📍 Улица (напр. Чуй)" onchange="geocodeAddress()">
-                    <div class="map-toggle-btn" onclick="openMapModal()">🗺️</div>
+
+                <div class="address-summary-card" onclick="openMapModal()">
+                    <div style="font-size: 24px; margin-right: 12px;">📍</div>
+                    <div style="flex-grow: 1;">
+                        <div id="checkout-summary-address" style="font-weight: bold; font-size: 15px;">Укажите адрес на карте</div>
+                        <div id="checkout-summary-details" style="font-size: 13px; color: var(--text-gray);">Нажмите, чтобы выбрать</div>
+                    </div>
+                    <div style="font-size: 20px; color: var(--text-gray);">›</div>
                 </div>
                 
                 <button class="btn-save-address" onclick="saveCurrentAddress()">⭐ Сохранить этот адрес</button>
-
-                <div class="inputs-grid">
-                    <div class="input-group"><label>Дом</label><input type="text" id="chk-dom" placeholder="57" onchange="geocodeAddress()"></div>
-                    <div class="input-group"><label>Подъезд</label><input type="text" id="chk-pod" placeholder="1"></div>
-                    <div class="input-group"><label>Этаж</label><input type="number" id="chk-etaj" placeholder="2"></div>
-                    <div class="input-group"><label>Квартира</label><input type="number" id="chk-kv" placeholder="4"></div>
-                </div>
-                <input type="text" id="order-comment" class="full-width-input" placeholder="💬 Комментарий (код домофона, название места и др.)">
             </div>
 
             <div id="block-pickup" class="hidden">
                 <h3 class="section-title">Откуда забрать</h3>
-                <div class="pickup-address-box">
-                    <div style="font-size:24px;">📍</div>
-                    <div class="pickup-address-text">
-                        <div class="pickup-address-title" id="pickup-address" style="font-weight: bold;">Адрес...</div>
-                    </div>
+                <div style="display: flex; align-items: center; background: #eee; padding: 14px; border-radius: 16px;">
+                    <div style="font-size:24px; margin-right: 10px;">📍</div>
+                    <div id="pickup-address" style="font-weight: bold; font-size: 14px;">Адрес...</div>
                 </div>
             </div>
         </div>
@@ -328,7 +276,7 @@
         <div class="cart-section">
             <h3 class="section-title" style="margin-top: 0;">Что в чеке</h3>
             <div class="receipt-row"><span>Товары в заказе</span><span id="check-items">0 сом</span></div>
-            <div class="receipt-row"><span id="delivery-label">Тариф доставки</span><span id="check-delivery">150 сом</span></div>
+            <div class="receipt-row"><span>Доставка</span><span id="check-delivery">150 сом</span></div>
             <div class="receipt-total"><span>Итого</span><span id="check-total">0 сом</span></div>
         </div>
 
@@ -341,21 +289,32 @@
     <div id="modal-map" class="hidden">
         <div class="header-nav">
             <div class="back-btn" onclick="onBackClick()">←</div>
-            <div class="header-title">Укажите адрес доставки</div>
+            <div class="header-title">Куда доставить?</div>
         </div>
         <div style="position: relative; flex-grow: 1; display: flex; flex-direction: column;">
             <div id="fullscreen-map"></div>
             
             <div class="map-floating-panel">
-                <div style="font-size: 12px; color: var(--text-gray); margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">Доставка по адресу:</div>
-                <div id="modal-map-address" style="font-weight: 800; margin-bottom: 16px; font-size: 16px; line-height: 1.3;">Ищем адрес...</div>
+                <input type="text" id="map-search-input" placeholder="🔍 Поиск (напр. Советская 10)" onchange="geocodeMapSearch()" class="full-width-input" style="background: #f0f0f0;">
+
+                <div style="font-size: 11px; color: var(--text-gray); margin-bottom: 6px; font-weight: bold; text-transform: uppercase;">Точный адрес:</div>
                 
-                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 16px; margin-bottom: 16px;">
-                    <span style="color: #555; font-size: 14px; font-weight: 600;">Стоимость доставки</span>
-                    <span id="modal-map-price" style="font-weight: 800; font-size: 18px; color: #E65100;">100 сом</span>
+                <div class="inputs-grid">
+                    <input type="text" id="map-street" placeholder="Улица / Село" class="grid-input" style="grid-column: span 2;">
+                    <input type="text" id="map-dom" placeholder="Дом" class="grid-input">
+                    <input type="text" id="map-pod" placeholder="Подъезд" class="grid-input">
+                    <input type="number" id="map-etaj" placeholder="Этаж" class="grid-input">
+                    <input type="text" id="map-kv" placeholder="Квартира" class="grid-input">
                 </div>
                 
-                <button class="btn-yellow" style="width: 100%;" onclick="onBackClick()">Готово</button>
+                <input type="text" id="map-comment" placeholder="💬 Комментарий курьеру (домофон и др.)" class="full-width-input">
+
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 16px; margin-bottom: 16px;">
+                    <span style="color: #555; font-size: 14px; font-weight: 600;">Доставка для вас:</span>
+                    <span id="modal-map-price" style="font-weight: 800; font-size: 20px; color: #E65100;">0 сом</span>
+                </div>
+                
+                <button class="btn-yellow" style="width: 100%;" onclick="confirmMapAddress()">Сохранить и продолжить</button>
             </div>
         </div>
     </div>
@@ -363,101 +322,20 @@
     <div id="screen-status" class="hidden" style="padding-bottom: 40px;">
         <div class="header-nav">
             <div class="back-btn" onclick="onBackClick()">←</div>
-            <div class="header-title" id="st-header-title">Статус</div>
+            <div class="header-title" id="st-header-title">Статус заказа</div>
         </div>
-        <div id="map"></div>
-        <div class="status-box">
-            <div class="status-row">
-                <div class="status-meta">
-                    <h3 id="st-current-status">Обрабатывается...</h3>
-                    <p id="st-res-name">Из ресторана</p>
-                </div>
-                <div class="status-price" id="st-total">0 сом</div>
-            </div>
-            <h3 class="section-title" style="margin-top: 0;">Состав заказа</h3>
-            <div id="st-items-list"></div>
-        </div>
-    </div>
-
-    <div id="modal-profile" class="modal-overlay hidden">
-        <div class="modal-content profile-modal-content">
-            <div class="modal-close" onclick="onBackClick()" style="box-shadow:none; background:#eee;">✕</div>
-            <div class="profile-header-t">Профиль</div>
-            <div class="profile-user-info-c">
-                <div class="profile-u-avatar">👥</div>
-                <div class="profile-u-details">
-                    <div class="profile-u-name">Гость</div>
-                    <div class="profile-u-phone">+996 700 000 000</div>
-                </div>
-            </div>
-            <div class="profile-section-c">
-                <div class="profile-s-header"><span>📍 Мои адреса</span></div>
-                <div class="profile-s-body" id="profile-address-text">
-                    Не указан
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="modal-product" class="modal-overlay hidden">
-        <div class="modal-content">
-            <div class="modal-img-container">
-                <div class="modal-back-btn hidden" id="m-back-btn" onclick="modalGoBack()">←</div>
-                <div class="modal-close" onclick="modalCloseAll()">✕</div>
-                <img src="" id="m-img" class="modal-img">
-            </div>
-            <div class="modal-body">
-                <div class="m-title-row">
-                    <h2 class="m-title" id="m-name">Название</h2>
-                    <span class="m-weight" id="m-weight">440 г</span>
-                </div>
-                <div class="m-desc" id="m-desc">Состав и описание...</div>
-                <div class="m-nut-row">
-                    <div class="m-nut"><span id="m-kcal">276</span><span>ккал</span></div>
-                    <div class="m-nut"><span>11</span><span>белки</span></div>
-                </div>
-                <div id="m-options-container" class="options-section"></div>
-                <div class="suggest-title">Лучшие предложения</div>
-                <div class="suggest-grid" id="m-suggests"></div>
-            </div>
-            <div class="modal-bottom-bar">
-                <div class="m-counter">
-                    <div class="btn-pm" onclick="modalChangeCount(-1)">−</div>
-                    <div id="m-count-val">1</div>
-                    <div class="btn-pm" onclick="modalChangeCount(1)">+</div>
-                </div>
-                <button class="btn-yellow" id="m-add-btn" onclick="modalAddToCart()">Добавить</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="modal-address" class="modal-overlay hidden">
-        <div class="modal-content address-modal-content">
-            <div class="modal-close" style="top:20px; right:20px; box-shadow:none; background:#eee;" onclick="onBackClick()">✕</div>
-            <h2 class="address-modal-title">Ваш город</h2>
-            <div class="input-group">
-                <label>Выберите город</label>
-                <select id="modal-city-select">
-                    <option value="Бишкек">Бишкек</option>
-                    <option value="Чолпон-Ата">Чолпон-Ата</option>
-                </select>
-            </div>
-            <button class="btn-yellow" style="margin-top: 12px;" onclick="saveAddressModal()">Готово</button>
-        </div>
-    </div>
-
-    <div id="modal-clear-cart" class="modal-overlay hidden" style="justify-content: center; align-items: center; padding: 20px;">
-        <div class="modal-content confirm-modal-content" style="border-radius: 24px; width: 100%; max-width: 340px; padding: 24px; text-align: center;">
-            <div style="font-size: 20px; font-weight: bold; margin-bottom: 12px;">Очистить корзину?</div>
-            <div style="display: flex; gap: 12px;">
-                <div style="flex:1; padding: 14px; background: #eee; border-radius: 12px; font-weight: bold; cursor: pointer;" onclick="onBackClick()">Отмена</div>
-                <div style="flex:1; padding: 14px; background: #ffebee; color: #d32f2f; border-radius: 12px; font-weight: bold; cursor: pointer;" onclick="executeClearCart()">Да, удалить</div>
-            </div>
+        <div class="status-box" style="margin-top: 20px;">
+            <h3 id="st-current-status" style="color: #1976d2; text-align: center; margin-bottom: 20px;">Обрабатывается...</h3>
+            <div class="receipt-row"><span>Ресторан:</span><span id="st-res-name">...</span></div>
+            <div class="receipt-row"><span>Сумма:</span><span id="st-total" style="font-weight: bold;">0 сом</span></div>
         </div>
     </div>
 
     <script>
-        // === МАТЕМАТИКА ДЛЯ ДОСТАВКИ ===
+        // === НАСТРОЙКИ ГОРОДА ПО УМОЛЧАНИЮ ===
+        let globalCity = "Чолпон-Ата";
+        
+        // Математика доставки
         function getDistance(lat1, lon1, lat2, lon2) {
             const R = 6371; 
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -469,191 +347,90 @@
         function calculateDynamicDeliveryFee(resLat, resLon, cLat, cLon) {
             const straightDist = getDistance(resLat, resLon, cLat, cLon);
             const realDist = straightDist * 1.3; 
-            let baseFee = 100;
-            if (realDist > 1) baseFee += (realDist - 1) * 20; 
+            let baseFee = 100; // Подача
+            if (realDist > 1) baseFee += (realDist - 1) * 20; // 20 сом за км
             return Math.round(baseFee);
         }
 
         const tg = window.Telegram.WebApp;
         tg.expand();
         
-        let globalCity = "Бишкек";
         let totalSum = 0;
         let currentDeliveryFee = 100; 
         let currentRestaurantId = null;
-        let activeFilters = [];
-        let activeTag = null;
         let cartItems = {}; 
         let cartActiveTabResId = null; 
-        let modalStack = [];
 
-        // Переменные для карты
+        // Переменные карты
         let checkoutMap;
         let checkoutClientMarker;
         let checkoutResMarker; 
         let clientLat = null;
         let clientLon = null;
 
+        // Хранилище заполненного адреса
+        let orderAddressData = { street: '', dom: '', pod: '', etaj: '', kv: '', comment: '' };
+
         const imgs = {
             asian: ['https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=300'],
-            national: ['https://images.unsplash.com/photo-1547592180-85f173990554?w=300'],
             fastfood: ['https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=100'],
-            pizza: ['https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=300'],
-            drinks: ['https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=300']
+            pizza: ['https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=300']
         };
 
-        const nameTemplates = {
-            'Холодные роллы': ['Филадельфия', 'Калифорния'], 
-            'Напитки': ['Кока-Кола 0.5', 'Спрайт 0.5'],
-            'Мангал': ['Шашлык из баранины'], 
-            'Горячие блюда': ['Плов Праздничный'],
-            'Бургеры': ['Чизбургер', 'Двойной Чизбургер'], 
-            'Пицца': ['Маргарита 30см', 'Пепперони 30см'], 
-            'Акции': ['Сет по акции']
-        };
-
-        const comboOptions = [
-            { title: 'Выберите соус', required: true, options: [{name: 'Кетчуп', price: 0}, {name: 'Сырный', price: 15}] }
-        ];
-
-        function generateItems(categoryName, defaultImgType, idPrefix) {
-            const names = nameTemplates[categoryName] || ['Блюдо'];
-            let imgType = defaultImgType;
-            if(categoryName.includes('Напитки')) imgType = 'drinks';
-            if(categoryName.includes('Пицца')) imgType = 'pizza';
-            
-            return names.map((name, index) => {
-                let item = {
-                    id: `${idPrefix}-${categoryName}-${index}`.replace(/\s+/g, ''),
-                    resId: idPrefix, 
-                    cat: categoryName, name: name, price: 250 + (index * 60),
-                    img: imgs[imgType][0],
-                    weight: 300, kcal: 450,
-                    desc: `Вкуснейшее блюдо "${name}".`
-                };
-                if(categoryName === 'Комбо' || categoryName === 'Бургеры') item.optionsGroups = comboOptions;
-                return item;
-            });
-        }
-
+        // БАЗА ДАННЫХ (Чолпон-Ата и Бостери)
         const database = {
-            'asian1': { lat: 42.8746, lon: 74.5698, city: 'Бишкек', title: 'Дракон Суши', logo: 'https://images.unsplash.com/photo-1553621042-f6e147245754?w=100', address: 'пр. Шабдана баатыра 11К', rating: 4.7, tags: ['sushi', 'promo'], img: 'https://images.unsplash.com/photo-1553621042-f6e147245754?w=600', categories: ['Акции', 'Холодные роллы', 'Напитки'], items: [...generateItems('Акции', 'asian', 'asian1'), ...generateItems('Холодные роллы', 'asian', 'asian1'), ...generateItems('Напитки', 'asian', 'asian1')] },
-            'fast1': { lat: 42.8800, lon: 74.5800, city: 'Бишкек', title: 'Burger Spot', logo: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=100', address: 'ул. Ахунбаева 94', rating: 4.2, tags: ['fastfood'], img: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=600', categories: ['Бургеры', 'Напитки'], items: [...generateItems('Бургеры', 'fastfood', 'fast1'), ...generateItems('Напитки', 'fastfood', 'fast1')] },
-            'piz1': { lat: 42.8600, lon: 74.6000, city: 'Бишкек', title: 'Roma Pizza', logo: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=100', address: 'ул. Токтогула 125', rating: 4.8, tags: ['pizza', 'top'], img: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600', categories: ['Пицца', 'Напитки'], items: [...generateItems('Пицца', 'pizza', 'piz1'), ...generateItems('Напитки', 'pizza', 'piz1')] }
+            'asian1': { lat: 42.6482, lon: 77.0855, city: 'Чолпон-Ата', title: 'Дракон Суши', logo: imgs.asian[0], address: 'ул. Советская, Чолпон-Ата', rating: 4.7, tags: ['sushi', 'promo'], img: imgs.asian[0], categories: ['Холодные роллы'], items: [{id: 'a1', cat: 'Холодные роллы', name: 'Филадельфия', price: 350, img: imgs.asian[0]}] },
+            'fast1': { lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', title: 'Burger Spot', logo: imgs.fastfood[0], address: 'ул. Горького, Чолпон-Ата', rating: 4.2, tags: ['fastfood'], img: imgs.fastfood[0], categories: ['Бургеры'], items: [{id: 'f1', cat: 'Бургеры', name: 'Чизбургер', price: 250, img: imgs.fastfood[0]}] },
+            'piz1': { lat: 42.6346, lon: 77.1950, city: 'Чолпон-Ата', title: 'Roma Pizza (Бостери)', logo: imgs.pizza[0], address: 'Бостери, Центр', rating: 4.8, tags: ['pizza', 'top'], img: imgs.pizza[0], categories: ['Пицца'], items: [{id: 'p1', cat: 'Пицца', name: 'Маргарита', price: 450, img: imgs.pizza[0]}] }
         };
 
-        // НАВИГАЦИЯ
-        function openAddressModal() {
-            closeAllModals(); 
-            document.getElementById('modal-city-select').value = globalCity;
-            document.getElementById('modal-address').classList.remove('hidden');
-            history.pushState({modal: 'address'}, '');
-        }
-
-        function saveAddressModal() {
-            globalCity = document.getElementById('modal-city-select').value;
-            document.getElementById('hdr-addr').innerText = globalCity;
-            onBackClick();
-            renderRestaurants(); 
-        }
-
+        // Навигация
         history.replaceState({screen: 'main'}, '');
 
         function showScreen(screenId) {
             ['screen-main', 'screen-menu', 'screen-cart-list', 'screen-checkout', 'screen-status', 'modal-map'].forEach(id => document.getElementById(id).classList.add('hidden'));
             document.getElementById('screen-'+screenId).classList.remove('hidden');
-            updateGlobalCartBtnState(screenId);
-            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-            if(['main', 'menu'].includes(screenId)) document.getElementById('nav-main').classList.add('active');
-            if(screenId === 'cart-list') document.getElementById('nav-cart').classList.add('active');
-            if(screenId === 'profile') document.getElementById('nav-profile').classList.add('active');
+            document.getElementById('cart-float-btn').style.display = (totalSum > 0 && ['main', 'menu'].includes(screenId)) ? 'flex' : 'none';
         }
 
         function onNavClick(type) {
             tg.HapticFeedback.impactOccurred('light');
-            if (type === 'main') { closeAllModals(); showScreen('main'); }
+            if (type === 'main') showScreen('main');
             if (type === 'cart') { if(totalSum === 0) return alert("Корзина пуста"); openCartList(); }
-            if (type === 'profile') { openProfileModal(); }
         }
 
         function onBackClick() { history.back(); }
 
         window.addEventListener('popstate', function(event) {
-            closeAllModals();
             if (!event.state) { showScreen('main'); return; }
-            const state = event.state;
-            if (state.screen) {
-                showScreen(state.screen);
-                if (state.page === 'menu' && state.resId) { currentRestaurantId = state.resId; renderRestaurantMenu(); }
-            } else if (state.modal) { 
-                if (state.modal === 'profile') document.getElementById('modal-profile').classList.remove('hidden');
-                if (state.modal === 'address') document.getElementById('modal-address').classList.remove('hidden');
-                if (state.modal === 'product') document.getElementById('modal-product').classList.remove('hidden');
-                if (state.modal === 'map') {
-                    document.getElementById('modal-map').classList.remove('hidden');
-                    setTimeout(() => checkoutMap.invalidateSize(), 50);
-                }
+            const st = event.state;
+            if (st.screen) {
+                showScreen(st.screen);
+                if (st.page === 'menu' && st.resId) { currentRestaurantId = st.resId; renderRestaurantMenu(); }
+            } else if (st.modal === 'map') {
+                document.getElementById('modal-map').classList.remove('hidden');
+                setTimeout(() => checkoutMap.invalidateSize(), 50);
             }
         });
 
-        function closeAllModals() {
-            ['modal-product', 'modal-profile', 'modal-address', 'modal-clear-cart', 'modal-map'].forEach(id => document.getElementById(id).classList.add('hidden'));
-        }
-
-        function openProfileModal() {
-            closeAllModals();
-            renderSavedAddressesInProfile();
-            document.getElementById('modal-profile').classList.remove('hidden');
-            history.pushState({modal: 'profile'}, '');
-        }
-
-        // РЕСТОРАНЫ
-        function handleSearch() { renderRestaurants(document.getElementById('search-input').value.toLowerCase()); }
-        function toggleFilter(el, tag) {
-            if(activeFilters.includes(tag)) { activeFilters = activeFilters.filter(t => t !== tag); el.classList.remove('active'); } 
-            else { activeFilters.push(tag); el.classList.add('active'); }
-            renderRestaurants();
-        }
-        function toggleTagFilter(el, tag) {
-            if(activeTag === tag) { activeTag = null; el.classList.remove('active'); } 
-            else { document.querySelectorAll('.filters-row .filter-btn').forEach(b => b.classList.remove('active')); activeTag = tag; el.classList.add('active'); }
-            renderRestaurants();
-        }
-
+        // Отрисовка
         function renderRestaurants() {
             const list = document.getElementById('restaurant-list');
-            const searchQuery = document.getElementById('search-input').value.toLowerCase();
             let html = '';
             Object.keys(database).forEach(key => {
                 const res = database[key];
                 if(res.city !== globalCity) return;
-                const passCategory = activeFilters.length === 0 || activeFilters.some(f => res.tags.includes(f));
-                const passTag = !activeTag || res.tags.includes(activeTag);
-                const passSearch = searchQuery === '' || res.title.toLowerCase().includes(searchQuery);
-                if(passCategory && passTag && passSearch) {
-                    html += `<div class="res-card" onclick="openMenu('${key}')"><img src="${res.img}" class="res-img"><div class="res-info"><div class="res-name"><span>${res.title}</span><span>★ ${res.rating}</span></div><div class="res-desc">${res.address}</div><div class="res-meta"><span>🛵 30 мин</span></div></div></div>`;
-                }
+                html += `<div class="res-card" onclick="openMenu('${key}')"><img src="${res.img}" class="res-img"><div class="res-info"><div class="res-name"><span>${res.title}</span><span>★ ${res.rating}</span></div><div class="res-desc">${res.address}</div></div></div>`;
             });
-            list.innerHTML = html || '<p style="text-align:center; color:gray; margin-top:40px;">Ничего не найдено</p>';
+            list.innerHTML = html;
         }
         renderRestaurants();
-
-        function updateGlobalCartBtnState(currentScreen) {
-            let cartBtn = document.getElementById('cart-float-btn');
-            cartBtn.style.display = (totalSum > 0 && ['main', 'menu'].includes(currentScreen)) ? 'flex' : 'none';
-        }
-
-        // МЕНЮ
-        function handleMenuSearch() { renderRestaurantMenu(); }
 
         function openMenu(resId) {
             currentRestaurantId = resId;
             const res = database[resId];
             document.getElementById('menu-title').innerText = res.title;
             document.getElementById('menu-logo').src = res.logo;
-            document.getElementById('pickup-address').innerText = res.address;
-            document.getElementById('menu-search-input').value = ''; 
-            
             renderRestaurantMenu();
             history.pushState({screen: 'menu', page: 'menu', resId: resId}, '');
             showScreen('menu');
@@ -661,391 +438,170 @@
 
         function renderRestaurantMenu() {
             const res = database[currentRestaurantId];
-            const query = document.getElementById('menu-search-input').value.toLowerCase();
-            let tabsHtml = '';
-            let allHtml = '';
-            res.categories.forEach((cat) => {
-                const items = res.items.filter(item => item.cat === cat && (query === '' || item.name.toLowerCase().includes(query)));
-                if(items.length > 0) {
-                    let cl = tabsHtml === '' ? 'active ' : '';
-                    tabsHtml += `<div class="tab ${cl}" onclick="scrollToCat('${cat}')">${cat}</div>`;
-                    allHtml += `<h3 class="cat-section-title" id="cat-${cat.replace(/\s+/g, '')}">${cat}</h3>`;
-                    allHtml += `<div class="products-grid">` + items.map(item => {
-                        let countInCart = 0;
-                        for(let k in cartItems) { if(cartItems[k].item.id === item.id) countInCart += cartItems[k].count; }
-                        return `
-                        <div class="item-card" onclick="openModal('${item.id}')">
-                            <div class="img-wrap">
-                                <img src="${item.img}" class="item-img">
-                                ${countInCart > 0 && !item.optionsGroups
-                                    ? `<div class="counter-inline" onclick="event.stopPropagation()">
-                                        <div onclick="updateInlineCart('${item.id}', -1)">−</div>
-                                        <div class="c-val">${countInCart}</div>
-                                        <div onclick="updateInlineCart('${item.id}', 1)">+</div>
-                                       </div>` 
-                                    : `<div class="btn-add-img" onclick="addToCartEvent(event, '${item.id}')">+</div>`}
-                            </div>
-                            <div class="item-info">
-                                <div class="item-price">${item.price} сом</div>
-                                <div class="item-name">${item.name}</div>
-                            </div>
-                        </div>`;
-                    }).join('') + `</div>`;
-                }
+            let html = `<h3 class="cat-section-title">Меню</h3><div class="products-grid">`;
+            res.items.forEach(item => {
+                let count = cartItems[item.id] ? cartItems[item.id].count : 0;
+                html += `
+                <div class="item-card">
+                    <div class="img-wrap"><img src="${item.img}" class="item-img">
+                        ${count > 0 ? `<div class="counter-inline"><div onclick="updateCart('${item.id}', -1)">−</div><div class="c-val">${count}</div><div onclick="updateCart('${item.id}', 1)">+</div></div>` : `<div class="btn-add-img" onclick="updateCart('${item.id}', 1)">+</div>`}
+                    </div>
+                    <div class="item-info"><div class="item-price">${item.price} сом</div><div class="item-name">${item.name}</div></div>
+                </div>`;
             });
-            document.getElementById('menu-tabs').innerHTML = tabsHtml;
-            document.getElementById('all-products-container').innerHTML = allHtml;
+            document.getElementById('all-products-container').innerHTML = html + `</div>`;
         }
 
-        function scrollToCat(cat) { 
-            const el = document.getElementById(`cat-${cat.replace(/\s+/g, '')}`); 
-            if(el) { const y = el.getBoundingClientRect().top + window.scrollY - 110; window.scrollTo({top: y, behavior: 'smooth'}); } 
-        }
-
-        function addToCartEvent(event, itemId) {
-            event.stopPropagation(); tg.HapticFeedback.impactOccurred('light');
-            const item = database[currentRestaurantId].items.find(i => i.id === itemId);
-            if(item.optionsGroups) { openModal(itemId); return; } 
-            
-            if(cartItems[itemId]) cartItems[itemId].count++;
-            else cartItems[itemId] = { count: 1, item: item, optionsData: null, pricePerUnit: item.price, resId: currentRestaurantId };
-            
-            recalcTotal(); renderRestaurantMenu();
-        }
-
-        function updateInlineCart(itemId, delta) {
+        function updateCart(itemId, delta) {
             tg.HapticFeedback.impactOccurred('light'); 
-            if(!cartItems[itemId]) return;
+            const item = database[currentRestaurantId].items.find(i => i.id === itemId);
+            if(!cartItems[itemId]) cartItems[itemId] = { count: 0, item: item, pricePerUnit: item.price, resId: currentRestaurantId };
             cartItems[itemId].count += delta; 
             if(cartItems[itemId].count <= 0) delete cartItems[itemId]; 
             recalcTotal(); renderRestaurantMenu();
         }
         
         function recalcTotal() {
-            totalSum = 0; let totalItemsCount = 0;
-            for(let key in cartItems) { totalSum += (cartItems[key].pricePerUnit * cartItems[key].count); totalItemsCount += cartItems[key].count; }
+            totalSum = 0; let totalCount = 0;
+            for(let k in cartItems) { totalSum += (cartItems[k].pricePerUnit * cartItems[k].count); totalCount += cartItems[k].count; }
             document.getElementById('total-price-btn').innerText = totalSum + " сом";
-            document.getElementById('cart-items-count').innerText = totalItemsCount;
-            updateGlobalCartBtnState(document.getElementById('screen-main').classList.contains('hidden') ? 'menu' : 'main');
+            document.getElementById('cart-items-count').innerText = totalCount;
+            document.getElementById('cart-float-btn').style.display = totalSum > 0 ? 'flex' : 'none';
         }
 
-        // МОДАЛКА БЛЮДА
-        let currentModalItem = null; let currentModalCount = 1; let selectedOptions = {};
-
-        function openModal(itemId, isDeepLink = false) {
-            const res = database[currentRestaurantId];
-            const item = res.items.find(i => i.id === itemId);
-            if(item) {
-                const cartSnapshot = JSON.parse(JSON.stringify(cartItems));
-                if (!isDeepLink) modalStack = [];
-                modalStack.push({ itemId: item.id, cartSnapshot: cartSnapshot });
-                renderModalContent(item);
-                document.getElementById('modal-product').classList.remove('hidden');
-                if(!isDeepLink) history.pushState({modal: 'product'}, '');
-            }
-        }
-
-        function renderModalContent(item) {
-            currentModalItem = item; 
-            let existingCount = cartItems[item.id] ? cartItems[item.id].count : 0;
-            currentModalCount = existingCount > 0 ? existingCount : 1; 
-            selectedOptions = {};
-            
-            document.getElementById('m-img').src = item.img;
-            document.getElementById('m-name').innerText = item.name;
-            
-            if (modalStack.length > 1) document.getElementById('m-back-btn').classList.remove('hidden'); 
-            else document.getElementById('m-back-btn').classList.add('hidden');
-
-            let optionsHtml = '';
-            if(item.optionsGroups) {
-                item.optionsGroups.forEach((group, gIndex) => {
-                    optionsHtml += `<div class="option-group-title">${group.title}</div>`;
-                    group.options.forEach((opt, oIndex) => {
-                        optionsHtml += `<div class="option-item" onclick="selectOption(${gIndex}, ${oIndex}, ${opt.price}, '${opt.name}')"><div class="option-label"><div class="option-radio" id="radio-${gIndex}-${oIndex}"></div>${opt.name}</div><div class="option-price">+${opt.price} сом</div></div>`;
-                    });
-                });
-            }
-            document.getElementById('m-options-container').innerHTML = optionsHtml;
-            renderSuggests(database[currentRestaurantId], item); updateModalBtn();
-        }
-
-        function selectOption(gIndex, oIndex, price, name) {
-            document.querySelectorAll(`[id^="radio-${gIndex}-"]`).forEach(el => el.classList.remove('selected'));
-            document.getElementById(`radio-${gIndex}-${oIndex}`).classList.add('selected');
-            selectedOptions[gIndex] = { index: oIndex, price: price, name: name };
-            updateModalBtn();
-        }
-
-        function renderSuggests(res, item) {
-            let suggests = [...res.items.filter(i => i.id !== item.id)];
-            document.getElementById('m-suggests').innerHTML = suggests.slice(0,2).map(s => {
-                return `<div class="suggest-card" onclick="openModal('${s.id}', true)">
-                    <div class="s-img-wrap"><img src="${s.img}"></div>
-                    <div class="s-price">${s.price} сом</div>
-                    <div class="s-name">${s.name}</div>
-                </div>`;
-            }).join('');
-        }
-
-        function modalChangeCount(delta) { if(currentModalCount + delta >= 1) { currentModalCount += delta; updateModalBtn(); } }
-
-        function updateModalBtn() {
-            document.getElementById('m-count-val').innerText = currentModalCount;
-            let optionsSum = 0; let allRequiredSelected = true;
-            if(currentModalItem.optionsGroups) { currentModalItem.optionsGroups.forEach((g, i) => { if(g.required && !selectedOptions[i]) allRequiredSelected = false; if(selectedOptions[i]) optionsSum += selectedOptions[i].price; }); }
-            
-            let btn = document.getElementById('m-add-btn'); 
-            btn.innerText = allRequiredSelected ? `Добавить ${(currentModalItem.price + optionsSum) * currentModalCount} сом` : `Выберите опции`;
-            if(!allRequiredSelected) btn.classList.add('disabled'); else btn.classList.remove('disabled');
-        }
-
-        function modalGoBack() {
-            if (modalStack.length > 1) {
-                cartItems = modalStack.pop().cartSnapshot; 
-                renderModalContent(database[currentRestaurantId].items.find(i => i.id === modalStack[modalStack.length - 1].itemId));
-                recalcTotal(); renderRestaurantMenu();
-            }
-        }
-
-        function modalCloseAll() {
-            if (modalStack.length > 0) cartItems = modalStack[0].cartSnapshot;
-            modalStack = []; document.getElementById('modal-product').classList.add('hidden');
-            recalcTotal(); renderRestaurantMenu(); onBackClick(); 
-        }
-
-        function modalAddToCart() {
-            if(document.getElementById('m-add-btn').classList.contains('disabled')) return;
-            tg.HapticFeedback.notificationOccurred('success');
-            let optionsSum = 0; let optsNames = []; 
-            for(let key in selectedOptions) { optionsSum += selectedOptions[key].price; optsNames.push(selectedOptions[key].name); }
-            let pricePerUnit = currentModalItem.price + optionsSum;
-            let cartKey = currentModalItem.id + (optsNames.length > 0 ? '-' + optsNames.join('-') : '');
-            
-            if (optsNames.length > 0 && cartItems[currentModalItem.id]) delete cartItems[currentModalItem.id];
-            cartItems[cartKey] = { count: currentModalCount, item: currentModalItem, optionsData: optsNames.join(', '), pricePerUnit: pricePerUnit, resId: currentRestaurantId };
-            
-            modalStack = []; document.getElementById('modal-product').classList.add('hidden');
-            recalcTotal(); renderRestaurantMenu(); onBackClick();
-        }
-
-        // КОРЗИНА И ОФОРМЛЕНИЕ
         function openCartList() {
-            closeAllModals(); 
-            let resIdsInCart = [...new Set(Object.values(cartItems).map(c => c.resId))];
-            if(!cartActiveTabResId || !resIdsInCart.includes(cartActiveTabResId)) cartActiveTabResId = resIdsInCart[0];
-            renderCartListTabs(resIdsInCart); renderCartListItems(); 
+            let resIds = [...new Set(Object.values(cartItems).map(c => c.resId))];
+            if(!cartActiveTabResId || !resIds.includes(cartActiveTabResId)) cartActiveTabResId = resIds[0];
+            renderCartListItems(); 
             history.pushState({screen: 'cart-list'}, ''); showScreen('cart-list');
         }
 
-        function renderCartListTabs(resIds) {
-            let tabsHtml = ''; resIds.forEach(resId => { let isActive = resId === cartActiveTabResId ? 'active' : ''; let sum = 0; for(let k in cartItems) { if(cartItems[k].resId === resId) sum += (cartItems[k].pricePerUnit * cartItems[k].count); } tabsHtml += `<div class="cart-res-tab ${isActive}" onclick="switchCartTab('${resId}')">${database[resId].title}<span>${sum} сом</span></div>`; });
-            document.getElementById('cart-res-tabs').innerHTML = tabsHtml; document.getElementById('cart-res-tabs').style.display = resIds.length > 1 ? 'flex' : 'none';
-        }
-
-        function switchCartTab(resId) { cartActiveTabResId = resId; renderCartListTabs([...new Set(Object.values(cartItems).map(c => c.resId))]); renderCartListItems(); }
-
         function renderCartListItems() {
-            let html = ''; let tabTotalSum = 0;
-            for(let key in cartItems) { let c = cartItems[key]; if(c.resId === cartActiveTabResId) { tabTotalSum += (c.pricePerUnit * c.count); html += `<div class="cart-item-row"><img src="${c.item.img}"><div class="cart-item-info"><div class="cart-item-title">${c.item.name}</div>${c.optionsData ? `<div class="cart-item-opts">${c.optionsData}</div>` : ''}<div class="cart-item-price">${c.pricePerUnit} сом</div></div><div class="cart-item-counter"><div onclick="updateCartListCount('${key}', -1)">−</div><div style="cursor:default; width:20px; text-align:center;">${c.count}</div><div onclick="updateCartListCount('${key}', 1)">+</div></div></div>`; } }
+            let html = ''; let sum = 0;
+            for(let key in cartItems) { 
+                let c = cartItems[key]; 
+                if(c.resId === cartActiveTabResId) { 
+                    sum += (c.pricePerUnit * c.count); 
+                    html += `<div class="cart-item-row"><img src="${c.item.img}"><div class="cart-item-info"><div class="cart-item-title">${c.item.name}</div><div class="cart-item-price">${c.pricePerUnit} сом</div></div><div class="cart-item-counter"><div onclick="updateCartListCount('${key}', -1)">−</div><div style="cursor:default; width:20px; text-align:center;">${c.count}</div><div onclick="updateCartListCount('${key}', 1)">+</div></div></div>`; 
+                } 
+            }
             document.getElementById('cart-list-container').innerHTML = html; 
-            document.getElementById('cart-list-total-sum').innerText = tabTotalSum + " сом"; 
-            document.getElementById('cart-list-delivery').innerText = (tabTotalSum > 0 ? currentDeliveryFee : 0) + " сом";
+            document.getElementById('cart-list-total-sum').innerText = sum + " сом"; 
+            document.getElementById('cart-list-delivery').innerText = (sum > 0 ? currentDeliveryFee : 0) + " сом";
         }
 
         function updateCartListCount(key, delta) {
-            if(!cartItems[key]) return;
             cartItems[key].count += delta; 
             if(cartItems[key].count <= 0) delete cartItems[key]; 
             recalcTotal();
-            if(totalSum === 0) { closeAllModals(); showScreen('main'); return; }
-            let resIdsInCart = [...new Set(Object.values(cartItems).map(c => c.resId))]; 
-            if(!resIdsInCart.includes(cartActiveTabResId)) cartActiveTabResId = resIdsInCart[0];
-            renderCartListTabs(resIdsInCart); renderCartListItems(); renderRestaurantMenu();
-        }
-
-        function openClearCartModal() { document.getElementById('modal-clear-cart').classList.remove('hidden'); history.pushState({modal: 'clear-cart'}, ''); }
-        function executeClearCart() { 
-            for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; } 
-            recalcTotal(); document.getElementById('modal-clear-cart').classList.add('hidden');
-            if(totalSum === 0) { closeAllModals(); showScreen('main'); } 
-            else { let resIdsInCart = [...new Set(Object.values(cartItems).map(c => c.resId))]; cartActiveTabResId = resIdsInCart[0]; renderCartListTabs(resIdsInCart); renderCartListItems(); } 
+            if(totalSum === 0) { showScreen('main'); return; }
+            renderCartListItems();
         }
 
         // ==========================================
-        // ПЕРЕХОД К ОФОРМЛЕНИЮ И ГЕОКОДИРОВАНИЕ
+        // ОФОРМЛЕНИЕ И КАРТА
         // ==========================================
-        
         function goToCheckout() {
-            let tabTotalSum = 0; 
-            for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) tabTotalSum += (cartItems[k].pricePerUnit * cartItems[k].count); } 
-            if(tabTotalSum === 0) return;
-            
+            if(totalSum === 0) return;
             const activeRes = database[cartActiveTabResId];
             
-            // Загрузка прошлого адреса из памяти
-            let savedAddresses = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-            
-            if (savedAddresses.length > 0) {
-                // Если есть сохраненные, берем последний
-                clientLat = savedAddresses[0].lat;
-                clientLon = savedAddresses[0].lon;
-                setTimeout(() => {
-                    document.getElementById('checkout-address').value = savedAddresses[0].street;
-                    document.getElementById('chk-dom').value = savedAddresses[0].dom;
-                }, 50);
-            } else {
-                // Иначе ставим точку рядом с рестораном
-                clientLat = activeRes.lat + 0.005;
-                clientLon = activeRes.lon + 0.005;
+            // Если клиент еще не выбирал адрес, ставим дефолт (Чолпон-Ата центр)
+            if (!clientLat) {
+                let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+                if (saved.length > 0) {
+                    selectSavedAddressData(saved[0]);
+                } else {
+                    clientLat = activeRes.lat + 0.005;
+                    clientLon = activeRes.lon + 0.005;
+                }
             }
 
-            setDeliveryMode('delivery'); 
             document.getElementById('pickup-address').innerText = activeRes.address; 
-            
+            setDeliveryMode('delivery'); 
             renderSavedAddressesUI(); 
+            updateCheckoutSummaryUI();
 
             history.pushState({screen: 'checkout'}, ''); showScreen('checkout');
-
-            // Подготавливаем карту в фоне
-            setTimeout(() => { initCheckoutMap(activeRes.lat, activeRes.lon); }, 100);
         }
-
-        // --- ЛОГИКА СОХРАНЕНИЯ АДРЕСОВ ---
-        function saveCurrentAddress() {
-            const street = document.getElementById('checkout-address').value;
-            const dom = document.getElementById('chk-dom').value;
-            if (!street) return alert("Укажите улицу перед сохранением!");
-
-            const fullText = street + (dom ? ", " + dom : "");
-            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-
-            if (saved.find(a => a.text === fullText)) {
-                return alert("Этот адрес уже сохранен!");
-            }
-
-            saved.unshift({
-                text: fullText,
-                street: street,
-                dom: dom,
-                lat: clientLat,
-                lon: clientLon
-            });
-
-            localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
-            renderSavedAddressesUI();
-            tg.HapticFeedback.notificationOccurred('success');
-            alert("Адрес успешно сохранен!");
-        }
-
-        function deleteSavedAddress(index) {
-            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-            saved.splice(index, 1);
-            localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
-            renderSavedAddressesUI();
-            tg.HapticFeedback.impactOccurred('light');
-        }
-
-        function selectSavedAddress(index) {
-            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-            let a = saved[index];
-            if (!a) return;
-
-            document.getElementById('checkout-address').value = a.street;
-            document.getElementById('chk-dom').value = a.dom;
-            clientLat = a.lat;
-            clientLon = a.lon;
-
-            if (checkoutMap && checkoutClientMarker) {
-                checkoutMap.setView([clientLat, clientLon], 15);
-                checkoutClientMarker.setLatLng([clientLat, clientLon]);
-            }
-            recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
-            tg.HapticFeedback.impactOccurred('light');
-        }
-
-        function renderSavedAddressesUI() {
-            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-            const wrapper = document.getElementById('saved-addresses-wrapper');
-            const list = document.getElementById('saved-addresses-list');
-
-            if (saved.length === 0) {
-                wrapper.classList.add('hidden');
-                return;
-            }
-
-            wrapper.classList.remove('hidden');
-            list.innerHTML = saved.map((a, index) => `
-                <div class="saved-addr-card">
-                    <div class="saved-addr-info" onclick="selectSavedAddress(${index})">📍 ${a.text}</div>
-                    <div class="saved-addr-del" onclick="deleteSavedAddress(${index})">✕</div>
-                </div>
-            `).join('');
-        }
-
-        function renderSavedAddressesInProfile() {
-            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-            const container = document.getElementById('profile-address-text');
-            if (saved.length === 0) {
-                container.innerHTML = "У вас пока нет сохраненных адресов.";
-            } else {
-                container.innerHTML = saved.map(a => `<div style="padding: 8px 0; border-bottom: 1px solid #eee;">📍 ${a.text}</div>`).join('');
-            }
-        }
-        // --------------------------------
 
         function openMapModal() {
             document.getElementById('modal-map').classList.remove('hidden');
             history.pushState({modal: 'map'}, '');
-            setTimeout(() => { 
-                if (checkoutMap) checkoutMap.invalidateSize(); 
-            }, 50);
+            
+            const activeRes = database[cartActiveTabResId];
+            setTimeout(() => { initCheckoutMap(activeRes.lat, activeRes.lon); }, 50);
+            
+            // Заполняем поля карты текущими данными
+            document.getElementById('map-street').value = orderAddressData.street;
+            document.getElementById('map-dom').value = orderAddressData.dom;
+            document.getElementById('map-pod').value = orderAddressData.pod;
+            document.getElementById('map-etaj').value = orderAddressData.etaj;
+            document.getElementById('map-kv').value = orderAddressData.kv;
+            document.getElementById('map-comment').value = orderAddressData.comment;
         }
 
-        async function geocodeAddress() {
-            const street = document.getElementById('checkout-address').value;
-            const dom = document.getElementById('chk-dom').value;
-            if (!street) return;
+        function confirmMapAddress() {
+            orderAddressData.street = document.getElementById('map-street').value;
+            orderAddressData.dom = document.getElementById('map-dom').value;
+            orderAddressData.pod = document.getElementById('map-pod').value;
+            orderAddressData.etaj = document.getElementById('map-etaj').value;
+            orderAddressData.kv = document.getElementById('map-kv').value;
+            orderAddressData.comment = document.getElementById('map-comment').value;
 
-            const query = `${globalCity}, ${street} ${dom}`;
+            if (!orderAddressData.street) return alert("Пожалуйста, укажите улицу или ориентир!");
+
+            updateCheckoutSummaryUI();
+            updateReceipt();
+            onBackClick(); // Закрываем модалку
+        }
+
+        function updateCheckoutSummaryUI() {
+            let title = "Укажите адрес на карте";
+            let details = "Нажмите, чтобы выбрать";
+
+            if (orderAddressData.street) {
+                title = orderAddressData.street + (orderAddressData.dom ? `, ${orderAddressData.dom}` : "");
+                let extra = [];
+                if(orderAddressData.pod) extra.push(`под.${orderAddressData.pod}`);
+                if(orderAddressData.etaj) extra.push(`эт.${orderAddressData.etaj}`);
+                if(orderAddressData.kv) extra.push(`кв.${orderAddressData.kv}`);
+                details = extra.length > 0 ? extra.join(', ') : "Уточните подъезд и квартиру";
+            }
+
+            document.getElementById('checkout-summary-address').innerText = title;
+            document.getElementById('checkout-summary-details').innerText = details;
+        }
+
+        // --- Геокодирование на Карте ---
+        async function geocodeMapSearch() {
+            const query = document.getElementById('map-search-input').value;
+            if (!query) return;
+
             try {
-                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&accept-language=ru`);
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(globalCity + ', ' + query)}&accept-language=ru`);
                 const data = await response.json();
-                
                 if (data && data.length > 0) {
                     clientLat = parseFloat(data[0].lat);
                     clientLon = parseFloat(data[0].lon);
-                    
-                    if (checkoutMap && checkoutClientMarker) {
-                        checkoutMap.setView([clientLat, clientLon], 15);
-                        checkoutClientMarker.setLatLng([clientLat, clientLon]);
-                    }
-                    const activeRes = database[cartActiveTabResId];
-                    if (activeRes) recalcCheckoutDelivery(activeRes.lat, activeRes.lon);
+                    if (checkoutMap) { checkoutMap.setView([clientLat, clientLon], 15); checkoutClientMarker.setLatLng([clientLat, clientLon]); }
+                    reverseGeocode(clientLat, clientLon);
                 }
-            } catch (err) { console.error("Ошибка поиска", err); }
+            } catch (err) {}
         }
 
         async function reverseGeocode(lat, lon) {
             try {
                 const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=ru`);
                 const data = await response.json();
-                
                 if (data && data.address) {
-                    let street = data.address.road || data.address.pedestrian || data.address.residential || "";
+                    let street = data.address.road || data.address.pedestrian || data.address.village || "";
                     let house = data.address.house_number || data.address.building || "";
                     
-                    let fullAddress = street;
-                    if (street && house) fullAddress += ", " + house;
-                    else if (house) fullAddress = house;
-                    
-                    if (fullAddress) {
-                        document.getElementById('checkout-address').value = fullAddress;
-                        document.getElementById('modal-map-address').innerText = fullAddress;
-                    }
-                    if (house) document.getElementById('chk-dom').value = house;
+                    document.getElementById('map-street').value = street;
+                    document.getElementById('map-dom').value = house;
                 }
-            } catch(e) { console.error("Ошибка обратного геокодирования", e); }
+            } catch(e) {}
+            recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
         }
 
         function initCheckoutMap(resLat, resLon) {
@@ -1060,17 +616,13 @@
                 checkoutClientMarker = L.marker([clientLat, clientLon], {icon: clientIcon, draggable: true}).addTo(checkoutMap).bindPopup("Доставить сюда").openPopup();
                 
                 checkoutClientMarker.on('dragend', function (e) {
-                    clientLat = e.target.getLatLng().lat;
-                    clientLon = e.target.getLatLng().lng;
-                    recalcCheckoutDelivery(resLat, resLon);
+                    clientLat = e.target.getLatLng().lat; clientLon = e.target.getLatLng().lng;
                     reverseGeocode(clientLat, clientLon);
                 });
 
                 checkoutMap.on('click', function(e) {
-                    clientLat = e.latlng.lat;
-                    clientLon = e.latlng.lng;
+                    clientLat = e.latlng.lat; clientLon = e.latlng.lng;
                     checkoutClientMarker.setLatLng([clientLat, clientLon]);
-                    recalcCheckoutDelivery(resLat, resLon);
                     reverseGeocode(clientLat, clientLon);
                 });
             } else {
@@ -1079,16 +631,66 @@
                 checkoutResMarker.setLatLng([resLat, resLon]);
             }
             recalcCheckoutDelivery(resLat, resLon);
-            reverseGeocode(clientLat, clientLon); // Чтобы сразу в модалке был текст
         }
 
         function recalcCheckoutDelivery(resLat, resLon) {
             currentDeliveryFee = calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon);
-            updateReceipt();
-            // Обновляем цену в модалке карты
             document.getElementById('modal-map-price').innerText = currentDeliveryFee + ' сом';
         }
 
+        // --- Логика Сохранения Адресов ---
+        function saveCurrentAddress() {
+            if (!orderAddressData.street) return alert("Сначала выберите адрес на карте!");
+            const fullText = orderAddressData.street + (orderAddressData.dom ? ", " + orderAddressData.dom : "");
+            
+            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+            if (saved.find(a => a.text === fullText)) return alert("Этот адрес уже сохранен!");
+
+            saved.unshift({ text: fullText, ...orderAddressData, lat: clientLat, lon: clientLon });
+            localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+            renderSavedAddressesUI();
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+
+        function deleteSavedAddress(index) {
+            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+            saved.splice(index, 1);
+            localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+            renderSavedAddressesUI();
+        }
+
+        function selectSavedAddress(index) {
+            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+            if (saved[index]) selectSavedAddressData(saved[index]);
+        }
+
+        function selectSavedAddressData(data) {
+            orderAddressData.street = data.street;
+            orderAddressData.dom = data.dom;
+            orderAddressData.pod = data.pod || '';
+            orderAddressData.etaj = data.etaj || '';
+            orderAddressData.kv = data.kv || '';
+            orderAddressData.comment = data.comment || '';
+            clientLat = data.lat;
+            clientLon = data.lon;
+            updateCheckoutSummaryUI();
+            updateReceipt();
+        }
+
+        function renderSavedAddressesUI() {
+            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+            const wrapper = document.getElementById('saved-addresses-wrapper');
+            if (saved.length === 0) { wrapper.classList.add('hidden'); return; }
+            wrapper.classList.remove('hidden');
+            document.getElementById('saved-addresses-list').innerHTML = saved.map((a, i) => `
+                <div class="saved-addr-card">
+                    <div class="saved-addr-info" onclick="selectSavedAddress(${i})">📍 ${a.text}</div>
+                    <div class="saved-addr-del" onclick="deleteSavedAddress(${i})">✕</div>
+                </div>
+            `).join('');
+        }
+
+        // --- Финал и Оплата ---
         function setDeliveryMode(mode) {
             document.getElementById('tab-delivery').classList.remove('active');
             document.getElementById('tab-pickup').classList.remove('active');
@@ -1096,13 +698,7 @@
                 document.getElementById('tab-delivery').classList.add('active');
                 document.getElementById('block-delivery').classList.remove('hidden');
                 document.getElementById('block-pickup').classList.add('hidden');
-                
-                const activeRes = database[cartActiveTabResId];
-                if(activeRes && clientLat && clientLon) {
-                    currentDeliveryFee = calculateDynamicDeliveryFee(activeRes.lat, activeRes.lon, clientLat, clientLon);
-                } else {
-                    currentDeliveryFee = 100;
-                }
+                if(clientLat && clientLon) currentDeliveryFee = calculateDynamicDeliveryFee(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon, clientLat, clientLon);
             } else {
                 document.getElementById('tab-pickup').classList.add('active');
                 document.getElementById('block-delivery').classList.add('hidden');
@@ -1117,17 +713,14 @@
             for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) tabTotalSum += (cartItems[k].pricePerUnit * cartItems[k].count); }
             document.getElementById('check-items').innerText = tabTotalSum + ' сом';
             document.getElementById('check-delivery').innerText = currentDeliveryFee + ' сом';
-            let total = tabTotalSum + currentDeliveryFee;
-            document.getElementById('check-total').innerText = total + ' сом';
-            document.getElementById('pay-btn-sum').innerText = total + ' сом';
+            document.getElementById('check-total').innerText = (tabTotalSum + currentDeliveryFee) + ' сом';
+            document.getElementById('pay-btn-sum').innerText = (tabTotalSum + currentDeliveryFee) + ' сом';
         }
 
         async function createOrder() {
-            const street = document.getElementById('checkout-address').value;
-            const dom = document.getElementById('chk-dom').value;
-            if (!street && currentDeliveryFee > 0) return alert("Пожалуйста, укажите улицу!");
-
-            const fullAddress = street; 
+            if (!orderAddressData.street && currentDeliveryFee > 0) return alert("Пожалуйста, укажите адрес доставки!");
+            
+            const fullAddress = `${orderAddressData.street} ${orderAddressData.dom}, кв.${orderAddressData.kv} (Под:${orderAddressData.pod}, Эт:${orderAddressData.etaj})`;
             
             const orderData = {
                 type: 'food', 
@@ -1137,7 +730,7 @@
                 dest_lon: clientLon, 
                 restaurantName: database[cartActiveTabResId]?.title || "Ресторан",
                 totalPrice: totalSum + currentDeliveryFee,
-                comment: document.getElementById('order-comment')?.value || "",
+                comment: orderAddressData.comment,
                 items: Object.values(cartItems).filter(item => item.resId === cartActiveTabResId)
             };
 
@@ -1149,66 +742,12 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(orderData)
                 });
-
                 if (response.ok) {
-                    showStatusScreen();
-                    startStatusProgression();
-                    for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
-                    recalcTotal();
-                } else {
-                    alert("Ошибка сервера.");
+                    showScreen('status');
+                    document.getElementById('st-res-name').innerText = database[cartActiveTabResId]?.title;
+                    document.getElementById('st-total').innerText = (totalSum + currentDeliveryFee) + " сом";
                 }
-            } catch (e) {
-                alert("Ошибка сети: " + e.message);
-            }
-        }
-
-        // ЭКРАН СТАТУСА 
-        let statusMap;
-        let statusCourierMarker;
-
-        function showStatusScreen() {
-            showScreen('status');
-            document.getElementById('st-res-name').innerText = "Из: " + (database[cartActiveTabResId]?.title || "Ресторана");
-            document.getElementById('st-total').innerText = (totalSum + currentDeliveryFee) + " сом";
-            let itemsHtml = '';
-            for (let k in cartItems) {
-                if (cartItems[k].resId === cartActiveTabResId) {
-                    itemsHtml += `<div class="st-item"><span style="font-weight:600">${cartItems[k].count}x ${cartItems[k].item.name}</span><span>${cartItems[k].pricePerUnit * cartItems[k].count} сом</span></div>`;
-                }
-            }
-            document.getElementById('st-items-list').innerHTML = itemsHtml;
-        }
-
-        function initStatusMap(resLat, resLng, userLat, userLng) {
-            if (statusMap) return;
-            statusMap = L.map('map').setView([resLat, resLng], 14);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(statusMap);
-            L.marker([resLat, resLng]).addTo(statusMap).bindPopup('Ресторан').openPopup();
-            L.marker([userLat, userLng]).addTo(statusMap).bindPopup('Ваш дом');
-            statusCourierMarker = L.marker([resLat, resLng], {
-                icon: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/2972/2972185.png', iconSize: [30, 30] })
-            }).addTo(statusMap).bindPopup('Курьер едет!');
-        }
-
-        function startStatusProgression() {
-            const statuses = [
-                { text: "Обрабатывается...", status: "pending" },
-                { text: "Готовится 👨‍🍳", status: "cooking" },
-                { text: "Курьер в пути! 🚴", status: "delivery" }
-            ];
-            let step = 0;
-            const activeRes = database[cartActiveTabResId] || database['asian1'];
-
-            const interval = setInterval(() => {
-                if (step < statuses.length) {
-                    document.getElementById('st-current-status').innerText = statuses[step].text;
-                    if (statuses[step].status === "delivery") {
-                        initStatusMap(activeRes.lat, activeRes.lon, clientLat, clientLon);
-                    }
-                    step++;
-                } else clearInterval(interval);
-            }, 5000); 
+            } catch (e) { alert("Ошибка сети"); }
         }
     </script>
 </body>
