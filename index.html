@@ -126,23 +126,19 @@
         .delivery-toggle { display: flex; background: var(--bg-color); border-radius: 12px; padding: 4px; margin-bottom: 20px; }
         .toggle-btn { flex: 1; text-align: center; padding: 10px; font-size: 14px; font-weight: 600; border-radius: 10px; color: var(--text-gray); cursor: pointer; transition: 0.2s; }
         .toggle-btn.active { background: white; color: var(--text-dark); box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
-        .input-w-icon { position: relative; margin-bottom: 12px; }
-        .input-w-icon input { width: 100%; background: var(--bg-color); border: none; padding: 14px 40px 14px 12px; border-radius: 12px; font-size: 14px; outline: none; box-sizing: border-box; }
-        .input-w-icon .icon { position: absolute; right: 12px; top: 12px; font-size: 18px; cursor: pointer; }
+        .input-w-icon { position: relative; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .input-w-icon input { flex-grow: 1; background: var(--bg-color); border: none; padding: 14px; border-radius: 12px; font-size: 14px; outline: none; box-sizing: border-box; }
+        .map-toggle-btn { width: 44px; height: 44px; background: var(--bg-color); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; border: 1px solid #eee; transition: 0.2s; }
+        .map-toggle-btn:active { background: #eee; }
+        
         .full-width-input { width: 100%; background: var(--bg-color); border: none; padding: 14px 12px; border-radius: 12px; font-size: 14px; outline: none; box-sizing: border-box; margin-bottom: 12px; }
         .inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .input-group { display: flex; flex-direction: column; margin-bottom: 12px; }
         .input-group label { font-size: 12px; color: var(--text-gray); margin-bottom: 4px; }
         .input-group input, .input-group select { background: var(--bg-color); border: none; padding: 14px; border-radius: 12px; font-size: 14px; outline: none; -webkit-appearance: none; appearance: none;}
-        .pickup-chip { border: 1px solid #E0E0E0; display: inline-block; padding: 6px 12px; border-radius: 12px; margin-bottom: 20px; }
         .pickup-address-box { display: flex; align-items: center; background: var(--bg-color); padding: 14px; border-radius: 16px; margin-bottom: 16px;}
         .pickup-address-text { flex-grow: 1; margin-left: 10px; line-height: 1.4; }
         .pickup-address-title { font-size: 14px; color: var(--text-dark); }
-        .payment-methods { display: flex; gap: 10px; overflow-x: auto; margin-bottom: 10px; padding-bottom: 5px; scrollbar-width: none;}
-        .payment-methods::-webkit-scrollbar { display: none; }
-        .pay-card { min-width: 100px; border: 2px solid #eee; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; height: 50px; font-weight: 600; font-size: 14px; background: white; cursor: pointer;}
-        .pay-card.active { border: 2px solid var(--text-dark); background: #fafafa; }
-        .pay-card.disabled { opacity: 0.5; cursor: not-allowed; background: var(--bg-color); border: 1px solid #eee;}
         .receipt-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 12px; color: #555; }
         .receipt-total { display: flex; justify-content: space-between; font-size: 18px; font-weight: 800; margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee; color: black; }
         .pay-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card-bg); padding: 16px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; z-index: 1000; padding-bottom: 20px;}
@@ -186,12 +182,6 @@
         .profile-s-header { display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 15px; margin-bottom: 10px; }
         .profile-add-btn { background: var(--text-dark); color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
         .profile-s-body { font-size: 14px; color: var(--text-gray); }
-        .profile-history-list { display: flex; flex-direction: column; gap: 10px; }
-        .p-history-item { display: flex; justify-content: space-between; font-size: 14px; color: var(--text-gray); padding: 8px 0; border-bottom: 1px solid #eee; }
-        .p-history-item:last-child { border-bottom: none; }
-        .profile-menu-list-c { display: flex; flex-direction: column; gap: 4px; }
-        .p-menu-item { padding: 16px; background: #eee; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
-        .profile-logout-b { color: #d32f2f; background: #ffebee; }
     </style>
 </head>
 <body>
@@ -287,15 +277,17 @@
             </div>
 
             <div id="block-delivery">
-                <h3 class="section-title" style="margin-top: 0;">Куда везти? Укажите на карте</h3>
-                
-                <div id="checkout-map" style="height: 200px; border-radius: 12px; margin-bottom: 16px; z-index: 1;"></div>
+                <h3 class="section-title" style="margin-top: 0;">Куда везти?</h3>
                 
                 <div class="input-w-icon">
-                    <input type="text" id="checkout-address" placeholder="📍 Улица / Микрорайон">
+                    <input type="text" id="checkout-address" placeholder="📍 Улица (напр. Чуй)" onchange="geocodeAddress()">
+                    <div class="map-toggle-btn" onclick="toggleCheckoutMap()">🗺️</div>
                 </div>
+                
+                <div id="checkout-map" class="hidden" style="height: 220px; border-radius: 12px; margin-bottom: 16px; z-index: 1;"></div>
+                
                 <div class="inputs-grid">
-                    <div class="input-group"><label>Дом</label><input type="text" id="chk-dom" placeholder="57"></div>
+                    <div class="input-group"><label>Дом</label><input type="text" id="chk-dom" placeholder="57" onchange="geocodeAddress()"></div>
                     <div class="input-group"><label>Подъезд</label><input type="text" id="chk-pod" placeholder="1"></div>
                     <div class="input-group"><label>Этаж</label><input type="number" id="chk-etaj" placeholder="2"></div>
                     <div class="input-group"><label>Квартира</label><input type="number" id="chk-kv" placeholder="4"></div>
@@ -455,6 +447,7 @@
         // Переменные для новой карты оформления
         let checkoutMap;
         let checkoutClientMarker;
+        let checkoutResMarker; // Маркер ресторана
         let clientLat = null;
         let clientLon = null;
 
@@ -500,7 +493,6 @@
             });
         }
 
-        // ДОБАВЛЕНЫ КООРДИНАТЫ РЕСТОРАНОВ ДЛЯ РАСЧЕТА
         const database = {
             'asian1': { lat: 42.8746, lon: 74.5698, city: 'Бишкек', title: 'Дракон Суши', logo: 'https://images.unsplash.com/photo-1553621042-f6e147245754?w=100', address: 'пр. Шабдана баатыра 11К', rating: 4.7, tags: ['sushi', 'promo'], img: 'https://images.unsplash.com/photo-1553621042-f6e147245754?w=600', categories: ['Акции', 'Холодные роллы', 'Напитки'], items: [...generateItems('Акции', 'asian', 'asian1'), ...generateItems('Холодные роллы', 'asian', 'asian1'), ...generateItems('Напитки', 'asian', 'asian1')] },
             'fast1': { lat: 42.8800, lon: 74.5800, city: 'Бишкек', title: 'Burger Spot', logo: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=100', address: 'ул. Ахунбаева 94', rating: 4.2, tags: ['fastfood'], img: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=600', categories: ['Бургеры', 'Напитки'], items: [...generateItems('Бургеры', 'fastfood', 'fast1'), ...generateItems('Напитки', 'fastfood', 'fast1')] },
@@ -832,27 +824,73 @@
             else { let resIdsInCart = [...new Set(Object.values(cartItems).map(c => c.resId))]; cartActiveTabResId = resIdsInCart[0]; renderCartListTabs(resIdsInCart); renderCartListItems(); } 
         }
 
-        // ПЕРЕХОД К ОФОРМЛЕНИЮ + КАРТА
+        // ==========================================
+        // ПЕРЕХОД К ОФОРМЛЕНИЮ И ГЕОКОДИРОВАНИЕ
+        // ==========================================
+        
         function goToCheckout() {
             let tabTotalSum = 0; 
             for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) tabTotalSum += (cartItems[k].pricePerUnit * cartItems[k].count); } 
             if(tabTotalSum === 0) return;
             
             const activeRes = database[cartActiveTabResId];
-            
-            // Задаем начальную точку клиента чуть в стороне от ресторана
             clientLat = activeRes.lat + 0.005;
             clientLon = activeRes.lon + 0.005;
 
+            // Скрываем карту при входе
+            document.getElementById('checkout-map').classList.add('hidden');
+
             setDeliveryMode('delivery'); 
             document.getElementById('pickup-address').innerText = activeRes.address; 
-            
             history.pushState({screen: 'checkout'}, ''); showScreen('checkout');
 
-            // Инициализируем карту через 100мс, чтобы HTML успел отобразиться
-            setTimeout(() => {
-                initCheckoutMap(activeRes.lat, activeRes.lon);
-            }, 100);
+            setTimeout(() => { initCheckoutMap(activeRes.lat, activeRes.lon); }, 100);
+        }
+
+        // Открытие/скрытие карты по кнопке
+        function toggleCheckoutMap() {
+            const mapDiv = document.getElementById('checkout-map');
+            mapDiv.classList.toggle('hidden');
+            if (!mapDiv.classList.contains('hidden') && checkoutMap) {
+                setTimeout(() => { checkoutMap.invalidateSize(); }, 100);
+            }
+        }
+
+        // Поиск координат по названию улицы (Прямое геокодирование)
+        async function geocodeAddress() {
+            const street = document.getElementById('checkout-address').value;
+            const dom = document.getElementById('chk-dom').value;
+            if (!street) return;
+
+            const query = `${globalCity}, ${street} ${dom}`;
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                
+                if (data && data.length > 0) {
+                    clientLat = parseFloat(data[0].lat);
+                    clientLon = parseFloat(data[0].lon);
+                    
+                    if (checkoutMap && checkoutClientMarker) {
+                        checkoutMap.setView([clientLat, clientLon], 15);
+                        checkoutClientMarker.setLatLng([clientLat, clientLon]);
+                    }
+                    const activeRes = database[cartActiveTabResId];
+                    if (activeRes) recalcCheckoutDelivery(activeRes.lat, activeRes.lon);
+                }
+            } catch (err) { console.error("Ошибка поиска", err); }
+        }
+
+        // Поиск улицы по перемещению маркера (Обратное геокодирование)
+        async function reverseGeocode(lat, lon) {
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                const data = await response.json();
+                if (data && data.address) {
+                    if (data.address.road) document.getElementById('checkout-address').value = data.address.road;
+                    if (data.address.house_number) document.getElementById('chk-dom').value = data.address.house_number;
+                }
+            } catch(e) {}
         }
 
         function initCheckoutMap(resLat, resLon) {
@@ -860,27 +898,32 @@
                 checkoutMap = L.map('checkout-map').setView([clientLat, clientLon], 14);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(checkoutMap);
                 
-                const clientIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/149/149059.png', iconSize: [36, 36], iconAnchor: [18, 36] });
-                checkoutClientMarker = L.marker([clientLat, clientLon], {icon: clientIcon, draggable: true}).addTo(checkoutMap).bindPopup("Доставить сюда").openPopup();
+                // Маркер Ресторана (Оранжевый)
+                const resIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180209.png', iconSize: [32, 32] });
+                checkoutResMarker = L.marker([resLat, resLon], {icon: resIcon}).addTo(checkoutMap).bindPopup("Ресторан");
                 
-                // Пересчет при перетаскивании маркера
+                // Маркер Клиента (Синий)
+                const clientIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/149/149059.png', iconSize: [36, 36], iconAnchor: [18, 36] });
+                checkoutClientMarker = L.marker([clientLat, clientLon], {icon: clientIcon, draggable: true}).addTo(checkoutMap).bindPopup("Доставить сюда");
+                
                 checkoutClientMarker.on('dragend', function (e) {
                     clientLat = e.target.getLatLng().lat;
                     clientLon = e.target.getLatLng().lng;
                     recalcCheckoutDelivery(resLat, resLon);
+                    reverseGeocode(clientLat, clientLon); // Авто-заполнение улицы
                 });
 
-                // Пересчет при клике по карте
                 checkoutMap.on('click', function(e) {
                     clientLat = e.latlng.lat;
                     clientLon = e.latlng.lng;
                     checkoutClientMarker.setLatLng([clientLat, clientLon]);
                     recalcCheckoutDelivery(resLat, resLon);
+                    reverseGeocode(clientLat, clientLon); // Авто-заполнение улицы
                 });
             } else {
                 checkoutMap.setView([clientLat, clientLon], 14);
                 checkoutClientMarker.setLatLng([clientLat, clientLon]);
-                checkoutMap.invalidateSize(); // Помогает, если карта "сломалась" внутри скрытого div
+                checkoutResMarker.setLatLng([resLat, resLon]);
             }
             recalcCheckoutDelivery(resLat, resLon);
         }
@@ -930,13 +973,12 @@
 
             const fullAddress = `${globalCity}, ${street}, д.${dom || '-'}`;
             
-            // ДАННЫЕ ЛЕТЯТ НА СЕРВЕР
             const orderData = {
-                type: 'food', // Сообщаем серверу, что это еда
-                user: tg.initDataUnsafe?.user || { id: 111, first_name: "Тест Юзер" }, // Заглушка, если открыли не в телеграме
+                type: 'food', 
+                user: tg.initDataUnsafe?.user || { id: 111, first_name: "Тест Юзер" }, 
                 address: fullAddress, 
-                dest_lat: clientLat, // Координаты доставки
-                dest_lon: clientLon, // Координаты доставки
+                dest_lat: clientLat, 
+                dest_lon: clientLon, 
                 restaurantName: database[cartActiveTabResId]?.title || "Ресторан",
                 totalPrice: totalSum + currentDeliveryFee,
                 comment: document.getElementById('order-comment')?.value || "",
@@ -1006,7 +1048,6 @@
                 if (step < statuses.length) {
                     document.getElementById('st-current-status').innerText = statuses[step].text;
                     if (statuses[step].status === "delivery") {
-                        // Инициализируем карту со статусом
                         initStatusMap(activeRes.lat, activeRes.lon, clientLat, clientLon);
                     }
                     step++;
