@@ -713,8 +713,46 @@
         }
 
         function recalcCheckoutDelivery(resLat, resLon) {
-            currentDeliveryFee = calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon);
-            document.getElementById('modal-map-price').innerText = currentDeliveryFee + ' сом';
+            // Считаем расстояние по прямой
+            const straightDist = getDistance(resLat, resLon, clientLat, clientLon);
+            
+            // === ОГРАНИЧЕНИЕ ЗОНЫ ДОСТАВКИ (МАКСИМУМ 15 КМ) ===
+            const MAX_DISTANCE_KM = 20; 
+            
+            const priceElement = document.getElementById('modal-map-price');
+            const submitButton = document.querySelector('#modal-map .btn-yellow'); // Кнопка "Готово" на карте
+
+            if (straightDist > MAX_DISTANCE_KM) {
+                // Если точка слишком далеко
+                currentDeliveryFee = 0; // Обнуляем цену
+                priceElement.innerText = 'Вне зоны доставки';
+                priceElement.style.color = '#d32f2f'; // Делаем текст красным
+                priceElement.style.fontSize = '14px'; // Уменьшаем шрифт, чтобы влезло
+                
+                // Блокируем кнопку "Готово"
+                submitButton.classList.add('disabled');
+                submitButton.style.pointerEvents = 'none';
+                submitButton.innerText = 'Слишком далеко от ресторана';
+                
+                // Вибрируем, чтобы клиент понял, что что-то не так
+                if(tg) tg.HapticFeedback.notificationOccurred('error');
+            } else {
+                // Если точка в пределах нормы (стандартный расчет)
+                currentDeliveryFee = calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon);
+                
+                // Возвращаем нормальный вид цены
+                priceElement.innerText = currentDeliveryFee + ' сом';
+                priceElement.style.color = '#E65100';
+                priceElement.style.fontSize = '20px';
+                
+                // Разблокируем кнопку "Готово"
+                submitButton.classList.remove('disabled');
+                submitButton.style.pointerEvents = 'auto';
+                submitButton.innerText = 'Готово';
+            }
+            
+            // Обновляем общий чек на странице оформления
+            updateReceipt();
         }
 
         function locateUser() {
