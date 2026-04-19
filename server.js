@@ -27,10 +27,10 @@ const COURIER_GROUP_ID = process.env.COURIER_CHAT_ID || process.env.ADMIN_CHAT_I
 const REST_GROUP_ID = process.env.REST_CHAT_ID || process.env.ADMIN_CHAT_ID; // Группа кухни
 
 // 4. Запускаем логику модулей
+// 4. Запускаем логику модулей
 setupClientBot(bot, supabase, ADMIN_GROUP_ID);
 setupCourierBot(courierBot, bot, supabase, ADMIN_GROUP_ID);
-setupRestaurantBot(restBot, courierBot, supabase, REST_GROUP_ID, COURIER_GROUP_ID);
-
+setupRestaurantBot(restBot, courierBot, bot, supabase, REST_GROUP_ID, COURIER_GROUP_ID); // ДОБАВЛЕН bot
 
 // ==========================================
 // ПРИЕМ ЗАКАЗА ИЗ WEB APP
@@ -68,7 +68,8 @@ app.post('/web-data', async (req, res) => {
         await restBot.telegram.sendMessage(REST_GROUP_ID, msg, {
             reply_markup: {
                 inline_keyboard: [
-                    [{ text: '✅ Принять (Начать готовить)', callback_data: `rest_accept_${orderId}` }]
+                    [{ text: '✅ Принять (Начать готовить)', callback_data: `rest_accept_${orderId}` }],
+                    [{ text: '❌ Отклонить', callback_data: `rest_decline_${orderId}` }]
                 ]
             }
         });

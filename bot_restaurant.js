@@ -1,6 +1,7 @@
 const { Markup } = require('telegraf');
 
-module.exports = function setupRestaurantBot(restBot, courierBot, supabase, REST_GROUP_ID, COURIER_GROUP_ID) {
+// ДОБАВЛЕН clientBot в аргументы, чтобы ресторан мог уведомить клиента
+module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, supabase, REST_GROUP_ID, COURIER_GROUP_ID) {
     
     // 1. Ресторан принимает заказ в готовку
     restBot.action(/rest_accept_(.+)/, async (ctx) => {
@@ -17,7 +18,32 @@ module.exports = function setupRestaurantBot(restBot, courierBot, supabase, REST
         );
     });
 
-    // 2. Ресторан приготовил еду, ищем курьера
+    // 2. Ресторан ОТКЛОНЯЕТ заказ
+    restBot.action(/rest_decline_(.+)/, async (ctx) => {
+        const orderId = ctx.match[1];
+
+        // Получаем ID клиента, чтобы написать ему напрямую
+        const { data: order } = await supabase.from('orders').select('client_id').eq('id', orderId).single();
+
+        // Меняем статус в базе
+        await supabase.from('orders').update({ status: 'canceled' }).eq('id', orderId);
+
+        // Обновляем панель ресторана (чтобы другие повара видели, что заказ отменен)
+        await ctx.editMessageText(`❌ Вы отклонили заказ #${orderId.slice(0, 5)}.`);
+
+        // Уведомляем клиента через клиентского бота
+        if (order && order.client_id) {
+            try {
+                await clientBot.telegram.sendMessage(order.client_id, 
+                    `😔 К сожалению, ресторан не смог принять ваш заказ #${orderId.slice(0, 5)}.\nДеньги не были списаны. Попробуйте заказать чуть позже или выберите другое заведение.`
+                );
+            } catch (e) {
+                console.error("🔴 Не удалось отправить сообщение клиенту:", e.message);
+            }
+        }
+    });
+
+    // 3. Ресторан приготовил еду, ищем курьера
     restBot.action(/rest_ready_(.+)/, async (ctx) => {
         const orderId = ctx.match[1];
 
