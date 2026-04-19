@@ -6,7 +6,7 @@ module.exports = function setupClientBot(bot, supabase, ADMIN_GROUP_ID) {
     bot.start((ctx) => {
         ctx.reply('Добро пожаловать в ТамакKG! 🍔\nСамая быстрая доставка на Иссык-Куле.', 
             Markup.inlineKeyboard([
-                [Markup.button.webApp('🍕 Открыть меню', 'https://edilkg.github.io/superkgapp/?v=35')] 
+                [Markup.button.webApp('🍕 Открыть меню', 'https://edilkg.github.io/superkgapp/?v=36')] 
             ])
         );
     });
