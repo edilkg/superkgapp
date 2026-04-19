@@ -63,7 +63,8 @@ app.post('/web-data', async (req, res) => {
             : 'Детали заказа в системе';
 
         // 2. ОТПРАВЛЯЕМ В РЕСТОРАН (а не курьерам)
-        let msg = `🍔 НОВЫЙ ЗАКАЗ!\nНомер: #${orderId.slice(0,5)}\n\nЧто приготовить:\n${itemsText}\n\nСумма: ${totalPrice} сом`;
+        // 2. ОТПРАВЛЯЕМ В РЕСТОРАН (а не курьерам)
+        let msg = `🍔 НОВЫЙ ЗАКАЗ!\nНомер: #${String(orderId).slice(0,5)}\n\nЧто приготовить:\n${itemsText}\n\nСумма: ${totalPrice} сом`;
         
         await restBot.telegram.sendMessage(REST_GROUP_ID, msg, {
             reply_markup: {
