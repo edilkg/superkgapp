@@ -7,7 +7,7 @@ const { createClient } = require('@supabase/supabase-js');
 // 1. Подключаем модули
 const setupClientBot = require('./bot_client');
 const setupCourierBot = require('./bot_courier');
-const setupRestaurantBot = require('./bot_restaurant'); // Подключили Ресторан!
+const setupRestaurantBot = require('./bot_restaurant');
 
 const app = express();
 app.use(cors());
@@ -19,61 +19,61 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 // 3. Инициализация ВСЕХ ботов
 const bot = new Telegraf(process.env.BOT_TOKEN); 
 const courierBot = new Telegraf(process.env.COURIER_BOT_TOKEN); 
-const restBot = new Telegraf(process.env.REST_BOT_TOKEN); // Третий бот
+const restBot = new Telegraf(process.env.REST_BOT_TOKEN); 
 
-// ID Групп
+// ID Группы Админов
 const ADMIN_GROUP_ID = process.env.ADMIN_CHAT_ID; 
-const COURIER_GROUP_ID = process.env.COURIER_CHAT_ID || process.env.ADMIN_CHAT_ID; 
-const REST_GROUP_ID = process.env.REST_CHAT_ID || process.env.ADMIN_CHAT_ID; // Группа кухни
 
-// 4. Запускаем логику модулей
-// 4. Запускаем логику модулей
+// 4. Запускаем логику модулей (теперь аргументы правильные)
 setupClientBot(bot, supabase, ADMIN_GROUP_ID);
 setupCourierBot(courierBot, bot, supabase, ADMIN_GROUP_ID);
-setupRestaurantBot(restBot, courierBot, bot, supabase, REST_GROUP_ID, COURIER_GROUP_ID); // ДОБАВЛЕН bot
+setupRestaurantBot(restBot, courierBot, bot, supabase, ADMIN_GROUP_ID);
 
-// ==========================================
-// ПРИЕМ ЗАКАЗА ИЗ WEB APP
-// ==========================================
+// 5. ПРИЕМ ЗАКАЗОВ ОТ МИНИ-АППА
 app.post('/web-data', async (req, res) => {
-    // Добавили items (список блюд), чтобы показать их повару
-    const { user, address, restaurantName, totalPrice, comment, items } = req.body;
-
     try {
-        const { data: newOrder, error } = await supabase
-            .from('orders')
-            .insert([{
-                client_id: user?.id,
-                address: address,
-                restaurant: restaurantName,
-                total_price: totalPrice,
-                comment: comment,
-                status: 'pending'
-            }])
-            .select()
-            .single();
+        const { type, user, address, dest_lat, dest_lon, restaurantName, totalPrice, comment, items } = req.body;
 
-        if (error) throw error;
-        const orderId = newOrder.id;
-        console.log(`📦 Заказ #${orderId} создан в БД`);
+        if (type !== 'food') return res.status(400).json({ error: 'Неизвестный тип заказа' });
 
-        // Формируем красивый список еды для повара
-        let itemsText = items && items.length > 0 
-            ? items.map(i => `🔸 ${i.count}x ${i.item.name}`).join('\n') 
-            : 'Детали заказа в системе';
+        const itemsText = items.map(i => `▫️ ${i.item.name} x${i.count} (${i.pricePerUnit} сом)`).join('\n');
 
-        // 2. ОТПРАВЛЯЕМ В РЕСТОРАН (а не курьерам)
-        // 2. ОТПРАВЛЯЕМ В РЕСТОРАН (а не курьерам)
-        let msg = `🍔 НОВЫЙ ЗАКАЗ!\nНомер: #${String(orderId).slice(0,5)}\n\nЧто приготовить:\n${itemsText}\n\nСумма: ${totalPrice} сом`;
-        
-        await restBot.telegram.sendMessage(REST_GROUP_ID, msg, {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: '✅ Принять (Начать готовить)', callback_data: `rest_accept_${orderId}` }],
-                    [{ text: '❌ Отклонить', callback_data: `rest_decline_${orderId}` }]
-                ]
-            }
-        });
+        // Сохраняем в БД
+        const { data: orderData, error: dbError } = await supabase.from('orders').insert([{
+            client_id: user?.id || null,
+            client_name: user?.first_name || 'Гость',
+            address: address,
+            dest_lat: dest_lat,
+            dest_lon: dest_lon,
+            restaurant: restaurantName,
+            total_price: totalPrice,
+            comment: comment || '',
+            items: items,
+            status: 'new'
+        }]).select();
+
+        if (dbError) throw dbError;
+        const orderId = orderData[0].id;
+
+        // ИЩЕМ РЕСТОРАН В БАЗЕ ПО НАЗВАНИЮ (чтобы отправить в личку)
+        const { data: restData } = await supabase.from('restaurants').select('id').eq('name', restaurantName).single();
+
+        if (restData && restData.id) {
+            // Отправляем лично менеджеру
+            let msg = `🍔 НОВЫЙ ЗАКАЗ!\nНомер: #${String(orderId).slice(0,5)}\n\nЧто приготовить:\n${itemsText}\n\nСумма: ${totalPrice} сом\nКомментарий: ${comment || 'нет'}`;
+            
+            await restBot.telegram.sendMessage(restData.id, msg, {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '✅ Принять (Начать готовить)', callback_data: `rest_accept_${orderId}` }],
+                        [{ text: '❌ Отклонить', callback_data: `rest_decline_${orderId}` }]
+                    ]
+                }
+            });
+        } else {
+            // Если менеджер не зарегистрировался, шлем уведомление тебе в админку
+            await bot.telegram.sendMessage(ADMIN_GROUP_ID, `⚠️ Заказ #${String(orderId).slice(0,5)} сохранен в базу, но бот не смог отправить его повару, так как ресторан "${restaurantName}" не найден в базе ресторанов!`);
+        }
 
         res.status(200).json({ success: true, orderId });
 
@@ -98,7 +98,7 @@ const startBots = async () => {
         await restBot.launch();
         console.log('✅ Ресторанный бот запущен');
     } catch (e) {
-        console.error('🔴 Ошибка запуска ботов:', e.message);
+        console.error('❌ Ошибка запуска ботов:', e);
     }
 };
 startBots();

@@ -3,10 +3,13 @@ const { Markup } = require('telegraf');
 module.exports = function setupClientBot(bot, supabase, ADMIN_GROUP_ID) {
     
     // Приветствие и кнопка запуска Web App
+    // Приветствие и кнопка запуска Web App
     bot.start((ctx) => {
+        const cacheBuster = Date.now(); // Генерирует уникальное число (текущее время)
         ctx.reply('Добро пожаловать в ТамакKG! 🍔\nСамая быстрая доставка на Иссык-Куле.', 
             Markup.inlineKeyboard([
-                [Markup.button.webApp('🍕 Открыть меню', 'https://edilkg.github.io/superkgapp/?v=36')] 
+                // Телеграм будет думать, что это всегда новая ссылка
+                [Markup.button.webApp('🍕 Открыть меню', `https://edilkg.github.io/superkgapp/?v=${cacheBuster}`)] 
             ])
         );
     });
