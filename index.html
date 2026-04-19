@@ -893,15 +893,21 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(orderData)
                 });
+                
+                const result = await response.json(); // Читаем ответ сервера
+
                 if (response.ok) {
                     showScreen('status');
                     document.getElementById('st-res-name').innerText = database[cartActiveTabResId]?.title;
                     document.getElementById('st-total').innerText = (totalSum + currentDeliveryFee) + " сом";
                     for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
                     recalcTotal();
+                } else {
+                    // ЕСЛИ СЕРВЕР ВЫДАЛ ОШИБКУ, ПОКАЗЫВАЕМ ЕЁ
+                    alert("Ошибка при заказе: " + (result.error || "Неизвестная ошибка"));
                 }
             } catch (e) { 
-                alert("Ошибка сети"); 
+                alert("Ошибка сети: " + e.message); 
             } finally {
                 payBtn.innerText = originalBtnText;
                 payBtn.style.pointerEvents = 'auto';
