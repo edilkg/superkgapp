@@ -30,6 +30,27 @@ setupCourierBot(courierBot, bot, supabase, ADMIN_GROUP_ID);
 setupRestaurantBot(restBot, courierBot, bot, supabase, ADMIN_GROUP_ID);
 
 // 5. ПРИЕМ ЗАКАЗОВ ОТ МИНИ-АППА
+// === ТЕСТ СВЯЗИ БОТОВ ===
+bot.command('testbots', async (ctx) => {
+    await ctx.reply("📡 Начинаю сканирование системы...");
+
+    // 1. Проверяем Ресторанного бота
+    try {
+        const restInfo = await restBot.telegram.getMe();
+        await ctx.reply(`🟢 РЕСТОРАН: Бот @${restInfo.username} на связи! Токен верный.`);
+    } catch (e) {
+        await ctx.reply(`🔴 РЕСТОРАН ОШИБКА: Токен не работает. Причина: ${e.message}`);
+    }
+
+    // 2. Проверяем Курьерского бота
+    try {
+        const courierInfo = await courierBot.telegram.getMe();
+        await ctx.reply(`🟢 КУРЬЕР: Бот @${courierInfo.username} на связи! Токен верный.`);
+    } catch (e) {
+        await ctx.reply(`🔴 КУРЬЕР ОШИБКА: Токен не работает. Причина: ${e.message}`);
+    }
+});
+// ========================
 app.post('/web-data', async (req, res) => {
     try {
         const { type, user, address, dest_lat, dest_lon, restaurantName, totalPrice, comment, items } = req.body;
