@@ -105,17 +105,25 @@ app.post('/web-data', async (req, res) => {
 });
 
 // ==========================================
-// ЗАПУСК СЕРВЕРА
+// ЗАПУСК СЕРВЕРА И БОТОВ
 // ==========================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Диспетчер запущен на порту ${PORT}`));
 
 const startBots = async () => {
     try {
+        console.log('🧹 Очистка старых подключений...');
+        // Принудительно отрываем ботов от старых серверов/кэша
+        await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+        await courierBot.telegram.deleteWebhook({ drop_pending_updates: true });
+        await restBot.telegram.deleteWebhook({ drop_pending_updates: true });
+
         await bot.launch();
         console.log('✅ Клиентский бот запущен');
+        
         await courierBot.launch();
         console.log('✅ Курьерский бот запущен');
+        
         await restBot.launch();
         console.log('✅ Ресторанный бот запущен');
     } catch (e) {
@@ -124,5 +132,10 @@ const startBots = async () => {
 };
 startBots();
 
-process.once('SIGINT', () => { bot.stop('SIGINT'); courierBot.stop('SIGINT'); restBot.stop('SIGINT'); });
-process.once('SIGTERM', () => { bot.stop('SIGTERM'); courierBot.stop('SIGTERM'); restBot.stop('SIGTERM'); });
+// Безопасное выключение (чтобы Render не крашился при перезагрузке)
+process.once('SIGINT', () => { 
+    try { bot.stop('SIGINT'); courierBot.stop('SIGINT'); restBot.stop('SIGINT'); } catch(e){} 
+});
+process.once('SIGTERM', () => { 
+    try { bot.stop('SIGTERM'); courierBot.stop('SIGTERM'); restBot.stop('SIGTERM'); } catch(e){} 
+});
