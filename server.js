@@ -111,34 +111,26 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Диспетчер запущен на порту ${PORT}`));
 
 const startBots = async () => {
-    console.log('⏳ Начинаем независимый запуск ботов...');
+    console.log('⏳ Начинаем ПАРАЛЛЕЛЬНЫЙ запуск ботов...');
     
-    // 1. Запуск Клиента
-    try {
-        console.log('🟡 Подключаем Клиентского бота...');
-        await bot.launch();
-        console.log('✅ Клиентский бот запущен');
-    } catch (e) {
-        console.error('❌ ОШИБКА КЛИЕНТА:', e.message);
-    }
+    // Функция-помощник для запуска каждого бота
+    const launchBot = async (botInstance, name) => {
+        try {
+            console.log(`🟡 [${name}] Стучимся в Телеграм...`);
+            const me = await botInstance.telegram.getMe(); // Проверка связи
+            console.log(`🟢 [${name}] Ответ получен! Бот @${me.username} на связи.`);
+            
+            await botInstance.launch();
+            console.log(`✅ [${name}] УСПЕШНО ЗАПУЩЕН!`);
+        } catch (e) {
+            console.error(`❌ [${name}] ОШИБКА:`, e.message);
+        }
+    };
 
-    // 2. Запуск Курьера
-    try {
-        console.log('🟡 Подключаем Курьерского бота...');
-        await courierBot.launch();
-        console.log('✅ Курьерский бот запущен');
-    } catch (e) {
-        console.error('❌ ОШИБКА КУРЬЕРА:', e.message);
-    }
-
-    // 3. Запуск Ресторана
-    try {
-        console.log('🟡 Подключаем Ресторанного бота...');
-        await restBot.launch();
-        console.log('✅ Ресторанный бот запущен');
-    } catch (e) {
-        console.error('❌ ОШИБКА РЕСТОРАНА:', e.message);
-    }
+    // Запускаем всех одновременно! Никто никого не ждет.
+    launchBot(bot, 'КЛИЕНТ');
+    launchBot(courierBot, 'КУРЬЕР');
+    launchBot(restBot, 'РЕСТОРАН');
 };
 startBots();
 
