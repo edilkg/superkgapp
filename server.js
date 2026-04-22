@@ -111,20 +111,30 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Диспетчер запущен на порту ${PORT}`));
 
 const startBots = async () => {
+    console.log('⏳ Начинаем независимый запуск ботов...');
+    
+    // 1. Запуск Клиента
     try {
-        console.log('⏳ Начинаем запуск ботов...');
-        
-        // Запускаем со встроенной очисткой очереди (самый надежный метод)
         await bot.launch({ dropPendingUpdates: true });
         console.log('✅ Клиентский бот запущен');
-        
+    } catch (e) {
+        console.error('❌ КОНФЛИКТ У КЛИЕНТСКОГО БОТА:', e.message);
+    }
+
+    // 2. Запуск Курьера
+    try {
         await courierBot.launch({ dropPendingUpdates: true });
         console.log('✅ Курьерский бот запущен');
-        
+    } catch (e) {
+        console.error('❌ КОНФЛИКТ У КУРЬЕРСКОГО БОТА:', e.message);
+    }
+
+    // 3. Запуск Ресторана
+    try {
         await restBot.launch({ dropPendingUpdates: true });
         console.log('✅ Ресторанный бот запущен');
     } catch (e) {
-        console.error('❌ КРИТИЧЕСКАЯ ОШИБКА ЗАПУСКА БОТОВ:', e.message);
+        console.error('❌ КОНФЛИКТ У РЕСТОРАННОГО БОТА:', e.message);
     }
 };
 startBots();
