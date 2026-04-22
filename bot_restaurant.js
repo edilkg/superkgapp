@@ -37,11 +37,34 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
     });
 
     // Одобрение (оставляем старое)
-    restBot.action(/approve_rest_(.+)/, async (ctx) => {
-        const restId = ctx.match[1];
-        await supabase.from('restaurants').update({ is_approved: true }).eq('id', restId);
-        ctx.editMessageText(`✅ Ресторан ${restId} одобрен!`);
-        restBot.telegram.sendMessage(restId, "🎉 Ваш ресторан одобрен!").catch(() => {});
+    restBot.action(/rest_ready_(.+)/, async (ctx) => {
+        try {
+            const orderId = ctx.match[1];
+            
+            // 1. Обновляем статус в базе
+            await supabase.from('orders').update({ status: 'searching_courier' }).eq('id', orderId);
+            ctx.editMessageText(`✅ Заказ #${String(orderId).slice(0,5)} готов. Ищем курьера...`);
+
+            // 2. Достаем информацию о заказе из базы
+            const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
+            if (!order) return;
+
+            // 3. Формируем красивое сообщение для курьера
+            const msg = `🔥 НОВЫЙ ЗАКАЗ ГОТОВ К ВЫДАЧЕ!\n\n🏢 Откуда: ${order.restaurant || 'Ресторан'}\n📍 Куда везти: ${order.address}\n💰 Сумма: ${order.total_price} сом\n\nКто заберет?`;
+
+            // 4. Курьерский бот кричит в группу! 
+            // (Если у тебя нет отдельной группы курьеров, заказ упадет в админскую)
+            const targetGroupId = process.env.COURIER_GROUP_ID || ADMIN_GROUP_ID;
+
+            await courierBot.telegram.sendMessage(targetGroupId, msg, 
+                Markup.inlineKeyboard([
+                    [Markup.button.callback('🏃‍♂️ Я ЗАБЕРУ ЗАКАЗ!', `courier_take_${orderId}`)]
+                ])
+            );
+        } catch (err) {
+            console.error("❌ Ошибка при вызове курьера:", err);
+            ctx.reply("⚠️ Ошибка при поиске курьера. Напишите администратору.");
+        }
     });
 
     console.log('📦 Модуль Restaurant (Debug Mode) загружен');
