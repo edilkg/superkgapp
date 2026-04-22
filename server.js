@@ -111,15 +111,18 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Диспетчер запущен на порту ${PORT}`));
 
 const startBots = async () => {
-    console.log('⏳ Начинаем ПАРАЛЛЕЛЬНЫЙ запуск ботов...');
+    console.log('⏳ Начинаем ПАРАЛЛЕЛЬНЫЙ запуск (с жесткой очисткой)...');
     
-    // Функция-помощник для запуска каждого бота
     const launchBot = async (botInstance, name) => {
         try {
-            console.log(`🟡 [${name}] Стучимся в Телеграм...`);
-            const me = await botInstance.telegram.getMe(); // Проверка связи
-            console.log(`🟢 [${name}] Ответ получен! Бот @${me.username} на связи.`);
+            // 1. Проверка связи
+            const me = await botInstance.telegram.getMe();
+            console.log(`🟢 [${name}] Бот @${me.username} на связи.`);
             
+            // 2. Уничтожаем зависшие сообщения, чтобы сервер не захлебнулся
+            await botInstance.telegram.deleteWebhook({ drop_pending_updates: true });
+            
+            // 3. Запускаем
             await botInstance.launch();
             console.log(`✅ [${name}] УСПЕШНО ЗАПУЩЕН!`);
         } catch (e) {
@@ -127,10 +130,12 @@ const startBots = async () => {
         }
     };
 
-    // Запускаем всех одновременно! Никто никого не ждет.
-    launchBot(bot, 'КЛИЕНТ');
-    launchBot(courierBot, 'КУРЬЕР');
-    launchBot(restBot, 'РЕСТОРАН');
+    // Запускаем всех
+    await Promise.all([
+        launchBot(bot, 'КЛИЕНТ'),
+        launchBot(courierBot, 'КУРЬЕР'),
+        launchBot(restBot, 'РЕСТОРАН')
+    ]);
 };
 startBots();
 
