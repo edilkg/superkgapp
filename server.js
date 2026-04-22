@@ -24,33 +24,26 @@ const restBot = new Telegraf(process.env.REST_BOT_TOKEN);
 // ID Группы Админов
 const ADMIN_GROUP_ID = process.env.ADMIN_CHAT_ID; 
 
-// 4. Запускаем логику модулей (теперь аргументы правильные)
+// 4. Запускаем логику модулей
 setupClientBot(bot, supabase, ADMIN_GROUP_ID);
 setupCourierBot(courierBot, bot, supabase, ADMIN_GROUP_ID);
 setupRestaurantBot(restBot, courierBot, bot, supabase, ADMIN_GROUP_ID);
 
-// 5. ПРИЕМ ЗАКАЗОВ ОТ МИНИ-АППА
 // === ТЕСТ СВЯЗИ БОТОВ ===
 bot.command('testbots', async (ctx) => {
     await ctx.reply("📡 Начинаю сканирование системы...");
-
-    // 1. Проверяем Ресторанного бота
     try {
         const restInfo = await restBot.telegram.getMe();
-        await ctx.reply(`🟢 РЕСТОРАН: Бот @${restInfo.username} на связи! Токен верный.`);
-    } catch (e) {
-        await ctx.reply(`🔴 РЕСТОРАН ОШИБКА: Токен не работает. Причина: ${e.message}`);
-    }
+        await ctx.reply(`🟢 РЕСТОРАН: Бот @${restInfo.username} на связи!`);
+    } catch (e) { await ctx.reply(`🔴 РЕСТОРАН ОШИБКА: ${e.message}`); }
 
-    // 2. Проверяем Курьерского бота
     try {
         const courierInfo = await courierBot.telegram.getMe();
-        await ctx.reply(`🟢 КУРЬЕР: Бот @${courierInfo.username} на связи! Токен верный.`);
-    } catch (e) {
-        await ctx.reply(`🔴 КУРЬЕР ОШИБКА: Токен не работает. Причина: ${e.message}`);
-    }
+        await ctx.reply(`🟢 КУРЬЕР: Бот @${courierInfo.username} на связи!`);
+    } catch (e) { await ctx.reply(`🔴 КУРЬЕР ОШИБКА: ${e.message}`); }
 });
-// ========================
+
+// 5. ПРИЕМ ЗАКАЗОВ ОТ МИНИ-АППА
 app.post('/web-data', async (req, res) => {
     try {
         const { type, user, address, dest_lat, dest_lon, restaurantName, totalPrice, comment, items } = req.body;
@@ -76,14 +69,18 @@ app.post('/web-data', async (req, res) => {
         if (dbError) throw dbError;
         const orderId = orderData[0].id;
 
-        // ИЩЕМ РЕСТОРАН В БАЗЕ ПО НАЗВАНИЮ (чтобы отправить в личку)
+        // ИЩЕМ РЕСТОРАН В БАЗЕ
         const { data: restData } = await supabase.from('restaurants').select('id').eq('name', restaurantName).single();
 
         if (restData && restData.id) {
-            // Отправляем лично менеджеру
-            let msg = `🍔 НОВЫЙ ЗАКАЗ!\nНомер: #${String(orderId).slice(0,5)}\n\nЧто приготовить:\n${itemsText}\n\nСумма: ${totalPrice} сом\nКомментарий: ${comment || 'нет'}`;
             
-            await restBot.telegram.sendMessage(restData.id, msg, {
+            // ==========================================
+            // ДВОЙНОЙ ЗАЛП: КУРЬЕРУ И РЕСТОРАНУ СРАЗУ
+            // ==========================================
+            
+            // Залп 1: В личку Ресторану
+            let msgRest = `🍔 НОВЫЙ ЗАКАЗ!\nНомер: #${String(orderId).slice(0,5)}\n\nЧто приготовить:\n${itemsText}\n\nСумма: ${totalPrice} сом\nКомментарий: ${comment || 'нет'}`;
+            await restBot.telegram.sendMessage(restData.id, msgRest, {
                 reply_markup: {
                     inline_keyboard: [
                         [{ text: '✅ Принять (Начать готовить)', callback_data: `rest_accept_${orderId}` }],
@@ -91,9 +88,21 @@ app.post('/web-data', async (req, res) => {
                     ]
                 }
             });
+
+            // Залп 2: Курьерам в группу
+            const targetGroupId = process.env.COURIER_GROUP_ID || ADMIN_GROUP_ID;
+            let msgCourier = `🔥 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n🏢 Забрать: ${restaurantName}\n📍 Отвезти: ${address}\n💰 Оплата клиентом: ${totalPrice} сом\n\nКто готов забрать?`;
+            await courierBot.telegram.sendMessage(targetGroupId, msgCourier, {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🏃‍♂️ Я ЗАБЕРУ!', callback_data: `courier_take_${orderId}` }]
+                    ]
+                }
+            });
+
         } else {
-            // Если менеджер не зарегистрировался, шлем уведомление тебе в админку
-            await bot.telegram.sendMessage(ADMIN_GROUP_ID, `⚠️ Заказ #${String(orderId).slice(0,5)} сохранен в базу, но бот не смог отправить его повару, так как ресторан "${restaurantName}" не найден в базе ресторанов!`);
+            // Если ресторан не найден
+            await bot.telegram.sendMessage(ADMIN_GROUP_ID, `⚠️ Заказ #${String(orderId).slice(0,5)} сохранен в базу, но ресторан "${restaurantName}" не найден!`);
         }
 
         res.status(200).json({ success: true, orderId });
@@ -115,14 +124,9 @@ const startBots = async () => {
     
     const launchBot = async (botInstance, name) => {
         try {
-            // 1. Проверка связи
             const me = await botInstance.telegram.getMe();
             console.log(`🟢 [${name}] Бот @${me.username} на связи.`);
-            
-            // 2. Уничтожаем зависшие сообщения, чтобы сервер не захлебнулся
             await botInstance.telegram.deleteWebhook({ drop_pending_updates: true });
-            
-            // 3. Запускаем
             await botInstance.launch();
             console.log(`✅ [${name}] УСПЕШНО ЗАПУЩЕН!`);
         } catch (e) {
@@ -130,7 +134,6 @@ const startBots = async () => {
         }
     };
 
-    // Запускаем всех
     await Promise.all([
         launchBot(bot, 'КЛИЕНТ'),
         launchBot(courierBot, 'КУРЬЕР'),
@@ -139,7 +142,6 @@ const startBots = async () => {
 };
 startBots();
 
-// Безопасное выключение (чтобы не было ошибки "Bot is not running")
 const safeStop = (signal) => {
     console.log(`🛑 Получен сигнал ${signal}, безопасно выключаем сервер...`);
     try { if (bot.botInfo) bot.stop(signal); } catch(e){}
