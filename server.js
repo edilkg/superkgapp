@@ -115,26 +115,29 @@ const startBots = async () => {
     
     // 1. Запуск Клиента
     try {
-        await bot.launch({ dropPendingUpdates: true });
+        console.log('🟡 Подключаем Клиентского бота...');
+        await bot.launch();
         console.log('✅ Клиентский бот запущен');
     } catch (e) {
-        console.error('❌ КОНФЛИКТ У КЛИЕНТСКОГО БОТА:', e.message);
+        console.error('❌ ОШИБКА КЛИЕНТА:', e.message);
     }
 
     // 2. Запуск Курьера
     try {
-        await courierBot.launch({ dropPendingUpdates: true });
+        console.log('🟡 Подключаем Курьерского бота...');
+        await courierBot.launch();
         console.log('✅ Курьерский бот запущен');
     } catch (e) {
-        console.error('❌ КОНФЛИКТ У КУРЬЕРСКОГО БОТА:', e.message);
+        console.error('❌ ОШИБКА КУРЬЕРА:', e.message);
     }
 
     // 3. Запуск Ресторана
     try {
-        await restBot.launch({ dropPendingUpdates: true });
+        console.log('🟡 Подключаем Ресторанного бота...');
+        await restBot.launch();
         console.log('✅ Ресторанный бот запущен');
     } catch (e) {
-        console.error('❌ КОНФЛИКТ У РЕСТОРАННОГО БОТА:', e.message);
+        console.error('❌ ОШИБКА РЕСТОРАНА:', e.message);
     }
 };
 startBots();
