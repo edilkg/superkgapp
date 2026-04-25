@@ -1,89 +1,128 @@
-const { Markup } = require('telegraf');
+require('dotenv').config();
+const { Telegraf, Markup } = require('telegraf');
+const express = require('express');
+const cors = require('cors');
+const { createClient } = require('@supabase/supabase-js');
 
-module.exports = function setupCourierBot(courierBot, clientBot, supabase, ADMIN_GROUP_ID) {
-    
-    // 1. СТАРТ И РЕГИСТРАЦИЯ КУРЬЕРА
-    courierBot.start(async (ctx) => {
-        const id = ctx.from.id;
-        if (ctx.chat.type !== 'private') return; // Регистрация только в личке
+// 1. Подключаем модули
+const setupClientBot = require('./bot_client');
+const setupCourierBot = require('./bot_courier');
+const setupRestaurantBot = require('./bot_restaurant');
 
-        const { data: courier } = await supabase.from('couriers').select('*').eq('id', id).maybeSingle();
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-        if (!courier) {
-            await supabase.from('couriers').insert([{ id, name: ctx.from.first_name, status: 'waiting_approval' }]);
-            return ctx.reply("Привет! Ты в панели курьера ТамакKG. 📢\nТвоя заявка отправлена администратору. Как только тебя одобрят, ты сможешь принимать заказы.");
+// 2. БД
+// Добавлена проверка на наличие переменных окружения
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
+    console.error("КРИТИЧЕСКАЯ ОШИБКА: Не заданы SUPABASE_URL или SUPABASE_KEY");
+    process.exit(1);
+}
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+// 3. Инициализация ВСЕХ ботов
+if (!process.env.BOT_TOKEN || !process.env.COURIER_BOT_TOKEN || !process.env.REST_BOT_TOKEN) {
+    console.error("КРИТИЧЕСКАЯ ОШИБКА: Отсутствует один или несколько токенов ботов");
+    process.exit(1);
+}
+const bot = new Telegraf(process.env.BOT_TOKEN); 
+const courierBot = new Telegraf(process.env.COURIER_BOT_TOKEN); 
+const restBot = new Telegraf(process.env.REST_BOT_TOKEN); 
+
+// ID Группы Админов
+const ADMIN_GROUP_ID = process.env.ADMIN_CHAT_ID; 
+
+// 4. Запускаем логику модулей
+setupClientBot(bot, supabase, ADMIN_GROUP_ID);
+setupCourierBot(courierBot, bot, supabase, ADMIN_GROUP_ID);
+setupRestaurantBot(restBot, courierBot, bot, supabase, ADMIN_GROUP_ID);
+
+// === ТЕСТ СВЯЗИ БОТОВ ===
+bot.command('testbots', async (ctx) => {
+    await ctx.reply("📡 Начинаю сканирование системы...");
+    try {
+        const restInfo = await restBot.telegram.getMe();
+        await ctx.reply(`🟢 РЕСТОРАН: Бот @${restInfo.username} на связи!`);
+    } catch (e) { await ctx.reply(`🔴 РЕСТОРАН ОШИБКА: ${e.message}`); }
+
+    try {
+        const courierInfo = await courierBot.telegram.getMe();
+        await ctx.reply(`🟢 КУРЬЕР: Бот @${courierInfo.username} на связи!`);
+    } catch (e) { await ctx.reply(`🔴 КУРЬЕР ОШИБКА: ${e.message}`); }
+});
+
+// 5. ПРИЕМ ЗАКАЗОВ ОТ МИНИ-АППА
+app.post('/web-data', async (req, res) => {
+    try {
+        const { type, user, address, restaurantName, totalPrice, comment, items } = req.body;
+        if (type !== 'food') return res.status(400).json({ error: 'Неизвестный тип' });
+
+        const itemsText = items.map(i => `▫️ ${i.item.name} x${i.count}`).join('\n');
+
+        const { data: orderData, error: dbError } = await supabase.from('orders').insert([{
+            client_id: user?.id || null,
+            client_name: user?.first_name || 'Гость',
+            address: address,
+            restaurant: restaurantName,
+            total_price: totalPrice,
+            comment: comment || '',
+            items: items,
+            status: 'new'
+        }]).select();
+
+        if (dbError) throw dbError;
+        const orderId = orderData[0].id;
+
+        const { data: restData } = await supabase.from('restaurants').select('id').eq('name', restaurantName).single();
+
+        if (restData && restData.id) {
+            // 1. Уведомление Ресторану (в личку)
+            let msgRest = `🍔 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}\n\n${itemsText}\n\nСумма: ${totalPrice} сом`;
+            await restBot.telegram.sendMessage(restData.id, msgRest, Markup.inlineKeyboard([
+                [Markup.button.callback('✅ Принять', `rest_accept_${orderId}`)],
+                [Markup.button.callback('❌ Отклонить', `rest_decline_${orderId}`)]
+            ]));
+
+            // 2. Уведомление Курьерам (в группу)
+            const targetGroupId = process.env.COURIER_GROUP_ID || ADMIN_GROUP_ID;
+            let msgCourier = `🔥 СВОБОДНЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n🏢 Откуда: ${restaurantName}\n📍 Куда: ${address}\n💰 Сумма: ${totalPrice} сом`;
+            
+            await courierBot.telegram.sendMessage(targetGroupId, msgCourier, Markup.inlineKeyboard([
+                [Markup.button.callback('🏃‍♂️ Я ЗАБЕРУ!', `courier_take_${orderId}`)]
+            ]));
+
+        } else {
+            await bot.telegram.sendMessage(ADMIN_GROUP_ID, `⚠️ Ресторан "${restaurantName}" не найден в базе для заказа #${orderId}`);
         }
 
-        if (courier.status === 'waiting_approval') {
-            return ctx.reply("⏳ Твой аккаунт еще на проверке у админа.");
-        }
+        res.status(200).json({ success: true, orderId });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
 
-        ctx.reply("✅ Ты в системе! Жди уведомлений о новых заказах в группе курьеров.");
-    });
+// Запуск
+const PORT = process.env.PORT || 3000;
+// Изменил '0.0.0.0' на просто PORT, иногда Render капризничает из-за этого
+app.listen(PORT, () => console.log(`🚀 Диспетчер запущен на порту ${PORT}`));
 
-    // 2. ЛОГИКА ПРИНЯТИЯ ЗАКАЗА
-    courierBot.action(/courier_take_(.+)/, async (ctx) => {
+const startBots = async () => {
+    const launch = async (b, name) => {
         try {
-            const orderId = ctx.match[1];
-            const courierId = ctx.from.id;
-
-            // Проверяем, не забрал ли уже кто-то этот заказ
-            const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
-
-            if (!order || order.courier_id) {
-                return ctx.answerCbQuery("❌ Этот заказ уже забрали!");
-            }
-
-            // Назначаем курьера в базе
-            await supabase.from('orders').update({ 
-                courier_id: courierId, 
-                status: 'delivery' 
-            }).eq('id', orderId);
-
-            // 1. Убираем кнопки в общей группе, чтобы другие не жали
-            await ctx.editMessageText(`🏃‍♂️ Заказ #${String(orderId).slice(0,5)} забрал курьер ${ctx.from.first_name || 'Инкогнито'}`);
-
-            // 2. ОТПРАВЛЯЕМ ПОЛНЫЕ ДАННЫЕ КУРЬЕРУ В ЛИЧКУ
-            const fullDetails = `📦 ДЕТАЛИ ЗАКАЗА #${String(orderId).slice(0,5)}\n\n` +
-                                `🏢 Ресторан: ${order.restaurant}\n` +
-                                `📍 Адрес доставки: ${order.address}\n` +
-                                `💰 Сумма к оплате: ${order.total_price} сом\n` +
-                                `👤 Клиент: ${order.client_name}\n` +
-                                `📝 Комментарий: ${order.comment || 'нет'}\n\n` +
-                                `Нажми кнопку, когда доставишь:`;
-
-            await courierBot.telegram.sendMessage(courierId, fullDetails, 
-                Markup.inlineKeyboard([
-                    [Markup.button.callback('✅ ДОСТАВЛЕНО!', `courier_done_${orderId}`)]
-                ])
-            );
-
-            await ctx.answerCbQuery("Заказ принят! Детали в личке.");
-
-            // 3. Уведомляем клиента
-            if (order.client_id) {
-                await clientBot.telegram.sendMessage(order.client_id, "🚀 Курьер уже забрал ваш заказ и выезжает!");
-            }
-
-        } catch (e) {
-            console.error(e);
-            ctx.answerCbQuery("Ошибка при принятии заказа.");
-        }
-    });
-
-    // 3. ЗАВЕРШЕНИЕ ЗАКАЗА
-    courierBot.action(/courier_done_(.+)/, async (ctx) => {
-        const orderId = ctx.match[1];
-        await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId);
-        
-        await ctx.editMessageText(`✅ Заказ #${String(orderId).slice(0,5)} успешно доставлен! Красава!`);
-        
-        // Финальное сообщение клиенту
-        const { data: order } = await supabase.from('orders').select('client_id').eq('id', orderId).maybeSingle();
-        if (order && order.client_id) {
-            await clientBot.telegram.sendMessage(order.client_id, "😋 Приятного аппетита! Заказ доставлен.");
-        }
-    });
-
-    console.log('📦 Модуль Courier (Private PM Mode) загружен');
+            await b.telegram.deleteWebhook({ drop_pending_updates: true });
+            await b.launch();
+            console.log(`✅ ${name} запущен`);
+        } catch (e) { console.error(`❌ Ошибка ${name}:`, e.message); }
+    };
+    await Promise.all([launch(bot, 'КЛИЕНТ'), launch(courierBot, 'КУРЬЕР'), launch(restBot, 'РЕСТОРАН')]);
 };
+startBots();
+
+const safeStop = (s) => {
+    try { bot.stop(s); courierBot.stop(s); restBot.stop(s); } catch(e){}
+    process.exit(0);
+};
+process.once('SIGINT', () => safeStop('SIGINT'));
+process.once('SIGTERM', () => safeStop('SIGTERM'));
