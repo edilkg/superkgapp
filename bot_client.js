@@ -3,7 +3,6 @@ const { Markup } = require('telegraf');
 module.exports = function setupClientBot(bot, supabase, ADMIN_GROUP_ID) {
     
     // Приветствие и кнопка запуска Web App
-    // Приветствие и кнопка запуска Web App
     bot.start((ctx) => {
         const cacheBuster = Date.now(); // Генерирует уникальное число (текущее время)
         ctx.reply('Добро пожаловать в ТамакKG! 🍔\nСамая быстрая доставка на Иссык-Куле.', 
