@@ -45,16 +45,7 @@
     border: none; font-size: 15px; padding: 10px; cursor: pointer; font-weight: 500;
 }
         
-        /* --- АДАПТИВНАЯ ЦВЕТОВАЯ ТЕМА (ТЕМНАЯ/СВЕТЛАЯ) --- */
-        :root { 
-            --main-yellow: #FCE000; /* Фирменный желтый оставляем всегда */
-            
-            /* Цвета автоматически подстраиваются под тему Telegram пользователя */
-            --bg-color: var(--tg-theme-secondary-bg-color, #F8F8F8); 
-            --card-bg: var(--tg-theme-bg-color, #FFFFFF); 
-            --text-dark: var(--tg-theme-text-color, #1A1A1A); 
-            --text-gray: var(--tg-theme-hint-color, #999999); 
-        }
+        :root { --bg-color: #F8F8F8; --card-bg: #FFFFFF; --main-yellow: #FCE000; --text-dark: #1A1A1A; --text-gray: #999999; }
         body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); margin: 0; padding: 0; padding-bottom: 120px !important; user-select: none; color: var(--text-dark); scroll-behavior: smooth;}
         .hidden { display: none !important; }
         input, textarea, select { font-family: inherit; outline: none; }
@@ -331,9 +322,12 @@
     <div id="screen-menu" class="hidden">
         <div class="header-nav">
             <div class="back-btn" onclick="onBackClick()">←</div>
-            <div class="res-header-info">
-                <img src="" id="menu-logo" class="res-header-logo">
-                <div class="header-title" id="menu-title" style="margin:0; text-align: left;">Ресторан</div>
+            <div class="res-header-info" style="display: flex; align-items: center; gap: 12px; flex-grow: 1; margin-right: 0;">
+                <img src="" id="menu-logo" class="res-header-logo" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover;">
+                <div class="res-header-text" style="display: flex; flex-direction: column;">
+                    <div id="menu-title" style="margin:0; text-align: left; font-weight: 800; font-size: 16px;">Ресторан</div>
+                    <div id="menu-details" style="font-size: 12px; color: var(--text-gray); margin-top: 4px;">📍 Адрес • 🕒 Время</div>
+                </div>
             </div>
         </div>
         <div class="menu-tabs" id="menu-tabs"></div>
@@ -557,17 +551,17 @@
 
         const database = {
             // ЧОЛПОН-АТА И БОСТЕРИ
-            'asian1': { lat: 42.6482, lon: 77.0855, city: 'Чолпон-Ата', title: 'Дракон Суши', logo: imgs.asian, address: 'ул. Советская, Чолпон-Ата', rating: 4.7, tags: ['sushi', 'promo'], img: imgs.asian, categories: ['Холодные роллы', 'Сеты'], items: [{id: 'a1', cat: 'Холодные роллы', name: 'Филадельфия', price: 350, img: imgs.asian}, {id: 'a2', cat: 'Сеты', name: 'Сет Самурай', price: 1200, img: imgs.asian}] },
-            'fast1': { lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', title: 'Burger Spot', logo: imgs.fastfood, address: 'ул. Горького, Чолпон-Ата', rating: 4.2, tags: ['fastfood'], img: imgs.fastfood, categories: ['Бургеры', 'Напитки'], items: [{id: 'f1', cat: 'Бургеры', name: 'Чизбургер', price: 250, img: imgs.fastfood}, {id: 'f2', cat: 'Напитки', name: 'Кола 0.5', price: 80, img: imgs.fastfood}] },
-            'piz1': { lat: 42.6346, lon: 77.1950, city: 'Бостери', title: 'Roma Pizza', logo: imgs.pizza, address: 'Бостери, Центр', rating: 4.8, tags: ['pizza', 'top'], img: imgs.pizza, categories: ['Пицца'], items: [{id: 'p1', cat: 'Пицца', name: 'Маргарита', price: 450, img: imgs.pizza}, {id: 'p2', cat: 'Пицца', name: 'Пепперони', price: 550, img: imgs.pizza}] },
+            'asian1': { lat: 42.6482, lon: 77.0855, city: 'Чолпон-Ата', title: 'Дракон Суши', logo: imgs.asian, address: 'ул. Советская, 15', hours: '10:00 - 23:00', rating: 4.7, tags: ['sushi', 'promo'], img: imgs.asian, categories: ['Холодные роллы', 'Сеты'], items: [{id: 'a1', cat: 'Холодные роллы', name: 'Филадельфия', price: 350, img: imgs.asian}, {id: 'a2', cat: 'Сеты', name: 'Сет Самурай', price: 1200, img: imgs.asian}] },
+            'fast1': { lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', title: 'Burger Spot', logo: imgs.fastfood, address: 'ул. Горького, 2', hours: '11:00 - 02:00', rating: 4.2, tags: ['fastfood'], img: imgs.fastfood, categories: ['Бургеры', 'Напитки'], items: [{id: 'f1', cat: 'Бургеры', name: 'Чизбургер', price: 250, img: imgs.fastfood}, {id: 'f2', cat: 'Напитки', name: 'Кола 0.5', price: 80, img: imgs.fastfood}] },
+            'piz1': { lat: 42.6346, lon: 77.1950, city: 'Бостери', title: 'Roma Pizza', logo: imgs.pizza, address: 'Бостери, Центр', hours: '10:00 - 22:00', rating: 4.8, tags: ['pizza', 'top'], img: imgs.pizza, categories: ['Пицца'], items: [{id: 'p1', cat: 'Пицца', name: 'Маргарита', price: 450, img: imgs.pizza}, {id: 'p2', cat: 'Пицца', name: 'Пепперони', price: 550, img: imgs.pizza}] },
             
             // БИШКЕК
-            'bish1': { lat: 42.8746, lon: 74.5698, city: 'Бишкек', title: 'Фаиза', logo: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', address: 'ул. Жибек Жолу, Бишкек', rating: 4.9, tags: ['national', 'top'], img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', categories: ['Горячие блюда', 'Выпечка'], items: [{id: 'b1', cat: 'Горячие блюда', name: 'Лагман', price: 280, img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300'}, {id: 'b2', cat: 'Выпечка', name: 'Самса с мясом', price: 80, img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300'}] },
-            'bish2': { lat: 42.8700, lon: 74.5900, city: 'Бишкек', title: 'KFC Азия Молл', logo: imgs.fastfood, address: 'ТЦ Азия Молл, Бишкек', rating: 4.5, tags: ['fastfood'], img: imgs.fastfood, categories: ['Курица'], items: [{id: 'k1', cat: 'Курица', name: 'Баскет Дуэт', price: 650, img: imgs.fastfood}, {id: 'k2', cat: 'Курица', name: 'Крылышки (5 шт)', price: 220, img: imgs.fastfood}] },
-            'bish3': { lat: 42.8820, lon: 74.5820, city: 'Бишкек', title: 'Dodo Pizza', logo: imgs.pizza, address: 'Шопокова, 101/1', rating: 4.7, tags: ['pizza'], img: imgs.pizza, categories: ['Пиццы'], items: [{id: 'd1', cat: 'Пиццы', name: 'Додо Классика', price: 600, img: imgs.pizza}] },
+            'bish1': { lat: 42.8746, lon: 74.5698, city: 'Бишкек', title: 'Фаиза', logo: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', address: 'ул. Жибек Жолу, 555', hours: '09:00 - 23:00', rating: 4.9, tags: ['national', 'top'], img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', categories: ['Горячие блюда', 'Выпечка'], items: [{id: 'b1', cat: 'Горячие блюда', name: 'Лагман', price: 280, img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300'}, {id: 'b2', cat: 'Выпечка', name: 'Самса с мясом', price: 80, img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300'}] },
+            'bish2': { lat: 42.8700, lon: 74.5900, city: 'Бишкек', title: 'KFC Азия Молл', logo: imgs.fastfood, address: 'пр. Ч. Айтматова, 3', hours: '10:00 - 00:00', rating: 4.5, tags: ['fastfood'], img: imgs.fastfood, categories: ['Курица'], items: [{id: 'k1', cat: 'Курица', name: 'Баскет Дуэт', price: 650, img: imgs.fastfood}, {id: 'k2', cat: 'Курица', name: 'Крылышки (5 шт)', price: 220, img: imgs.fastfood}] },
+            'bish3': { lat: 42.8820, lon: 74.5820, city: 'Бишкек', title: 'Dodo Pizza', logo: imgs.pizza, address: 'ул. Шопокова, 101/1', hours: '10:00 - 02:00', rating: 4.7, tags: ['pizza'], img: imgs.pizza, categories: ['Пиццы'], items: [{id: 'd1', cat: 'Пиццы', name: 'Додо Классика', price: 600, img: imgs.pizza}] },
 
             // БАЛЫКЧЫ
-            'bal1': { lat: 42.4600, lon: 76.1800, city: 'Балыкчы', title: 'Балыкчы Гриль', logo: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', address: 'ул. Фрунзе, Балыкчы', rating: 4.6, tags: ['national'], img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', categories: ['Рыба', 'Шашлыки'], items: [{id: 'bal1', cat: 'Рыба', name: 'Форель на мангале', price: 600, img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300'}, {id: 'bal2', cat: 'Шашлыки', name: 'Баранина мякоть', price: 350, img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300'}] }
+            'bal1': { lat: 42.4600, lon: 76.1800, city: 'Балыкчы', title: 'Балыкчы Гриль', logo: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', address: 'ул. Фрунзе, 42', hours: '11:00 - 23:00', rating: 4.6, tags: ['national'], img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', categories: ['Рыба', 'Шашлыки'], items: [{id: 'bal1', cat: 'Рыба', name: 'Форель на мангале', price: 600, img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300'}, {id: 'bal2', cat: 'Шашлыки', name: 'Баранина мякоть', price: 350, img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300'}] }
         };
 
         history.replaceState({screen: 'main'}, '');
@@ -677,7 +671,13 @@
             for(let k in cartItems) { totalSum += (cartItems[k].pricePerUnit * cartItems[k].count); totalCount += cartItems[k].count; }
             document.getElementById('total-price-btn').innerText = totalSum + " сом";
             document.getElementById('cart-items-count').innerText = totalCount;
-            document.getElementById('cart-float-btn').style.display = totalSum > 0 ? 'flex' : 'none';
+            
+            // Узнаем, открыта ли сейчас Главная страница или Меню ресторана
+            const isMainVisible = !document.getElementById('screen-main').classList.contains('hidden');
+            const isMenuVisible = !document.getElementById('screen-menu').classList.contains('hidden');
+            
+            // Показываем плавающую кнопку ТОЛЬКО на главной и в меню (и прячем на странице оформления)
+            document.getElementById('cart-float-btn').style.display = (totalSum > 0 && (isMainVisible || isMenuVisible)) ? 'flex' : 'none';
         }
 
         function openCartList() {
