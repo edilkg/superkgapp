@@ -3,17 +3,15 @@ const { Markup } = require('telegraf');
 module.exports = function setupClientBot(bot, supabase, ADMIN_GROUP_ID) {
     
     // Приветствие и кнопка запуска Web App
-    const { Markup } = require('telegraf');
-
-// Внутри твоего bot_client.js
-bot.start((ctx) => {
-    ctx.reply(
-        'Добро пожаловать в ТамакKG! Нажмите кнопку ниже, чтобы открыть меню и сделать заказ 🍔',
-        Markup.inlineKeyboard([
-            Markup.button.webApp('🚀 Открыть меню', 'https://ТВОЯ-ССЫЛКА-НА-VERCEL.app')
-        ])
-    );
-});
+    bot.start((ctx) => {
+        const cacheBuster = Date.now(); // Генерирует уникальное число (текущее время)
+        ctx.reply('Добро пожаловать в ТамакKG! 🍔\nСамая быстрая доставка на Иссык-Куле.', 
+            Markup.inlineKeyboard([
+                // Телеграм будет думать, что это всегда новая ссылка
+                [Markup.button.webApp('🍕 Открыть меню', `https://edilkg.github.io/superkgapp/?v=${cacheBuster}`)] 
+            ])
+        );
+    });
 
     // Обработка кнопок администратора (одобрение курьеров)
     // Эта кнопка нажимается в админской группе, но обрабатывается главным ботом

@@ -406,6 +406,8 @@
                 <select id="modal-city-select">
                     <option value="Бишкек">Бишкек</option>
                     <option value="Чолпон-Ата">Чолпон-Ата</option>
+                    <option value="Балыкчы">Балыкчы</option>
+                    <option value="Бостери">Бостери</option>
                 </select>
             </div>
             <button class="btn-yellow" style="margin-top: 12px;" onclick="saveAddressModal()">Готово</button>
@@ -465,9 +467,18 @@
         };
 
         const database = {
-            'asian1': { lat: 42.6482, lon: 77.0855, city: 'Чолпон-Ата', title: 'Дракон Суши', logo: imgs.asian, address: 'ул. Советская, Чолпон-Ата', rating: 4.7, tags: ['sushi', 'promo'], img: imgs.asian, categories: ['Холодные роллы'], items: [{id: 'a1', cat: 'Холодные роллы', name: 'Филадельфия', price: 350, img: imgs.asian}] },
-            'fast1': { lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', title: 'Burger Spot', logo: imgs.fastfood, address: 'ул. Горького, Чолпон-Ата', rating: 4.2, tags: ['fastfood'], img: imgs.fastfood, categories: ['Бургеры'], items: [{id: 'f1', cat: 'Бургеры', name: 'Чизбургер', price: 250, img: imgs.fastfood}] },
-            'piz1': { lat: 42.6346, lon: 77.1950, city: 'Чолпон-Ата', title: 'Roma Pizza (Бостери)', logo: imgs.pizza, address: 'Бостери, Центр', rating: 4.8, tags: ['pizza', 'top'], img: imgs.pizza, categories: ['Пицца'], items: [{id: 'p1', cat: 'Пицца', name: 'Маргарита', price: 450, img: imgs.pizza}] }
+            // ЧОЛПОН-АТА И БОСТЕРИ
+            'asian1': { lat: 42.6482, lon: 77.0855, city: 'Чолпон-Ата', title: 'Дракон Суши', logo: imgs.asian, address: 'ул. Советская, Чолпон-Ата', rating: 4.7, tags: ['sushi', 'promo'], img: imgs.asian, categories: ['Холодные роллы', 'Сеты'], items: [{id: 'a1', cat: 'Холодные роллы', name: 'Филадельфия', price: 350, img: imgs.asian}, {id: 'a2', cat: 'Сеты', name: 'Сет Самурай', price: 1200, img: imgs.asian}] },
+            'fast1': { lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', title: 'Burger Spot', logo: imgs.fastfood, address: 'ул. Горького, Чолпон-Ата', rating: 4.2, tags: ['fastfood'], img: imgs.fastfood, categories: ['Бургеры', 'Напитки'], items: [{id: 'f1', cat: 'Бургеры', name: 'Чизбургер', price: 250, img: imgs.fastfood}, {id: 'f2', cat: 'Напитки', name: 'Кола 0.5', price: 80, img: imgs.fastfood}] },
+            'piz1': { lat: 42.6346, lon: 77.1950, city: 'Бостери', title: 'Roma Pizza', logo: imgs.pizza, address: 'Бостери, Центр', rating: 4.8, tags: ['pizza', 'top'], img: imgs.pizza, categories: ['Пицца'], items: [{id: 'p1', cat: 'Пицца', name: 'Маргарита', price: 450, img: imgs.pizza}, {id: 'p2', cat: 'Пицца', name: 'Пепперони', price: 550, img: imgs.pizza}] },
+            
+            // БИШКЕК
+            'bish1': { lat: 42.8746, lon: 74.5698, city: 'Бишкек', title: 'Фаиза', logo: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', address: 'ул. Жибек Жолу, Бишкек', rating: 4.9, tags: ['national', 'top'], img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', categories: ['Горячие блюда', 'Выпечка'], items: [{id: 'b1', cat: 'Горячие блюда', name: 'Лагман', price: 280, img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300'}, {id: 'b2', cat: 'Выпечка', name: 'Самса с мясом', price: 80, img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300'}] },
+            'bish2': { lat: 42.8700, lon: 74.5900, city: 'Бишкек', title: 'KFC Азия Молл', logo: imgs.fastfood, address: 'ТЦ Азия Молл, Бишкек', rating: 4.5, tags: ['fastfood'], img: imgs.fastfood, categories: ['Курица'], items: [{id: 'k1', cat: 'Курица', name: 'Баскет Дуэт', price: 650, img: imgs.fastfood}, {id: 'k2', cat: 'Курица', name: 'Крылышки (5 шт)', price: 220, img: imgs.fastfood}] },
+            'bish3': { lat: 42.8820, lon: 74.5820, city: 'Бишкек', title: 'Dodo Pizza', logo: imgs.pizza, address: 'Шопокова, 101/1', rating: 4.7, tags: ['pizza'], img: imgs.pizza, categories: ['Пиццы'], items: [{id: 'd1', cat: 'Пиццы', name: 'Додо Классика', price: 600, img: imgs.pizza}] },
+
+            // БАЛЫКЧЫ
+            'bal1': { lat: 42.4600, lon: 76.1800, city: 'Балыкчы', title: 'Балыкчы Гриль', logo: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', address: 'ул. Фрунзе, Балыкчы', rating: 4.6, tags: ['national'], img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', categories: ['Рыба', 'Шашлыки'], items: [{id: 'bal1', cat: 'Рыба', name: 'Форель на мангале', price: 600, img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300'}, {id: 'bal2', cat: 'Шашлыки', name: 'Баранина мякоть', price: 350, img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300'}] }
         };
 
         history.replaceState({screen: 'main'}, '');
@@ -945,11 +956,11 @@
                 payBtn.style.opacity = '1';
             }
         }
-        const tg = window.Telegram.WebApp;
+        const tgAppInstance = window.Telegram.WebApp;
 
 // Сообщаем телеграму, что приложение готово и можно менять цвета
-tg.ready();
-tg.expand(); // Разворачиваем на весь экран
+tgAppInstance.ready();
+tgAppInstance.expand(); // Разворачиваем на весь экран
 
 const overlay = document.getElementById('geo-modal-overlay');
 const btnConfirm = document.getElementById('btn-geo-confirm');
@@ -962,7 +973,7 @@ if (!localStorage.getItem('user_geo')) {
 
 btnConfirm.addEventListener('click', () => {
     // Легкая вибрация при нажатии
-    tg.HapticFeedback.impactOccurred('medium');
+    tgAppInstance.HapticFeedback.impactOccurred('medium');
     
     btnConfirm.innerText = "Определяем...";
     
@@ -970,12 +981,12 @@ btnConfirm.addEventListener('click', () => {
         (pos) => {
             const data = { lat: pos.coords.latitude, lon: pos.coords.longitude };
             localStorage.setItem('user_geo', JSON.stringify(data));
-            tg.HapticFeedback.notificationOccurred('success');
+            tgAppInstance.HapticFeedback.notificationOccurred('success');
             overlay.style.display = 'none';
             console.log("Гео получено:", data);
         },
         (err) => {
-            tg.HapticFeedback.notificationOccurred('error');
+            tgAppInstance.HapticFeedback.notificationOccurred('error');
             alert("Пожалуйста, разрешите доступ к геопозиции в настройках телефона.");
             btnConfirm.innerText = "Указать текущее";
         }
@@ -990,7 +1001,7 @@ btnSkip.addEventListener('click', () => {
     <div class="modal-window">
         <div class="modal-icon-circle">📍</div>
         <h2 class="modal-title">Куда доставить еду?</h2>
-        <p class="modal-text">Разрешите доступ к местоположению, чтобы мы нашли ближайшие рестораны в Чолпон-Ате и Бостери.</p>
+        <p class="modal-text">Разрешите доступ к местоположению, чтобы мы нашли ближайшие рестораны.</p>
         <button id="btn-geo-confirm" class="main-button">Указать текущее</button>
         <button id="btn-geo-skip" class="secondary-button">Ввести адрес вручную</button>
     </div>
