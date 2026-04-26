@@ -45,7 +45,16 @@
     border: none; font-size: 15px; padding: 10px; cursor: pointer; font-weight: 500;
 }
         
-        :root { --bg-color: #F8F8F8; --card-bg: #FFFFFF; --main-yellow: #FCE000; --text-dark: #1A1A1A; --text-gray: #999999; }
+        /* --- АДАПТИВНАЯ ЦВЕТОВАЯ ТЕМА (ТЕМНАЯ/СВЕТЛАЯ) --- */
+        :root { 
+            --main-yellow: #FCE000; /* Фирменный желтый оставляем всегда */
+            
+            /* Цвета автоматически подстраиваются под тему Telegram пользователя */
+            --bg-color: var(--tg-theme-secondary-bg-color, #F8F8F8); 
+            --card-bg: var(--tg-theme-bg-color, #FFFFFF); 
+            --text-dark: var(--tg-theme-text-color, #1A1A1A); 
+            --text-gray: var(--tg-theme-hint-color, #999999); 
+        }
         body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); margin: 0; padding: 0; padding-bottom: 120px !important; user-select: none; color: var(--text-dark); scroll-behavior: smooth;}
         .hidden { display: none !important; }
         input, textarea, select { font-family: inherit; outline: none; }
@@ -418,7 +427,7 @@
 
                <input type="text" id="map-kv" placeholder="🏠 (гостевой дом, № дома, № кв )" class="full-width-input" style="background: #f0f0f0; margin-bottom: 12px;">
                 
-                <input type="text" id="map-comment" placeholder="💬 Комментарий курьеру (ориентир)" class="full-width-input" style="background: #f0f0f0;">
+                <input type="text" id="map-comment" placeholder="💬 курьеру (ориентир, красные ворота)" class="full-width-input" style="background: #f0f0f0;">
 
                 <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 16px; margin-bottom: 16px;">
                     <span style="color: #555; font-size: 14px; font-weight: 600;">Доставка:</span>
