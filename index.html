@@ -181,20 +181,48 @@
         #modal-map.hidden { display: none !important; }
        #fullscreen-map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         
-        .center-marker {
-            position: absolute; top: 35%; left: 50%;
-            transform: translate(-50%, -100%);
-            font-size: 46px; z-index: 2000;
-            pointer-events: none; /* Пропускаем клики сквозь маркер на карту */
-            text-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            transition: margin-top 0.2s ease-out;
+        /* ПОЛНОЭКРАННАЯ КАРТА (Стиль Yandex) */
+        #modal-map { background: var(--bg-color); z-index: 2500; position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; }
+        #modal-map.hidden { display: none !important; }
+        #fullscreen-map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        
+        /* ЦЕНТРАЛЬНЫЙ МАРКЕР С ТЕНЬЮ */
+        .center-marker-container {
+            position: absolute; top: 30%; left: 50%; /* Подняли до 30% */
+            transform: translate(-50%, -50%);
+            z-index: 2000; pointer-events: none;
+            display: flex; flex-direction: column; align-items: center;
         }
-        .center-marker.is-dragging { margin-top: -15px; } /* Подпрыгивание */
-
-        /* КНОПКИ ПОВЕРХ КАРТЫ */
+        .center-marker-icon {
+            width: 48px; height: 48px; background: #E65100; border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg); display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: transform 0.2s ease, margin-bottom 0.2s ease;
+        }
+        .center-marker-icon::after {
+            content: ''; width: 16px; height: 16px; background: white; border-radius: 50%;
+        }
+        .center-marker-shadow {
+            width: 12px; height: 6px; background: rgba(0,0,0,0.3); border-radius: 50%;
+            margin-top: 4px; transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+        
+        /* Анимация при перетаскивании */
+        .center-marker-container.is-dragging .center-marker-icon {
+            transform: rotate(-45deg) scale(1.1); margin-bottom: 15px; /* Иконка подпрыгивает */
+        }
+        .center-marker-container.is-dragging .center-marker-shadow {
+            transform: scale(0.6); opacity: 0.5; /* Тень уменьшается */
+        }
         
         /* КНОПКИ ПОВЕРХ КАРТЫ */
-        .map-floating-controls { position: absolute; bottom: 0; left: 0; right: 0; z-index: 3000; display: flex; flex-direction: column; }
+        .map-floating-controls { 
+            position: absolute; bottom: 0; left: 0; right: 0; z-index: 3000; 
+            display: flex; flex-direction: column;
+            transform: translateY(0); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .map-floating-controls.hidden-panel {
+            transform: translateY(120%); /* Уезжает вниз за экран */
+        }
         
         .map-buttons-row { display: flex; justify-content: space-between; padding: 0 16px 16px 16px; }
         .btn-round { width: 48px; height: 48px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); cursor: pointer; color: #333; }
@@ -320,7 +348,10 @@
 
     <div id="modal-map" class="hidden">
         <div id="fullscreen-map"></div>
-        <div class="center-marker">📍</div>
+        <div class="center-marker-container">
+            <div class="center-marker-icon"></div>
+            <div class="center-marker-shadow"></div>
+        </div>
         <div class="map-floating-controls">
             <div class="map-buttons-row">
                 <div class="btn-round" onclick="onBackClick()">←</div>
@@ -755,15 +786,15 @@
             recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
         }
 
-        // НОВАЯ УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы GPS-точка оказалась ровно под маркером на 35%
+        // НОВАЯ УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы GPS-точка оказалась ровно под маркером на 30%
         function setMapCenterToMarker(lat, lon) {
             if (!checkoutMap) return;
             const mapSize = checkoutMap.getSize();
             const targetPoint = checkoutMap.project([lat, lon], 16);
-            // Реальный центр экрана (50%) опускаем на 15% ниже, чтобы искомая точка поднялась на 35%
-            targetPoint.y += (mapSize.y * 0.15); 
+            // Сдвигаем на 20% ниже центра (50% - 20% = 30% от верхнего края)
+            targetPoint.y += (mapSize.y * 0.20); 
             const centerLatLng = checkoutMap.unproject(targetPoint, 16);
-            checkoutMap.setView(centerLatLng, 16);
+            checkoutMap.setView(centerLatLng, 16, {animate: false});
         }
 
         function initCheckoutMap(resLat, resLon) {
@@ -774,19 +805,22 @@
                 const resIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180209.png', iconSize: [32, 32] });
                 checkoutResMarker = L.marker([resLat, resLon], {icon: resIcon}).addTo(checkoutMap).bindPopup("Ресторан");
                 
-                const centerMarkerEl = document.querySelector('.center-marker');
+                const centerMarkerEl = document.querySelector('.center-marker-container');
+                const bottomPanel = document.querySelector('.map-floating-controls');
 
                 checkoutMap.on('movestart', function() {
                     centerMarkerEl.classList.add('is-dragging');
+                    bottomPanel.classList.add('hidden-panel'); // Прячем панель при движении
                     document.getElementById('map-street').value = 'Определение адреса...'; 
                 });
 
                 checkoutMap.on('moveend', function() {
                     centerMarkerEl.classList.remove('is-dragging');
+                    bottomPanel.classList.remove('hidden-panel'); // Возвращаем панель
                     
-                    // БЕРЕМ КООРДИНАТЫ РОВНО ИЗ-ПОД МАРКЕРА (На высоте 35% экрана)
+                    // БЕРЕМ КООРДИНАТЫ РОВНО ИЗ-ПОД МАРКЕРА (На высоте 30% экрана)
                     const mapSize = checkoutMap.getSize();
-                    const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.35);
+                    const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.30);
                     const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
                     
                     clientLat = latlng.lat; 
@@ -794,7 +828,6 @@
                     reverseGeocode(clientLat, clientLon);
                 });
                 
-                // Ставим карту под маркер при открытии
                 setMapCenterToMarker(clientLat, clientLon);
             } else {
                 setMapCenterToMarker(clientLat, clientLon);
@@ -810,7 +843,7 @@
             navigator.geolocation.getCurrentPosition(
                 (position) => {
                     clientLat = position.coords.latitude; clientLon = position.coords.longitude;
-                    setMapCenterToMarker(clientLat, clientLon); // Сдвигаем по новой логике
+                    setMapCenterToMarker(clientLat, clientLon); // Сдвигаем по новой логике (30%)
                 },
                 (error) => {
                     if (error.code === 1) alert("Разрешите доступ к геолокации в настройках телефона");
