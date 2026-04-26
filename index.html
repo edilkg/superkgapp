@@ -81,10 +81,13 @@
         .res-desc { color: var(--text-gray); font-size: 13px; margin-bottom: 8px;}
         .res-meta { font-size: 13px; font-weight: 600; display: flex; gap: 12px; align-items: center;}
 
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card-bg); display: flex; justify-content: space-around; padding: 12px 0 20px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 1000; }
-        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--text-gray); cursor: pointer; }
-        .nav-item.active { color: var(--text-dark); }
-        .nav-item span { font-size: 22px; }
+        /* --- СТИЛИ ДЛЯ СПИСКА ГОРОДОВ --- */
+        .city-list { display: flex; flex-direction: column; padding: 10px 0 20px 0; }
+        .city-item { padding: 16px 20px; font-size: 16px; font-weight: 600; border-bottom: 1px solid #eee; cursor: pointer; transition: 0.2s; display: flex; justify-content: space-between; align-items: center; }
+        .city-item:active { background: #f9f9f9; }
+        .city-item:last-child { border-bottom: none; }
+        .city-item.active { background: #fffcf0; color: #111; }
+        .city-item.active::after { content: '✓'; color: var(--text-dark); font-size: 18px; }
 
         .cart-btn { position: fixed; bottom: 85px; left: 16px; right: 16px; background: var(--main-yellow); border-radius: 16px; padding: 18px; display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); z-index: 900; cursor: pointer; }
 
@@ -104,10 +107,14 @@
         .item-price { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
         .item-name { font-size: 13px; color: #333; margin-bottom: 4px; line-height: 1.3; font-weight: 600;}
 
-        .btn-add-img { position: absolute; bottom: 8px; right: 8px; width: 34px; height: 34px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.15); cursor: pointer; color: black; z-index: 2;}
-        .counter-inline { position: absolute; bottom: 8px; left: 8px; right: 8px; background: white; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.15); height: 34px; z-index: 2; padding: 0 4px; }
-        .counter-inline div { width: 34px; height: 100%; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 18px; cursor: pointer; color: var(--text-dark);}
-        .counter-inline .c-val { font-size: 14px; font-weight: 700; pointer-events: none; width: auto;}
+        /* --- КНОПКИ В КАРТОЧКАХ БЛЮД (Стиль Clickfood) --- */
+        .item-action { margin-top: 12px; display: flex; justify-content: center; }
+        .item-counter { display: flex; align-items: center; justify-content: space-between; border-radius: 14px; height: 38px; width: 100%; transition: 0.2s; overflow: hidden;}
+        .item-counter.active { background: var(--main-yellow); box-shadow: 0 4px 12px rgba(252, 224, 0, 0.3); }
+        .item-counter.inactive { background: #f0f0f0; }
+        .item-counter .btn-pm { width: 44px; height: 100%; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 22px; cursor: pointer; color: var(--text-dark); transition: 0.1s;}
+        .item-counter .btn-pm:active { background: rgba(0,0,0,0.05); }
+        .item-counter .c-val { font-size: 16px; font-weight: 800; pointer-events: none; text-align: center; flex-grow: 1; }
 
         /* МОДАЛКИ БЛЮД */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 2000; display: flex; flex-direction: column; justify-content: flex-end; opacity: 1; transition: opacity 0.3s; }
@@ -172,7 +179,19 @@
         /* ПОЛНОЭКРАННАЯ КАРТА (Стиль Yandex) */
         #modal-map { background: var(--bg-color); z-index: 2500; position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; }
         #modal-map.hidden { display: none !important; }
-        #fullscreen-map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+       #fullscreen-map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        
+        .center-marker {
+            position: absolute; top: 35%; left: 50%;
+            transform: translate(-50%, -100%);
+            font-size: 46px; z-index: 2000;
+            pointer-events: none; /* Пропускаем клики сквозь маркер на карту */
+            text-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: margin-top 0.2s ease-out;
+        }
+        .center-marker.is-dragging { margin-top: -15px; } /* Подпрыгивание */
+
+        /* КНОПКИ ПОВЕРХ КАРТЫ */
         
         /* КНОПКИ ПОВЕРХ КАРТЫ */
         .map-floating-controls { position: absolute; bottom: 0; left: 0; right: 0; z-index: 3000; display: flex; flex-direction: column; }
@@ -199,12 +218,6 @@
     </style>
 </head>
 <body>
-
-    <div class="bottom-nav" id="bottom-nav">
-        <div class="nav-item active" id="nav-main" onclick="onNavClick('main')"><span>🏠</span>Главная</div>
-        <div class="nav-item" id="nav-cart" onclick="onNavClick('cart')"><span>🛒</span>Корзина</div>
-        <div class="nav-item" id="nav-profile" onclick="onNavClick('profile')"><span>👤</span>Профиль</div>
-    </div>
 
     <div class="cart-btn" id="cart-float-btn" onclick="onNavClick('cart')" style="display:none;">
         <span>Корзина • <span id="cart-items-count">0</span></span>
@@ -246,25 +259,18 @@
         <div id="all-products-container"></div>
     </div>
 
-    <div id="screen-cart-list" class="hidden" style="padding-bottom: 120px;">
+    <div id="screen-cart-list" class="hidden" style="padding-bottom: 120px; background: var(--bg-color);">
         <div class="cart-list-header">
             <div class="back-btn" onclick="onBackClick()" style="margin:0;">←</div>
-            <h2>Корзина</h2>
+            <h2 style="margin: 0; font-size: 18px; text-align: center; flex-grow: 1;">Оформление заказа</h2>
             <div class="trash-btn" onclick="openClearCartModal()">🗑️</div>
         </div>
-        <div class="cart-restaurant-tabs" id="cart-res-tabs"></div>
-        <div class="cart-items-container" id="cart-list-container"></div>
-        
-        <div class="pay-bar">
-            <div class="pay-sum"><span id="cart-list-total-sum">0 сом</span><span style="color:#2E7D32;">Доставка: <span id="cart-list-delivery">0 сом</span></span></div>
-            <div class="btn-pay" onclick="goToCheckout()" style="background: var(--main-yellow); padding: 12px 20px; border-radius: 12px; font-weight: bold; cursor: pointer;">К оформлению ➔</div>
-        </div>
-    </div>
 
-    <div id="screen-checkout" class="hidden" style="padding-bottom: 100px;">
-        <div class="header-nav">
-            <div class="back-btn" onclick="onBackClick()">←</div>
-            <div class="header-title">Оформление заказа</div>
+        <div class="cart-restaurant-tabs" id="cart-res-tabs"></div>
+        
+        <div class="cart-section" style="margin-top: 0; border-radius: 0 0 20px 20px;">
+            <div class="cart-items-container" id="cart-list-container" style="padding: 0;"></div>
+            <textarea id="res-comment" class="full-width-input" placeholder="💬 Комментарий заведению (напр. без лука, поострее)" style="margin-top: 16px; background: #f5f5f5; resize: none; font-family: inherit;"></textarea>
         </div>
 
         <div class="cart-section">
@@ -274,13 +280,9 @@
             </div>
 
             <div id="block-delivery">
-                <h3 class="section-title" style="margin-top: 0;">Адрес доставки</h3>
-
-                <div id="saved-addresses-wrapper" class="hidden">
-                    <div id="saved-addresses-list"></div>
-                </div>
-
-                <div class="address-summary-card" onclick="openMapModal()">
+                <h3 class="section-title" style="margin-top: 0; padding: 0 0 12px 0;">Адрес доставки</h3>
+                <div id="saved-addresses-wrapper" class="hidden"><div id="saved-addresses-list"></div></div>
+                <div class="address-summary-card" onclick="openMapModal()" style="margin-bottom: 12px;">
                     <div style="font-size: 24px; margin-right: 12px;">📍</div>
                     <div style="flex-grow: 1;">
                         <div id="checkout-summary-address" style="font-weight: bold; font-size: 15px;">Укажите адрес на карте</div>
@@ -288,35 +290,37 @@
                     </div>
                     <div style="font-size: 20px; color: var(--text-gray);">›</div>
                 </div>
-                
-                <button class="btn-save-address" onclick="saveCurrentAddress()">⭐ Сохранить этот адрес</button>
+                <button class="btn-save-address" onclick="saveCurrentAddress()" style="margin-bottom: 8px;">⭐ Сохранить этот адрес</button>
             </div>
 
             <div id="block-pickup" class="hidden">
-                <h3 class="section-title">Откуда забрать</h3>
-                <div style="display: flex; align-items: center; background: #eee; padding: 14px; border-radius: 16px;">
+                <h3 class="section-title" style="margin-top: 0; padding: 0 0 12px 0;">Откуда забрать</h3>
+                <div style="display: flex; align-items: center; background: #f5f5f5; padding: 14px; border-radius: 16px; margin-bottom: 12px;">
                     <div style="font-size:24px; margin-right: 10px;">📍</div>
                     <div id="pickup-address" style="font-weight: bold; font-size: 14px;">Адрес...</div>
                 </div>
             </div>
+            
+            <h3 class="section-title" style="margin-top: 16px; padding: 0 0 12px 0;">Контакты получателя</h3>
+            <input type="tel" id="client-phone" class="full-width-input" placeholder="📞 Ваш номер телефона" style="background: #f5f5f5; font-weight: bold;">
         </div>
 
         <div class="cart-section">
-            <h3 class="section-title" style="margin-top: 0;">Что в чеке</h3>
-            <div class="receipt-row"><span>Товары в заказе</span><span id="check-items">0 сом</span></div>
-            <div class="receipt-row"><span>Доставка</span><span id="check-delivery">150 сом</span></div>
+            <h3 class="section-title" style="margin-top: 0; padding: 0 0 12px 0;">Чек</h3>
+            <div class="receipt-row"><span>Товары</span><span id="check-items">0 сом</span></div>
+            <div class="receipt-row"><span>Доставка</span><span id="check-delivery">0 сом</span></div>
             <div class="receipt-total"><span>Итого</span><span id="check-total">0 сом</span></div>
         </div>
 
         <div class="pay-bar">
-            <div class="pay-sum"><span id="pay-btn-sum">0 сом</span><span>Сумма заказа</span></div>
-            <div class="btn-pay" id="main-pay-btn" onclick="createOrder()" style="background: var(--main-yellow); padding: 12px 20px; border-radius: 12px; font-weight: bold; cursor: pointer;">Оплатить</div>
+            <div class="pay-sum"><span id="pay-btn-sum">0 сом</span><span>К оплате</span></div>
+            <div class="btn-pay" id="main-pay-btn" onclick="createOrder()" style="background: var(--main-yellow); padding: 14px 24px; border-radius: 14px; font-weight: 800; cursor: pointer; font-size: 16px;">Оформить</div>
         </div>
     </div>
 
     <div id="modal-map" class="hidden">
         <div id="fullscreen-map"></div>
-        
+        <div class="center-marker">📍</div>
         <div class="map-floating-controls">
             <div class="map-buttons-row">
                 <div class="btn-round" onclick="onBackClick()">←</div>
@@ -397,20 +401,12 @@
         </div>
     </div>
 
-    <div id="modal-address" class="modal-overlay hidden">
-        <div class="modal-content address-modal-content">
-            <div class="modal-close" style="top:20px; right:20px; box-shadow:none; background:#eee;" onclick="onBackClick()">✕</div>
-            <h2 class="address-modal-title">Ваш город</h2>
-            <div class="input-group">
-                <label>Выберите город</label>
-                <select id="modal-city-select">
-                    <option value="Бишкек">Бишкек</option>
-                    <option value="Чолпон-Ата">Чолпон-Ата</option>
-                    <option value="Балыкчы">Балыкчы</option>
-                    <option value="Бостери">Бостери</option>
-                </select>
-            </div>
-            <button class="btn-yellow" style="margin-top: 12px;" onclick="saveAddressModal()">Готово</button>
+    <div id="modal-address" class="modal-overlay hidden" onclick="closeAddressModalIfOverlay(event)">
+        <div class="modal-content">
+            <div class="modal-close" style="top:16px; right:16px; box-shadow:none; background:#f0f0f0;" onclick="closeAddressModal()">✕</div>
+            <h2 style="margin: 0; padding: 20px; font-size: 20px;">Выберите город</h2>
+            <div class="city-list" id="city-list-container">
+                </div>
         </div>
     </div>
 
@@ -484,7 +480,7 @@
         history.replaceState({screen: 'main'}, '');
 
         function showScreen(screenId) {
-            ['screen-main', 'screen-menu', 'screen-cart-list', 'screen-checkout', 'screen-status', 'modal-map'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            ['screen-main', 'screen-menu', 'screen-cart-list', 'screen-status', 'modal-map'].forEach(id => document.getElementById(id).classList.add('hidden'));
             document.getElementById('screen-'+screenId).classList.remove('hidden');
             document.getElementById('cart-float-btn').style.display = (totalSum > 0 && ['main', 'menu'].includes(screenId)) ? 'flex' : 'none';
         }
@@ -548,10 +544,27 @@
                 let count = cartItems[item.id] ? cartItems[item.id].count : 0;
                 html += `
                 <div class="item-card">
-                    <div class="img-wrap"><img src="${item.img}" class="item-img">
-                        ${count > 0 ? `<div class="counter-inline"><div onclick="updateCart('${item.id}', -1)">−</div><div class="c-val">${count}</div><div onclick="updateCart('${item.id}', 1)">+</div></div>` : `<div class="btn-add-img" onclick="updateCart('${item.id}', 1)">+</div>`}
+                    <div class="img-wrap"><img src="${item.img}" class="item-img"></div>
+                    <div class="item-info">
+                        <div style="flex-grow: 1;">
+                            <div class="item-price">${item.price} сом</div>
+                            <div class="item-name">${item.name}</div>
+                        </div>
+                        <div class="item-action">
+                            ${count > 0 
+                                ? `<div class="item-counter active">
+                                    <div class="btn-pm" onclick="updateCart('${item.id}', -1, event)">−</div>
+                                    <div class="c-val">${count}</div>
+                                    <div class="btn-pm" onclick="updateCart('${item.id}', 1, event)">+</div>
+                                   </div>` 
+                                : `<div class="item-counter inactive">
+                                    <div class="btn-pm" style="color:#ccc; cursor:default;" onclick="event.stopPropagation()">−</div>
+                                    <div class="c-val" style="color:#888;">0</div>
+                                    <div class="btn-pm" onclick="updateCart('${item.id}', 1, event)">+</div>
+                                   </div>`
+                            }
+                        </div>
                     </div>
-                    <div class="item-info"><div class="item-price">${item.price} сом</div><div class="item-name">${item.name}</div></div>
                 </div>`;
             });
             document.getElementById('all-products-container').innerHTML = html + `</div>`;
@@ -577,22 +590,37 @@
         function openCartList() {
             let resIds = [...new Set(Object.values(cartItems).map(c => c.resId))];
             if(!cartActiveTabResId || !resIds.includes(cartActiveTabResId)) cartActiveTabResId = resIds[0];
+            
+            // Настраиваем данные для оформления сразу в корзине
+            const activeRes = database[cartActiveTabResId];
+            if (!clientLat) {
+                let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+                if (saved.length > 0) {
+                    selectSavedAddressData(saved[0]);
+                } else {
+                    clientLat = activeRes.lat + 0.005;
+                    clientLon = activeRes.lon + 0.005;
+                }
+            }
+            document.getElementById('pickup-address').innerText = activeRes.address; 
+            setDeliveryMode('delivery'); 
+            renderSavedAddressesUI(); 
+            updateCheckoutSummaryUI();
+            
             renderCartListItems(); 
             history.pushState({screen: 'cart-list'}, ''); showScreen('cart-list');
         }
 
         function renderCartListItems() {
-            let html = ''; let sum = 0;
+            let html = '';
             for(let key in cartItems) { 
                 let c = cartItems[key]; 
                 if(c.resId === cartActiveTabResId) { 
-                    sum += (c.pricePerUnit * c.count); 
-                    html += `<div class="cart-item-row"><img src="${c.item.img}"><div class="cart-item-info"><div class="cart-item-title">${c.item.name}</div><div class="cart-item-price">${c.pricePerUnit} сом</div></div><div class="cart-item-counter"><div onclick="updateCartListCount('${key}', -1)">−</div><div style="cursor:default; width:20px; text-align:center;">${c.count}</div><div onclick="updateCartListCount('${key}', 1)">+</div></div></div>`; 
+                    html += `<div class="cart-item-row" style="padding: 12px 0;"><img src="${c.item.img}"><div class="cart-item-info"><div class="cart-item-title">${c.item.name}</div><div class="cart-item-price">${c.pricePerUnit} сом</div></div><div class="cart-item-counter"><div onclick="updateCartListCount('${key}', -1)">−</div><div style="cursor:default; width:20px; text-align:center;">${c.count}</div><div onclick="updateCartListCount('${key}', 1)">+</div></div></div>`; 
                 } 
             }
             document.getElementById('cart-list-container').innerHTML = html; 
-            document.getElementById('cart-list-total-sum').innerText = sum + " сом"; 
-            document.getElementById('cart-list-delivery').innerText = (sum > 0 ? currentDeliveryFee : 0) + " сом";
+            updateReceipt(); // Сразу пересчитываем чек
         }
 
         function updateCartListCount(key, delta) {
@@ -610,16 +638,37 @@
             if(totalSum === 0) { showScreen('main'); } else { renderCartListItems(); }
         }
 
+        const availableCities = ['Бишкек', 'Чолпон-Ата', 'Балыкчы', 'Бостери'];
+
         function openAddressModal() {
-            document.getElementById('modal-city-select').value = globalCity;
+            // Генерируем красивый список городов. Выбранный город подсвечиваем галочкой
+            const container = document.getElementById('city-list-container');
+            container.innerHTML = availableCities.map(city => 
+                `<div class="city-item ${city === globalCity ? 'active' : ''}" onclick="selectCityFast('${city}')">${city}</div>`
+            ).join('');
+            
             document.getElementById('modal-address').classList.remove('hidden');
-            history.pushState({modal: 'address'}, '');
         }
 
-        function saveAddressModal() {
-            globalCity = document.getElementById('modal-city-select').value;
+        function closeAddressModal() {
+            // Железобетонное закрытие окна (крестик теперь точно работает)
+            document.getElementById('modal-address').classList.add('hidden');
+        }
+
+        function closeAddressModalIfOverlay(event) {
+            // Закрытие при клике мимо белого окна
+            if(event.target.id === 'modal-address') {
+                closeAddressModal();
+            }
+        }
+
+        function selectCityFast(cityName) {
+            // Быстрый выбор города в 1 клик
+            globalCity = cityName;
             document.getElementById('hdr-addr').innerText = globalCity;
-            onBackClick(); renderRestaurants();
+            closeAddressModal(); // Сразу прячем окно
+            renderRestaurants(); // Обновляем рестораны
+            if(tg) tg.HapticFeedback.selectionChanged(); // Легкая вибрация
         }
 
         function openProfileModal() {
@@ -631,27 +680,6 @@
         // ==========================================
         // ОФОРМЛЕНИЕ И КАРТА
         // ==========================================
-        function goToCheckout() {
-            if(totalSum === 0) return;
-            const activeRes = database[cartActiveTabResId];
-            
-            if (!clientLat) {
-                let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-                if (saved.length > 0) {
-                    selectSavedAddressData(saved[0]);
-                } else {
-                    clientLat = activeRes.lat + 0.005;
-                    clientLon = activeRes.lon + 0.005;
-                }
-            }
-
-            document.getElementById('pickup-address').innerText = activeRes.address; 
-            setDeliveryMode('delivery'); 
-            renderSavedAddressesUI(); 
-            updateCheckoutSummaryUI();
-
-            history.pushState({screen: 'checkout'}, ''); showScreen('checkout');
-        }
 
         function openMapModal() {
             document.getElementById('modal-map').classList.remove('hidden');
@@ -705,8 +733,7 @@
                 if (data && data.length > 0) {
                     clientLat = parseFloat(data[0].lat);
                     clientLon = parseFloat(data[0].lon);
-                    if (checkoutMap) { checkoutMap.setView([clientLat, clientLon], 16); checkoutClientMarker.setLatLng([clientLat, clientLon]); }
-                    recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
+                    setMapCenterToMarker(clientLat, clientLon); // Центрируем по новой логике
                 }
             } catch (err) {}
         }
@@ -718,7 +745,6 @@
                 if (data && data.address) {
                     let street = data.address.road || data.address.pedestrian || data.address.village || "";
                     let house = data.address.house_number || data.address.building || "";
-                    
                     let fullAddress = street;
                     if (street && house) fullAddress += ", " + house;
                     else if (house) fullAddress = house;
@@ -729,33 +755,68 @@
             recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
         }
 
+        // НОВАЯ УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы GPS-точка оказалась ровно под маркером на 35%
+        function setMapCenterToMarker(lat, lon) {
+            if (!checkoutMap) return;
+            const mapSize = checkoutMap.getSize();
+            const targetPoint = checkoutMap.project([lat, lon], 16);
+            // Реальный центр экрана (50%) опускаем на 15% ниже, чтобы искомая точка поднялась на 35%
+            targetPoint.y += (mapSize.y * 0.15); 
+            const centerLatLng = checkoutMap.unproject(targetPoint, 16);
+            checkoutMap.setView(centerLatLng, 16);
+        }
+
         function initCheckoutMap(resLat, resLon) {
             if (!checkoutMap) {
-                checkoutMap = L.map('fullscreen-map', {zoomControl: false}).setView([clientLat, clientLon], 15);
+                checkoutMap = L.map('fullscreen-map', {zoomControl: false}).setView([clientLat, clientLon], 16);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(checkoutMap);
                 
                 const resIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180209.png', iconSize: [32, 32] });
                 checkoutResMarker = L.marker([resLat, resLon], {icon: resIcon}).addTo(checkoutMap).bindPopup("Ресторан");
                 
-                const clientIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/149/149059.png', iconSize: [36, 36], iconAnchor: [18, 36] });
-                checkoutClientMarker = L.marker([clientLat, clientLon], {icon: clientIcon, draggable: true}).addTo(checkoutMap).bindPopup("Доставить сюда").openPopup();
-                
-                checkoutClientMarker.on('dragend', function (e) {
-                    clientLat = e.target.getLatLng().lat; clientLon = e.target.getLatLng().lng;
-                    reverseGeocode(clientLat, clientLon);
+                const centerMarkerEl = document.querySelector('.center-marker');
+
+                checkoutMap.on('movestart', function() {
+                    centerMarkerEl.classList.add('is-dragging');
+                    document.getElementById('map-street').value = 'Определение адреса...'; 
                 });
 
-                checkoutMap.on('click', function(e) {
-                    clientLat = e.latlng.lat; clientLon = e.latlng.lng;
-                    checkoutClientMarker.setLatLng([clientLat, clientLon]);
+                checkoutMap.on('moveend', function() {
+                    centerMarkerEl.classList.remove('is-dragging');
+                    
+                    // БЕРЕМ КООРДИНАТЫ РОВНО ИЗ-ПОД МАРКЕРА (На высоте 35% экрана)
+                    const mapSize = checkoutMap.getSize();
+                    const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.35);
+                    const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
+                    
+                    clientLat = latlng.lat; 
+                    clientLon = latlng.lng;
                     reverseGeocode(clientLat, clientLon);
                 });
+                
+                // Ставим карту под маркер при открытии
+                setMapCenterToMarker(clientLat, clientLon);
             } else {
-                checkoutMap.setView([clientLat, clientLon], 15);
-                checkoutClientMarker.setLatLng([clientLat, clientLon]);
+                setMapCenterToMarker(clientLat, clientLon);
                 checkoutResMarker.setLatLng([resLat, resLon]);
             }
             recalcCheckoutDelivery(resLat, resLon);
+        }
+
+        function locateUser() {
+            if (!navigator.geolocation) return alert("Браузер не поддерживает GPS");
+            if(tg) tg.HapticFeedback.impactOccurred('medium');
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    clientLat = position.coords.latitude; clientLon = position.coords.longitude;
+                    setMapCenterToMarker(clientLat, clientLon); // Сдвигаем по новой логике
+                },
+                (error) => {
+                    if (error.code === 1) alert("Разрешите доступ к геолокации в настройках телефона");
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
         }
 
         function recalcCheckoutDelivery(resLat, resLon) {
@@ -799,23 +860,6 @@
             
             // Обновляем общий чек на странице оформления
             updateReceipt();
-        }
-
-        function locateUser() {
-            if (!navigator.geolocation) return alert("Браузер не поддерживает GPS");
-            if(tg) tg.HapticFeedback.impactOccurred('medium');
-            
-            navigator.geolocation.getCurrentPosition(
-                async (position) => {
-                    clientLat = position.coords.latitude; clientLon = position.coords.longitude;
-                    if (checkoutMap) { checkoutMap.setView([clientLat, clientLon], 16); checkoutClientMarker.setLatLng([clientLat, clientLon]); }
-                    await reverseGeocode(clientLat, clientLon);
-                },
-                (error) => {
-                    if (error.code === 1) alert("Разрешите доступ к геолокации в настройках телефона");
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
-            );
         }
 
         function saveCurrentAddress() {
@@ -904,6 +948,11 @@
         async function createOrder() {
             if (!orderAddressData.street && currentDeliveryFee > 0) return alert("Пожалуйста, выберите адрес на карте!");
             
+            const clientPhone = document.getElementById('client-phone').value;
+            if (!clientPhone) return alert("Пожалуйста, укажите ваш номер телефона для курьера!");
+
+            const resComment = document.getElementById('res-comment').value; // Забираем коммент
+
             const payBtn = document.getElementById('main-pay-btn');
             const originalBtnText = payBtn.innerText;
             payBtn.innerText = '⏳ Обработка...';
@@ -918,14 +967,18 @@
             const orderData = {
                 type: 'food', 
                 user: tg?.initDataUnsafe?.user || { id: 111, first_name: "Тест Юзер" }, 
+                phone: clientPhone, // <-- ОТПРАВЛЯЕМ ТЕЛЕФОН
                 address: fullAddress, 
                 dest_lat: clientLat, 
                 dest_lon: clientLon, 
                 restaurantName: database[cartActiveTabResId]?.title || "Ресторан",
                 totalPrice: totalSum + currentDeliveryFee,
-                comment: orderAddressData.comment,
+                comment: orderAddressData.comment, // Комментарий курьеру (домофон и тд)
+                resComment: resComment, // <-- ОТПРАВЛЯЕМ КОММЕНТАРИЙ РЕСТОРАНУ
                 items: Object.values(cartItems).filter(item => item.resId === cartActiveTabResId)
             };
+
+            // Дальше остальной код функции (if(tg)... try { fetch... ) оставляем без изменений!
 
             if(tg) tg.HapticFeedback.notificationOccurred('success');
             
