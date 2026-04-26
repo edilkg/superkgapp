@@ -152,6 +152,30 @@
         .saved-addr-info { flex-grow: 1; font-size: 14px; font-weight: 600; cursor:pointer; }
         .saved-addr-del { width: 30px; height: 30px; display:flex; align-items:center; justify-content:center; color: #d32f2f; background: #ffebee; border-radius: 8px; cursor: pointer; font-size: 16px;}
         .btn-save-address { background: var(--bg-color); border: 1px dashed #ccc; padding: 12px; border-radius: 12px; font-weight: bold; width: 100%; margin-top: 8px; margin-bottom: 16px; cursor: pointer; color: #555; transition: 0.2s; }
+        /* --- СТИЛИ КНОПКИ "ДО ДВЕРИ" --- */
+        .door-delivery-btn {
+            display: flex; align-items: center; justify-content: space-between;
+            background: var(--card-bg); border: 1px solid #eee; padding: 14px 16px;
+            border-radius: 14px; cursor: pointer; margin-bottom: 12px; transition: 0.2s;
+        }
+        .door-delivery-btn.active {
+            background: #fffcf0; border-color: var(--main-yellow);
+        }
+        .door-info { display: flex; align-items: center; gap: 12px; }
+        .door-icon { font-size: 22px; }
+        .door-text { display: flex; flex-direction: column; }
+        .door-title { font-weight: 700; font-size: 15px; color: var(--text-dark); }
+        .door-price { font-size: 12px; color: #E65100; font-weight: 600; }
+        .door-checkbox {
+            width: 24px; height: 24px; border-radius: 6px; border: 2px solid #ddd;
+            display: flex; align-items: center; justify-content: center; transition: 0.2s;
+        }
+        .door-delivery-btn.active .door-checkbox {
+            background: var(--main-yellow); border-color: var(--main-yellow);
+        }
+        .door-delivery-btn.active .door-checkbox::after {
+            content: '✓'; color: #111; font-weight: 900; font-size: 14px;
+        }
 
         .receipt-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 12px; color: #555; }
         .receipt-total { display: flex; justify-content: space-between; font-size: 18px; font-weight: 800; margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee; color: black; }
@@ -186,32 +210,41 @@
         #modal-map.hidden { display: none !important; }
         #fullscreen-map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         
-        /* ЦЕНТРАЛЬНЫЙ МАРКЕР С ТЕНЬЮ */
+        /* ЦЕНТРАЛЬНЫЙ МАРКЕР С ТЕНЬЮ (Уменьшен и с длинной ножкой) */
         .center-marker-container {
-            position: absolute; top: 30%; left: 50%; /* Подняли до 30% */
-            transform: translate(-50%, -50%);
+            position: absolute; top: 30%; left: 50%; 
+            transform: translate(-50%, -100%); /* Сдвигаем вверх, чтобы острый кончик точно указывал в центр */
             z-index: 2000; pointer-events: none;
             display: flex; flex-direction: column; align-items: center;
         }
         .center-marker-icon {
-            width: 48px; height: 48px; background: #E65100; border-radius: 50% 50% 50% 0;
-            transform: rotate(-45deg); display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: transform 0.2s ease, margin-bottom 0.2s ease;
+            position: relative;
+            width: 32px; height: 32px; background: #E65100; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.2); 
+            transition: transform 0.2s ease, margin-bottom 0.2s ease;
         }
+        /* Длинная ножка маркера */
+        .center-marker-icon::before {
+            content: ''; position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%);
+            border-width: 14px 10px 0; border-style: solid; border-color: #E65100 transparent transparent transparent;
+        }
+        /* Белая точка внутри маркера */
         .center-marker-icon::after {
-            content: ''; width: 16px; height: 16px; background: white; border-radius: 50%;
+            content: ''; width: 10px; height: 10px; background: white; border-radius: 50%; z-index: 1;
         }
         .center-marker-shadow {
             width: 12px; height: 6px; background: rgba(0,0,0,0.3); border-radius: 50%;
-            margin-top: 4px; transition: transform 0.2s ease, opacity 0.2s ease;
+            margin-top: 14px; /* Отступ под ножку */
+            transition: transform 0.2s ease, opacity 0.2s ease;
         }
         
         /* Анимация при перетаскивании */
         .center-marker-container.is-dragging .center-marker-icon {
-            transform: rotate(-45deg) scale(1.1); margin-bottom: 15px; /* Иконка подпрыгивает */
+            transform: scale(1.1); margin-bottom: 15px;
         }
         .center-marker-container.is-dragging .center-marker-shadow {
-            transform: scale(0.6); opacity: 0.5; /* Тень уменьшается */
+            transform: scale(0.6); opacity: 0.5;
         }
         
         /* КНОПКИ ПОВЕРХ КАРТЫ */
@@ -219,16 +252,27 @@
             position: absolute; bottom: 0; left: 0; right: 0; z-index: 3000; 
             display: flex; flex-direction: column;
             transform: translateY(0); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none; /* <-- ВАЖНО: Пропускаем клики сквозь пустое пространство! */
         }
         .map-floating-controls.hidden-panel {
-            transform: translateY(120%); /* Уезжает вниз за экран */
+            transform: translateY(120%); 
         }
         
         .map-buttons-row { display: flex; justify-content: space-between; padding: 0 16px 16px 16px; }
-        .btn-round { width: 48px; height: 48px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); cursor: pointer; color: #333; }
+        .btn-round { 
+            width: 48px; height: 48px; background: white; border-radius: 50%; 
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); 
+            cursor: pointer; color: #333; 
+            pointer-events: auto; /* <-- ВАЖНО: Возвращаем кликабельность самим кнопкам */
+        }
         .btn-round:active { background: #eee; transform: scale(0.95); }
 
-        .map-bottom-panel { background: white; padding: 20px; border-radius: 24px 24px 0 0; box-shadow: 0 -4px 20px rgba(0,0,0,0.1); }
+        .map-bottom-panel { 
+            background: white; padding: 20px; border-radius: 24px 24px 0 0; 
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.1); 
+            pointer-events: auto; /* <-- ВАЖНО: Возвращаем кликабельность нижней белой панели */
+        }
         
         .full-width-input { width: 100%; background: #eee; border: none; padding: 14px; border-radius: 12px; font-size: 14px; box-sizing: border-box; margin-bottom: 12px; }
         .inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;}
@@ -319,6 +363,17 @@
                     <div style="font-size: 20px; color: var(--text-gray);">›</div>
                 </div>
                 <button class="btn-save-address" onclick="saveCurrentAddress()" style="margin-bottom: 8px;">⭐ Сохранить этот адрес</button>
+                
+                <div class="door-delivery-btn" id="door-delivery-btn" onclick="toggleDoorDelivery()">
+                    <div class="door-info">
+                        <div class="door-icon">🚪</div>
+                        <div class="door-text">
+                            <span class="door-title">Доставка до двери</span>
+                            <span class="door-price">+50 сом к доставке</span>
+                        </div>
+                    </div>
+                    <div class="door-checkbox"></div>
+                </div>
             </div>
 
             <div id="block-pickup" class="hidden">
@@ -361,12 +416,9 @@
             <div class="map-bottom-panel">
                 <input type="text" id="map-street" placeholder="📍 Улица и дом (напр. Советская 10)" onchange="geocodeAddressFromInput()" class="full-width-input" style="background: #f0f0f0; font-weight: bold; border: 2px solid var(--main-yellow);">
 
-                <div class="inputs-grid">
-                    <input type="text" id="map-pod" placeholder="Подъезд" class="grid-input">
-                    <input type="text" id="map-kv" placeholder="Квартира" class="grid-input">
-                </div>
+               <input type="text" id="map-kv" placeholder="🏠 (гостевой дом, № дома, № кв )" class="full-width-input" style="background: #f0f0f0; margin-bottom: 12px;">
                 
-                <input type="text" id="map-comment" placeholder="💬 Комментарий курьеру" class="full-width-input">
+                <input type="text" id="map-comment" placeholder="💬 Комментарий курьеру (ориентир)" class="full-width-input" style="background: #f0f0f0;">
 
                 <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 16px; margin-bottom: 16px;">
                     <span style="color: #555; font-size: 14px; font-weight: 600;">Доставка:</span>
@@ -474,7 +526,8 @@
         if(tg) tg.expand();
         
         let totalSum = 0;
-        let currentDeliveryFee = 100; 
+        let currentDeliveryFee = 100;
+        let doorDeliveryFee = 0; // НОВАЯ ПЕРЕМЕННАЯ (0 или 50) 
         let currentRestaurantId = null;
         let cartItems = {}; 
         let cartActiveTabResId = null; 
@@ -727,11 +780,11 @@
 
         function confirmMapAddress() {
             orderAddressData.street = document.getElementById('map-street').value;
-            orderAddressData.pod = document.getElementById('map-pod').value;
+            orderAddressData.pod = ''; // Очистили, так как поля больше нет
             orderAddressData.kv = document.getElementById('map-kv').value;
             orderAddressData.comment = document.getElementById('map-comment').value;
 
-            if (!orderAddressData.street) return alert("Пожалуйста, укажите улицу и дом!");
+            if (!orderAddressData.street) return alert("Пожалуйста, укажите улицу!");
 
             updateCheckoutSummaryUI();
             updateReceipt();
@@ -744,10 +797,8 @@
 
             if (orderAddressData.street) {
                 title = orderAddressData.street;
-                let extra = [];
-                if(orderAddressData.pod) extra.push(`под.${orderAddressData.pod}`);
-                if(orderAddressData.kv) extra.push(`кв.${orderAddressData.kv}`);
-                details = extra.length > 0 ? extra.join(', ') : "Можно указать подъезд и квартиру";
+                // Если заполнили номер дома/квартиру, показываем их, иначе текст по умолчанию
+                details = orderAddressData.kv ? orderAddressData.kv : "Можно указать дом и квартиру";
             }
 
             document.getElementById('checkout-summary-address').innerText = title;
@@ -972,10 +1023,29 @@
         function updateReceipt() {
             let tabTotalSum = 0; 
             for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) tabTotalSum += (cartItems[k].pricePerUnit * cartItems[k].count); }
+            
+            // Итоговая доставка = Базовая + До двери (если включена)
+            let finalDeliveryFee = currentDeliveryFee > 0 ? (currentDeliveryFee + doorDeliveryFee) : 0;
+
             document.getElementById('check-items').innerText = tabTotalSum + ' сом';
-            document.getElementById('check-delivery').innerText = currentDeliveryFee + ' сом';
-            document.getElementById('check-total').innerText = (tabTotalSum + currentDeliveryFee) + ' сом';
-            document.getElementById('pay-btn-sum').innerText = (tabTotalSum + currentDeliveryFee) + ' сом';
+            document.getElementById('check-delivery').innerText = finalDeliveryFee + ' сом';
+            document.getElementById('check-total').innerText = (tabTotalSum + finalDeliveryFee) + ' сом';
+            document.getElementById('pay-btn-sum').innerText = (tabTotalSum + finalDeliveryFee) + ' сом';
+        }
+
+        // НОВАЯ ФУНКЦИЯ: ПЕРЕКЛЮЧАТЕЛЬ "ДО ДВЕРИ"
+        function toggleDoorDelivery() {
+            const btn = document.getElementById('door-delivery-btn');
+            if (doorDeliveryFee === 0) {
+                doorDeliveryFee = 50;
+                btn.classList.add('active');
+                if(tg) tg.HapticFeedback.impactOccurred('light');
+            } else {
+                doorDeliveryFee = 0;
+                btn.classList.remove('active');
+                if(tg) tg.HapticFeedback.selectionChanged();
+            }
+            updateReceipt(); // Сразу обновляем чек
         }
 
         async function createOrder() {
@@ -993,21 +1063,24 @@
             payBtn.style.opacity = '0.7';
 
             let fullAddress = orderAddressData.street;
-            if(orderAddressData.kv || orderAddressData.pod) {
-                fullAddress += ` (кв.${orderAddressData.kv || '-'}, под.${orderAddressData.pod || '-'})`;
+            if(orderAddressData.kv) {
+                fullAddress += ` (${orderAddressData.kv})`;
             }
             
             const orderData = {
                 type: 'food', 
                 user: tg?.initDataUnsafe?.user || { id: 111, first_name: "Тест Юзер" }, 
-                phone: clientPhone, // <-- ОТПРАВЛЯЕМ ТЕЛЕФОН
+                phone: clientPhone, 
                 address: fullAddress, 
                 dest_lat: clientLat, 
                 dest_lon: clientLon, 
                 restaurantName: database[cartActiveTabResId]?.title || "Ресторан",
-                totalPrice: totalSum + currentDeliveryFee,
-                comment: orderAddressData.comment, // Комментарий курьеру (домофон и тд)
-                resComment: resComment, // <-- ОТПРАВЛЯЕМ КОММЕНТАРИЙ РЕСТОРАНУ
+                // ОБНОВЛЕННАЯ СТРОКА: Учитываем доставку до двери
+                totalPrice: totalSum + (currentDeliveryFee > 0 ? currentDeliveryFee + doorDeliveryFee : 0),
+                comment: orderAddressData.comment, 
+                resComment: resComment, 
+                // НОВАЯ СТРОКА: Сообщаем курьеру, нужна ли доставка до двери
+                isDoorDelivery: doorDeliveryFee > 0 ? true : false, 
                 items: Object.values(cartItems).filter(item => item.resId === cartActiveTabResId)
             };
 
