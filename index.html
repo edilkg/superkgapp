@@ -155,12 +155,16 @@
         .pm-section-title { font-size: 16px; font-weight: 700; color: #111; margin-bottom: 8px; margin-top: 16px;}
         .pm-text { font-size: 14px; color: #555; line-height: 1.5; }
         
-        /* Нижняя панель с огромным счетчиком */
+        /* Нижняя панель и элементы модалки */
         .pm-bottom { position: absolute; bottom: 0; left: 0; right: 0; padding: 16px 20px; background: white; border-top: 1px solid #eee; z-index: 100; }
-        .pm-counter-full { display: flex; align-items: center; justify-content: space-between; background: #f5f5f5; border-radius: 20px; height: 56px; padding: 0 10px; }
+        
+        .pm-counter-full { display: flex; align-items: center; justify-content: space-between; background: #f5f5f5; border-radius: 20px; height: 56px; padding: 0 10px; margin-top: 24px; border: 1px solid #eee; }
         .pm-btn { width: 60px; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 500; cursor: pointer; color: #333; transition: 0.1s; }
         .pm-btn:active { background: rgba(0,0,0,0.05); border-radius: 16px; }
         .pm-val { font-size: 22px; font-weight: 800; color: #111; }
+        
+        .pm-save-btn { width: 100%; background: var(--main-yellow); height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; font-weight: 800; font-size: 16px; cursor: pointer; transition: 0.2s; border: none; }
+        .pm-save-btn:active { transform: scale(0.98); }
         /* ОФОРМЛЕНИЕ ЗАКАЗА */
         .cart-section { background: var(--card-bg); margin-top: 8px; padding: 16px; border-radius: 20px; }
         .delivery-toggle { display: flex; background: var(--bg-color); border-radius: 12px; padding: 4px; margin-bottom: 20px; }
@@ -505,13 +509,19 @@
                 
                 <div class="pm-section-title">Описание</div>
                 <div class="pm-text" id="pm-desc">Описание блюда...</div>
-            </div>
-            <div class="pm-bottom">
+                
                 <div class="pm-counter-full">
                     <div class="pm-btn" onclick="changeProductModalCount(-1)">−</div>
                     <div class="pm-val" id="pm-count">0</div>
                     <div class="pm-btn" onclick="changeProductModalCount(1)">+</div>
                 </div>
+            </div>
+            
+            <div class="pm-bottom">
+                <button class="pm-save-btn" onclick="closeProductModal()">
+                    <span id="pm-add-text">Закрыть</span>
+                    <span id="pm-cart-total-price">0 сом</span>
+                </button>
             </div>
         </div>
     </div>
@@ -580,17 +590,23 @@
 
         const database = {
             // ЧОЛПОН-АТА И БОСТЕРИ
-            'asian1': { lat: 42.6482, lon: 77.0855, city: 'Чолпон-Ата', title: 'Дракон Суши', logo: imgs.asian, address: 'ул. Советская, 15', hours: '10:00 - 23:00', rating: 4.7, tags: ['sushi', 'promo'], img: imgs.asian, categories: ['Холодные роллы', 'Сеты'], items: [{id: 'a1', cat: 'Холодные роллы', name: 'Филадельфия', price: 350, img: imgs.asian}, {id: 'a2', cat: 'Сеты', name: 'Сет Самурай', price: 1200, img: imgs.asian}] },
-            'fast1': { lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', title: 'Burger Spot', logo: imgs.fastfood, address: 'ул. Горького, 2', hours: '11:00 - 02:00', rating: 4.2, tags: ['fastfood'], img: imgs.fastfood, categories: ['Бургеры', 'Напитки'], items: [{id: 'f1', cat: 'Бургеры', name: 'Чизбургер', price: 250, img: imgs.fastfood}, {id: 'f2', cat: 'Напитки', name: 'Кола 0.5', price: 80, img: imgs.fastfood}] },
-            'piz1': { lat: 42.6346, lon: 77.1950, city: 'Бостери', title: 'Roma Pizza', logo: imgs.pizza, address: 'Бостери, Центр', hours: '10:00 - 22:00', rating: 4.8, tags: ['pizza', 'top'], img: imgs.pizza, categories: ['Пицца'], items: [{id: 'p1', cat: 'Пицца', name: 'Маргарита', price: 450, img: imgs.pizza}, {id: 'p2', cat: 'Пицца', name: 'Пепперони', price: 550, img: imgs.pizza}] },
+            'asian1': { lat: 42.6482, lon: 77.0855, city: 'Чолпон-Ата', title: 'Дракон Суши', logo: imgs.asian, address: 'ул. Советская, 15', hours: '10:00 - 23:00', rating: 4.7, img: imgs.asian, items: [{id: 'a1', name: 'Филадельфия', price: 350, weight: '250 г', img: imgs.asian}, {id: 'a2', name: 'Сет Самурай', price: 1200, weight: '1000 г', img: imgs.asian}] },
+            'fast1': { lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', title: 'Burger Spot', logo: imgs.fastfood, address: 'ул. Горького, 2', hours: '11:00 - 02:00', rating: 4.2, img: imgs.fastfood, items: [{id: 'f1', name: 'Чизбургер', price: 250, weight: '300 г', img: imgs.fastfood}, {id: 'f2', name: 'Кола', price: 80, weight: '0.5 л', img: imgs.fastfood}] },
+            'piz1': { lat: 42.6346, lon: 77.1950, city: 'Бостери', title: 'Roma Pizza', logo: imgs.pizza, address: 'Бостери, Центр', hours: '10:00 - 22:00', rating: 4.8, img: imgs.pizza, items: [{id: 'p1', name: 'Маргарита', price: 450, weight: '500 г', img: imgs.pizza}, {id: 'p2', name: 'Пепперони', price: 550, weight: '550 г', img: imgs.pizza}] },
             
-            // БИШКЕК
-            'bish1': { lat: 42.8746, lon: 74.5698, city: 'Бишкек', title: 'Фаиза', logo: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', address: 'ул. Жибек Жолу, 555', hours: '09:00 - 23:00', rating: 4.9, tags: ['national', 'top'], img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', categories: ['Горячие блюда', 'Выпечка'], items: [{id: 'b1', cat: 'Горячие блюда', name: 'Лагман', price: 280, img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300'}, {id: 'b2', cat: 'Выпечка', name: 'Самса с мясом', price: 80, img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300'}] },
-            'bish2': { lat: 42.8700, lon: 74.5900, city: 'Бишкек', title: 'KFC Азия Молл', logo: imgs.fastfood, address: 'пр. Ч. Айтматова, 3', hours: '10:00 - 00:00', rating: 4.5, tags: ['fastfood'], img: imgs.fastfood, categories: ['Курица'], items: [{id: 'k1', cat: 'Курица', name: 'Баскет Дуэт', price: 650, img: imgs.fastfood}, {id: 'k2', cat: 'Курица', name: 'Крылышки (5 шт)', price: 220, img: imgs.fastfood}] },
-            'bish3': { lat: 42.8820, lon: 74.5820, city: 'Бишкек', title: 'Dodo Pizza', logo: imgs.pizza, address: 'ул. Шопокова, 101/1', hours: '10:00 - 02:00', rating: 4.7, tags: ['pizza'], img: imgs.pizza, categories: ['Пиццы'], items: [{id: 'd1', cat: 'Пиццы', name: 'Додо Классика', price: 600, img: imgs.pizza}] },
-
+            // БИШКЕК (СЮДА ДОБАВЛЕНЫ НАПИТКИ!)
+            'bish1': { lat: 42.8746, lon: 74.5698, city: 'Бишкек', title: 'Фаиза', logo: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', address: 'ул. Жибек Жолу, 555', hours: '09:00 - 23:00', rating: 4.9, img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', 
+                items: [
+                    {id: 'b1', name: 'Лагман Гуйру', price: 280, weight: '450 г', desc: 'Традиционный уйгурский лагман с обжаренным мясом (говядина), свежими овощами и домашней тянутой лапшой.', img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400'}, 
+                    {id: 'b2', name: 'Самса с мясом', price: 80, weight: '120 г', desc: 'Хрустящая слоеная самса из тандыра с сочной рубленой говядиной, луком и специями.', img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400'},
+                    {id: 'b3', name: 'Coca-Cola', price: 90, weight: '0.5 л', desc: 'Классическая охлажденная кола в пластиковой бутылке.', img: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=400'},
+                    {id: 'b4', name: 'Лимонад Дюшес', price: 120, weight: '1 л', desc: 'Освежающий грушевый лимонад, идеально к горячим блюдам.', img: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=400'}
+                ] 
+            },
+            'bish2': { lat: 42.8700, lon: 74.5900, city: 'Бишкек', title: 'KFC Азия Молл', logo: imgs.fastfood, address: 'пр. Ч. Айтматова, 3', hours: '10:00 - 00:00', rating: 4.5, img: imgs.fastfood, items: [{id: 'k1', name: 'Баскет Дуэт', price: 650, weight: '800 г', img: imgs.fastfood}, {id: 'k2', name: 'Крылышки (5 шт)', price: 220, weight: '200 г', img: imgs.fastfood}] },
+            
             // БАЛЫКЧЫ
-            'bal1': { lat: 42.4600, lon: 76.1800, city: 'Балыкчы', title: 'Балыкчы Гриль', logo: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', address: 'ул. Фрунзе, 42', hours: '11:00 - 23:00', rating: 4.6, tags: ['national'], img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', categories: ['Рыба', 'Шашлыки'], items: [{id: 'bal1', cat: 'Рыба', name: 'Форель на мангале', price: 600, img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300'}, {id: 'bal2', cat: 'Шашлыки', name: 'Баранина мякоть', price: 350, img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300'}] }
+            'bal1': { lat: 42.4600, lon: 76.1800, city: 'Балыкчы', title: 'Балыкчы Гриль', logo: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', address: 'ул. Фрунзе, 42', hours: '11:00 - 23:00', rating: 4.6, img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', items: [{id: 'bal1', name: 'Форель на мангале', price: 600, weight: '350 г', img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300'}, {id: 'bal2', name: 'Баранина мякоть', price: 350, weight: '200 г', img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300'}] }
         };
 
         history.replaceState({screen: 'main'}, '');
@@ -656,27 +672,35 @@
         function renderRestaurantMenu() {
             const res = database[currentRestaurantId];
             let html = `<h3 class="cat-section-title">Меню</h3><div class="products-grid">`;
+            
             res.items.forEach(item => {
                 let count = cartItems[item.id] ? cartItems[item.id].count : 0;
+                
+                // Формируем текст с весом или литрами (серым цветом, с точкой)
+                let weightHtml = item.weight ? `<span style="color: #888; font-size: 13px; font-weight: 500; margin-left: 6px;">• ${item.weight}</span>` : '';
+
                 html += `
                 <div class="item-card">
-                    <div class="img-wrap" onclick="openProductModal('${item.id}')" style="cursor: pointer;"><img src="${item.img}" class="item-img"></div>
+                    <div class="img-wrap" onclick="openProductModal('${item.id}')" style="cursor: pointer;">
+                        <img src="${item.img}" class="item-img">
+                    </div>
                     <div class="item-info">
-                        <div style="flex-grow: 1;">
-                            <div class="item-price">${item.price} сом</div>
+                        <div style="flex-grow: 1; cursor: pointer;" onclick="openProductModal('${item.id}')">
+                            <div class="item-price">${item.price} сом ${weightHtml}</div>
                             <div class="item-name">${item.name}</div>
                         </div>
+                        
                         <div class="item-action">
                             ${count > 0 
                                 ? `<div class="item-counter active">
-                                    <div class="btn-pm" onclick="updateCart('${item.id}', -1, event)">−</div>
+                                    <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', -1)">−</div>
                                     <div class="c-val">${count}</div>
-                                    <div class="btn-pm" onclick="updateCart('${item.id}', 1, event)">+</div>
+                                    <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">+</div>
                                    </div>` 
                                 : `<div class="item-counter inactive">
                                     <div class="btn-pm" style="color:#ccc; cursor:default;" onclick="event.stopPropagation()">−</div>
                                     <div class="c-val" style="color:#888;">0</div>
-                                    <div class="btn-pm" onclick="updateCart('${item.id}', 1, event)">+</div>
+                                    <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">+</div>
                                    </div>`
                             }
                         </div>
@@ -1194,9 +1218,9 @@ btnSkip.addEventListener('click', () => {
     overlay.style.display = 'none';
 });
 // ==========================================
-        // ЛОГИКА МОДАЛЬНОГО ОКНА БЛЮДА (Умная корзина)
+        // ЛОГИКА МОДАЛЬНОГО ОКНА БЛЮДА (ЖЕЛЕЗОБЕТОННАЯ ВЕРСИЯ)
         // ==========================================
-        let currentModalItem = null;
+        var currentModalItem = null; // Используем var, чтобы избежать ошибки инициализации
 
         function openProductModal(itemId) {
             const res = database[currentRestaurantId];
@@ -1206,7 +1230,7 @@ btnSkip.addEventListener('click', () => {
             document.getElementById('pm-title').innerText = currentModalItem.name;
             document.getElementById('pm-price').innerText = currentModalItem.price + ' сом';
             
-            // Если в базе нет данных, подставляем текст-заглушку
+            // Если в базе нет данных, подставляем заглушки
             document.getElementById('pm-weight').innerText = currentModalItem.weight || '350 г';
             document.getElementById('pm-composition').innerText = currentModalItem.composition || 'Ингредиенты не указаны';
             document.getElementById('pm-desc').innerText = currentModalItem.desc || 'Очень вкусное и сытное блюдо.';
@@ -1214,14 +1238,27 @@ btnSkip.addEventListener('click', () => {
             updateProductModalUI();
             
             document.getElementById('modal-product').classList.remove('hidden');
-            if(tg) tg.HapticFeedback.impactOccurred('light');
+            if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+            }
         }
 
         function updateProductModalUI() {
             if (!currentModalItem) return;
-            // Берем актуальное количество ИЗ ГЛОБАЛЬНОЙ КОРЗИНЫ
+            // Обновляем количество товара в счетчике
             let count = cartItems[currentModalItem.id] ? cartItems[currentModalItem.id].count : 0;
             document.getElementById('pm-count').innerText = count;
+            
+            // Обновляем ОБЩУЮ СУММУ КОРЗИНЫ на нижней кнопке
+            document.getElementById('pm-cart-total-price').innerText = totalSum + " сом";
+            
+            // Логика текста: если корзина не пустая, пишем "В корзине", иначе "Закрыть"
+            const btnText = document.getElementById('pm-add-text');
+            if (totalSum > 0) {
+                btnText.innerText = "В корзине";
+            } else {
+                btnText.innerText = "Закрыть";
+            }
         }
 
         function changeProductModalCount(delta) {
@@ -1231,13 +1268,15 @@ btnSkip.addEventListener('click', () => {
             // Если 0 и мы жмем минус — игнорируем
             if (currentCount === 0 && delta < 0) return;
             
-            // Вызываем ТВОЮ оригинальную функцию добавления (она ничего не сломает!)
+            // Вызываем ТВОЮ оригинальную функцию добавления
             updateCart(currentModalItem.id, delta);
             
             // Мгновенно обновляем цифру внутри открытой модалки
             updateProductModalUI();
             
-            if(tg) tg.HapticFeedback.selectionChanged();
+            if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                window.Telegram.WebApp.HapticFeedback.selectionChanged();
+            }
         }
 
         function closeProductModal() {
@@ -1247,60 +1286,6 @@ btnSkip.addEventListener('click', () => {
         function closeProductModalIfOverlay(event) {
             if(event.target.classList.contains('pm-overlay')) closeProductModal();
         }
-    </script>
-   <div id="geo-modal-overlay" class="modal-overlay" style="display: none;">
-    <div class="modal-window">
-        <div class="modal-icon-circle">📍</div>
-        <h2 class="modal-title">Куда доставить еду?</h2>
-        <p class="modal-text">Разрешите доступ к местоположению, чтобы мы нашли ближайшие рестораны.</p>
-        <button id="btn-geo-confirm" class="main-button">Указать текущее</button>
-        <button id="btn-geo-skip" class="secondary-button">Ввести адрес вручную</button>
-    </div>
-</div>
-
-<script>
-(function() {
-    const tgApp = window.Telegram?.WebApp;
-    const geoOverlay = document.getElementById('geo-modal-overlay');
-    const btnConfirmGeo = document.getElementById('btn-geo-confirm');
-    const btnSkipGeo = document.getElementById('btn-geo-skip');
-
-    if (!geoOverlay || !btnConfirmGeo || !btnSkipGeo) return;
-
-    // Показываем окно при загрузке страницы, если гео еще нет в памяти телефона
-    if (!localStorage.getItem('user_geo')) {
-        geoOverlay.style.display = 'flex';
-    }
-
-    btnConfirmGeo.addEventListener('click', () => {
-        if (tgApp?.HapticFeedback) tgApp.HapticFeedback.impactOccurred('medium');
-        
-        btnConfirmGeo.disabled = true;
-        btnConfirmGeo.innerText = "Определяем...";
-
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                const data = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-                localStorage.setItem('user_geo', JSON.stringify(data)); // Сохраняем, чтобы больше не спрашивать
-                
-                if (tgApp?.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('success');
-                geoOverlay.style.display = 'none'; // Скрываем окно
-            },
-            (err) => {
-                if (tgApp?.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('error');
-                alert("Не удалось получить доступ к GPS. Пожалуйста, проверьте настройки телефона.");
-                
-                btnConfirmGeo.disabled = false;
-                btnConfirmGeo.innerText = "Указать текущее";
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
-    });
-
-    btnSkipGeo.addEventListener('click', () => {
-        geoOverlay.style.display = 'none';
-    });
-})();
 </script>
 </body>
 </html>
