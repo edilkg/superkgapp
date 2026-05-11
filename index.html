@@ -845,38 +845,14 @@
             history.pushState({modal: 'map'}, '');
             
             const activeRes = database[cartActiveTabResId];
+            
+            // Карта сама использует уже сохраненные clientLat и clientLon, 
+            // которые мы получили при входе в приложение!
             setTimeout(() => { initCheckoutMap(activeRes.lat, activeRes.lon); }, 100);
             
             document.getElementById('map-street').value = orderAddressData.street || '';
             document.getElementById('map-kv').value = orderAddressData.kv || '';
             document.getElementById('map-comment').value = orderAddressData.comment || '';
-
-            // НОВАЯ ЛОГИКА: Автоматически запрашиваем локацию, если открыли карту
-            if (navigator.geolocation) {
-                // Легкая вибрация для обратной связи
-                if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-                    window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
-                }
-                
-                // Пробуем получить точные координаты клиента
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        clientLat = position.coords.latitude; 
-                        clientLon = position.coords.longitude;
-                        
-                        // Сохраняем в память телефона
-                        localStorage.setItem('user_geo', JSON.stringify({ lat: clientLat, lon: clientLon }));
-                        
-                        // Сдвигаем карту к клиенту (с учетом нашей поправки на 30% под маркер)
-                        setMapCenterToMarker(clientLat, clientLon);
-                    },
-                    (error) => {
-                        // Если клиент отказал в доступе, просто оставляем карту как есть
-                        console.log("Локация не предоставлена: ", error);
-                    },
-                    { enableHighAccuracy: true, timeout: 5000 }
-                );
-            }
         }
 
         function confirmMapAddress() {
