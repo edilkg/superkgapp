@@ -6,12 +6,9 @@
     <title>ТамакKG</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
     <style>
         /* --- СТИЛИ ДЛЯ ОКНА ГЕОЛОКАЦИИ --- */
@@ -323,13 +320,18 @@
     </div>
 
     <!-- Модальное окно для запроса геолокации -->
-    <div id="modal-geolocation" class="modal-overlay hidden">
-        <div class="modal-window">
-            <div class="modal-icon-circle">📍</div>
-            <div class="modal-title">Разрешить геолокацию</div>
-            <div class="modal-text">Чтобы найти ближайшие рестораны и рассчитать стоимость доставки, приложению нужен доступ к вашему местоположению.</div>
-            <button class="main-button" onclick="requestGeolocation()">Разрешить</button>
-            <button class="secondary-button" onclick="skipGeolocation()">Позже</button>
+    <div id="geo-modal-overlay" class="modal-overlay" style="display: none; z-index: 10000; justify-content: center; align-items: flex-end;">
+        <div class="modal-window" style="background: white; width: 100%; border-radius: 24px 24px 0 0; padding: 32px 20px 24px; text-align: center; box-shadow: 0 -4px 20px rgba(0,0,0,0.1);">
+            <div style="font-size: 72px; line-height: 1; margin-bottom: 16px;">🗺️</div>
+            <h2 style="font-size: 24px; font-weight: 800; color: #111; margin: 0 0 12px 0;">Укажите адрес доставки</h2>
+            <p style="font-size: 15px; color: #666; line-height: 1.4; margin: 0 0 24px 0; padding: 0 10px;">Разрешите доступ к геолокации, чтобы мы могли отображать актуальное меню и цены.</p>
+            
+            <button id="btn-geo-confirm" style="width: 100%; background: var(--main-yellow); color: #111; border: none; border-radius: 16px; height: 56px; font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; margin-bottom: 12px; transition: 0.2s;">
+                <span style="font-size: 20px;">📍</span> Текущее местоположение
+            </button>
+            <button id="btn-geo-skip" style="width: 100%; background: transparent; color: #888; border: none; font-size: 16px; font-weight: 600; padding: 12px; cursor: pointer;">
+                Ввести вручную
+            </button>
         </div>
     </div>
 
@@ -577,15 +579,6 @@
 
         const tg = window.Telegram?.WebApp || null;
         if(tg) tg.expand();
-        
-        // Инициализация геолокации при загрузке
-        window.addEventListener('load', () => {
-            // Проверяем, есть ли уже сохраненные координаты
-            if (!clientLat || !clientLon) {
-                // Если нет, показываем модальное окно для запроса геолокации
-                showGeolocationModal();
-            }
-        });
         
         let totalSum = 0;
         let currentDeliveryFee = 100;
@@ -1226,44 +1219,7 @@
         // ==========================================
         // ФУНКЦИИ ДЛЯ ГЕОЛОКАЦИИ
         // ==========================================
-        function showGeolocationModal() {
-            document.getElementById('modal-geolocation').classList.remove('hidden');
-        }
 
-        function requestGeolocation() {
-            if (!navigator.geolocation) {
-                alert("Ваш браузер не поддерживает геолокацию");
-                skipGeolocation();
-                return;
-            }
-            
-            if (tg) tg.HapticFeedback.impactOccurred('medium');
-            
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    clientLat = position.coords.latitude;
-                    clientLon = position.coords.longitude;
-                    document.getElementById('modal-geolocation').classList.add('hidden');
-                    if (tg) tg.HapticFeedback.notificationOccurred('success');
-                    console.log("Геолокация получена:", clientLat, clientLon);
-                },
-                (error) => {
-                    if (error.code === 1) {
-                        alert("Разрешите доступ к геолокации в настройках телефона");
-                    } else {
-                        alert("Не удалось определить местоположение");
-                    }
-                    skipGeolocation();
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
-            );
-        }
-
-        function skipGeolocation() {
-            document.getElementById('modal-geolocation').classList.add('hidden');
-            // Можно установить дефолтные координаты или просто продолжить без гео
-            console.log("Геолокация пропущена");
-        }
         // ==========================================
         // ЛОГИКА МОДАЛЬНОГО ОКНА БЛЮДА (ЖЕЛЕЗОБЕТОННАЯ ВЕРСИЯ)
         // ==========================================
@@ -1333,6 +1289,80 @@
         function closeProductModalIfOverlay(event) {
             if(event.target.classList.contains('pm-overlay')) closeProductModal();
         }
+        // ==========================================
+        // УМНЫЙ ЗАПРОС ГЕОЛОКАЦИИ ПРИ ВХОДЕ
+        // ==========================================
+        const geoOverlay = document.getElementById('geo-modal-overlay');
+        const btnConfirmGeo = document.getElementById('btn-geo-confirm');
+        const btnSkipGeo = document.getElementById('btn-geo-skip');
+
+        // Показываем окно ТОЛЬКО если гео еще нет в памяти телефона
+        if (!localStorage.getItem('user_geo')) {
+            geoOverlay.style.display = 'flex';
+        }
+
+        btnConfirmGeo.addEventListener('click', () => {
+            const tg = window.Telegram?.WebApp;
+            
+            if(tg && tg.HapticFeedback) {
+                tg.HapticFeedback.impactOccurred('medium');
+            }
+            btnConfirmGeo.innerText = "Определяем...";
+
+            // 1. ИСПОЛЬЗУЕМ ВСТРОЕННУЮ ФУНКЦИЮ ТЕЛЕГРАМА (Как в Click Food)
+            if (tg && tg.LocationManager) {
+                tg.LocationManager.init(() => {
+                    tg.LocationManager.getLocation((data) => {
+                        if (data && data.latitude) {
+                            // Успешно получили локацию
+                            const geoData = { lat: data.latitude, lon: data.longitude };
+                            localStorage.setItem('user_geo', JSON.stringify(geoData)); 
+                            clientLat = data.latitude;
+                            clientLon = data.longitude;
+                            geoOverlay.style.display = 'none'; 
+                        } else {
+                            // ЕСЛИ GPS ВЫКЛЮЧЕН — ТЕЛЕГРАМ САМ ОТКРОЕТ НАСТРОЙКИ ТЕЛЕФОНА!
+                            if(tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+                            
+                            // Волшебная функция, которая перекидывает в настройки:
+                            tg.LocationManager.openSettings(); 
+                            
+                            btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">🔄</span> Я включил, повторить';
+                            btnConfirmGeo.style.background = "#eeeeee";
+                        }
+                    });
+                });
+            } 
+            // 2. РЕЗЕРВНЫЙ ВАРИАНТ (Если у клиента старая версия Telegram)
+            else {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        const geoData = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+                        localStorage.setItem('user_geo', JSON.stringify(geoData)); 
+                        clientLat = pos.coords.latitude;
+                        clientLon = pos.coords.longitude;
+                        geoOverlay.style.display = 'none'; 
+                    },
+                    (err) => {
+                        if(tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error');
+                        const geoTitle = document.querySelector('#geo-modal-overlay h2');
+                        const geoDesc = document.querySelector('#geo-modal-overlay p');
+                        
+                        geoTitle.innerText = "Включите GPS 📡";
+                        geoTitle.style.color = "#d32f2f";
+                        geoDesc.innerHTML = "Пожалуйста, включите Геолокацию в шторке телефона, а затем нажмите кнопку ниже.";
+                        
+                        btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">🔄</span> Попробовать снова';
+                        btnConfirmGeo.style.background = "#eeeeee";
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            }
+        });
+
+        btnSkipGeo.addEventListener('click', () => {
+            geoOverlay.style.display = 'none'; // Закрываем, клиент выберет сам
+        });
 </script>
 </body>
 </html>

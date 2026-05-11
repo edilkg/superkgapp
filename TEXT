@@ -1,2 +1,6 @@
 git config --global user.email "sulaimaonv.2002.es@gmail.com"
 git config --global user.name "edilkgr"
+
+git add .
+git commit -m "Добавил красивое окно геолокации на входе"
+git push
