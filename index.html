@@ -936,13 +936,28 @@
                 const centerMarkerEl = document.querySelector('.center-marker-container');
                 const bottomPanel = document.querySelector('.map-floating-controls');
 
+                // --- НОВАЯ ЗАЩИТА ОТ КЛАВИАТУРЫ ---
+                let isTyping = false;
+                const mapInputs = document.querySelectorAll('.map-bottom-panel input');
+                mapInputs.forEach(inp => {
+                    inp.addEventListener('focus', () => isTyping = true);
+                    inp.addEventListener('blur', () => {
+                        // Ждем полсекунды, чтобы клавиатура успела плавно закрыться
+                        setTimeout(() => isTyping = false, 500); 
+                    });
+                });
+
                 checkoutMap.on('movestart', function() {
+                    if (isTyping) return; // Игнорируем скачки от клавиатуры
+                    
                     centerMarkerEl.classList.add('is-dragging');
-                    bottomPanel.classList.add('hidden-panel'); // Прячем панель при движении
+                    bottomPanel.classList.add('hidden-panel'); // Прячем панель
                     document.getElementById('map-street').value = 'Определение адреса...'; 
                 });
 
                 checkoutMap.on('moveend', function() {
+                    if (isTyping) return; // Игнорируем перерасчет адреса
+                    
                     centerMarkerEl.classList.remove('is-dragging');
                     bottomPanel.classList.remove('hidden-panel'); // Возвращаем панель
                     
