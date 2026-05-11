@@ -915,14 +915,24 @@
         }
 
         // НОВАЯ УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы GPS-точка оказалась ровно под маркером на 30%
-        function setMapCenterToMarker(lat, lon) {
+        // НОВАЯ УМНАЯ ФУНКЦИЯ: Сдвигает карту и сохраняет зум, либо сильно приближает
+        function setMapCenterToMarker(lat, lon, customZoom = null) {
             if (!checkoutMap) return;
+            
+            // Если передан customZoom (например 18, если нажали самолетик) - используем его.
+            // Иначе оставляем тот масштаб, который сейчас на карте, чтобы не сбрасывать масштаб юзера.
+            let zoom = customZoom || checkoutMap.getZoom() || 17;
+
             const mapSize = checkoutMap.getSize();
-            const targetPoint = checkoutMap.project([lat, lon], 16);
-            // Сдвигаем на 20% ниже центра (50% - 20% = 30% от верхнего края)
+            const targetPoint = checkoutMap.project([lat, lon], zoom);
+            
+            // Сдвигаем на 20% ниже центра (чтобы острый кончик маркера был точно по центру)
             targetPoint.y += (mapSize.y * 0.20); 
-            const centerLatLng = checkoutMap.unproject(targetPoint, 16);
-            checkoutMap.setView(centerLatLng, 16, {animate: false});
+            
+            const centerLatLng = checkoutMap.unproject(targetPoint, zoom);
+            
+            // Если нажали самолетик (есть customZoom), делаем плавную анимацию полета (animate: true)
+            checkoutMap.setView(centerLatLng, zoom, { animate: customZoom ? true : false });
         }
 
         function initCheckoutMap(resLat, resLon) {
@@ -980,19 +990,48 @@
         }
 
         function locateUser() {
-            if (!navigator.geolocation) return alert("Браузер не поддерживает GPS");
-            if(tg) tg.HapticFeedback.impactOccurred('medium');
-            
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    clientLat = position.coords.latitude; clientLon = position.coords.longitude;
-                    setMapCenterToMarker(clientLat, clientLon); // Сдвигаем по новой логике (30%)
-                },
-                (error) => {
-                    if (error.code === 1) alert("Разрешите доступ к геолокации в настройках телефона");
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
-            );
+            const tgApp = window.Telegram?.WebApp;
+            if (tgApp && tgApp.HapticFeedback) {
+                tgApp.HapticFeedback.impactOccurred('medium');
+            }
+
+            // 1. Используем нативную локацию Телеграма (как у Click Food)
+            if (tgApp && tgApp.LocationManager) {
+                tgApp.LocationManager.init(() => {
+                    // Если доступа нет или GPS выключен - кидаем в настройки
+                    if (!tgApp.LocationManager.isAccessGranted) {
+                        tgApp.LocationManager.openSettings();
+                        return;
+                    }
+                    
+                    // Если доступ есть, берем координаты
+                    tgApp.LocationManager.getLocation((data) => {
+                        if (data && data.latitude) {
+                            clientLat = data.latitude;
+                            clientLon = data.longitude;
+                            // Сдвигаем карту к клиенту и СИЛЬНО ПРИБЛИЖАЕМ (зум 18)
+                            setMapCenterToMarker(clientLat, clientLon, 18);
+                        }
+                    });
+                });
+            } 
+            // 2. Резервный вариант для ПК или старых версий Telegram
+            else {
+                if (!navigator.geolocation) return alert("Браузер не поддерживает GPS");
+                
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        clientLat = position.coords.latitude; 
+                        clientLon = position.coords.longitude;
+                        // Сдвигаем карту к клиенту и СИЛЬНО ПРИБЛИЖАЕМ (зум 18)
+                        setMapCenterToMarker(clientLat, clientLon, 18); 
+                    },
+                    (error) => {
+                        if (error.code === 1) alert("Разрешите доступ к геолокации в настройках телефона");
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            }
         }
 
         function recalcCheckoutDelivery(resLat, resLon) {
