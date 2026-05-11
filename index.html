@@ -322,6 +322,17 @@
         <span id="total-price-btn">0 сом</span>
     </div>
 
+    <!-- Модальное окно для запроса геолокации -->
+    <div id="modal-geolocation" class="modal-overlay hidden">
+        <div class="modal-window">
+            <div class="modal-icon-circle">📍</div>
+            <div class="modal-title">Разрешить геолокацию</div>
+            <div class="modal-text">Чтобы найти ближайшие рестораны и рассчитать стоимость доставки, приложению нужен доступ к вашему местоположению.</div>
+            <button class="main-button" onclick="requestGeolocation()">Разрешить</button>
+            <button class="secondary-button" onclick="skipGeolocation()">Позже</button>
+        </div>
+    </div>
+
     <div id="screen-main">
         <div class="header-nav">
             <img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=100" class="logo-img">
@@ -566,6 +577,15 @@
 
         const tg = window.Telegram?.WebApp || null;
         if(tg) tg.expand();
+        
+        // Инициализация геолокации при загрузке
+        window.addEventListener('load', () => {
+            // Проверяем, есть ли уже сохраненные координаты
+            if (!clientLat || !clientLon) {
+                // Если нет, показываем модальное окно для запроса геолокации
+                showGeolocationModal();
+            }
+        });
         
         let totalSum = 0;
         let currentDeliveryFee = 100;
@@ -1203,47 +1223,48 @@
                 payBtn.style.opacity = '1';
             }
         }
-        const tgAppInstance = window.Telegram.WebApp;
-
-// Сообщаем телеграму, что приложение готово и можно менять цвета
-tgAppInstance.ready();
-tgAppInstance.expand(); // Разворачиваем на весь экран
-
-const overlay = document.getElementById('geo-modal-overlay');
-const btnConfirm = document.getElementById('btn-geo-confirm');
-const btnSkip = document.getElementById('btn-geo-skip');
-
-// Показываем окно при загрузке, если адрес не установлен
-if (!localStorage.getItem('user_geo')) {
-    overlay.style.display = 'flex';
-}
-
-btnConfirm.addEventListener('click', () => {
-    // Легкая вибрация при нажатии
-    tgAppInstance.HapticFeedback.impactOccurred('medium');
-    
-    btnConfirm.innerText = "Определяем...";
-    
-    navigator.geolocation.getCurrentPosition(
-        (pos) => {
-            const data = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-            localStorage.setItem('user_geo', JSON.stringify(data));
-            tgAppInstance.HapticFeedback.notificationOccurred('success');
-            overlay.style.display = 'none';
-            console.log("Гео получено:", data);
-        },
-        (err) => {
-            tgAppInstance.HapticFeedback.notificationOccurred('error');
-            alert("Пожалуйста, разрешите доступ к геопозиции в настройках телефона.");
-            btnConfirm.innerText = "Указать текущее";
+        // ==========================================
+        // ФУНКЦИИ ДЛЯ ГЕОЛОКАЦИИ
+        // ==========================================
+        function showGeolocationModal() {
+            document.getElementById('modal-geolocation').classList.remove('hidden');
         }
-    );
-});
 
-btnSkip.addEventListener('click', () => {
-    overlay.style.display = 'none';
-});
-// ==========================================
+        function requestGeolocation() {
+            if (!navigator.geolocation) {
+                alert("Ваш браузер не поддерживает геолокацию");
+                skipGeolocation();
+                return;
+            }
+            
+            if (tg) tg.HapticFeedback.impactOccurred('medium');
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    clientLat = position.coords.latitude;
+                    clientLon = position.coords.longitude;
+                    document.getElementById('modal-geolocation').classList.add('hidden');
+                    if (tg) tg.HapticFeedback.notificationOccurred('success');
+                    console.log("Геолокация получена:", clientLat, clientLon);
+                },
+                (error) => {
+                    if (error.code === 1) {
+                        alert("Разрешите доступ к геолокации в настройках телефона");
+                    } else {
+                        alert("Не удалось определить местоположение");
+                    }
+                    skipGeolocation();
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+
+        function skipGeolocation() {
+            document.getElementById('modal-geolocation').classList.add('hidden');
+            // Можно установить дефолтные координаты или просто продолжить без гео
+            console.log("Геолокация пропущена");
+        }
+        // ==========================================
         // ЛОГИКА МОДАЛЬНОГО ОКНА БЛЮДА (ЖЕЛЕЗОБЕТОННАЯ ВЕРСИЯ)
         // ==========================================
         var currentModalItem = null; // Используем var, чтобы избежать ошибки инициализации
