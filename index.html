@@ -841,13 +841,22 @@
         // ==========================================
 
         function openMapModal() {
-            document.getElementById('modal-map').classList.remove('hidden');
+            const mapModal = document.getElementById('modal-map');
+            
+            // --- ЖЕЛЕЗОБЕТОННАЯ ЗАЩИТА ОТ КЛАВИАТУРЫ ---
+            // Берем точную высоту экрана до открытия клавиатуры
+            let vh = window.innerHeight;
+            if (window.Telegram?.WebApp?.viewportHeight) {
+                vh = window.Telegram.WebApp.viewportHeight;
+            }
+            // Намертво фиксируем высоту окна в пикселях. 
+            // Теперь выезд клавиатуры не сожмет карту!
+            mapModal.style.height = vh + 'px';
+            
+            mapModal.classList.remove('hidden');
             history.pushState({modal: 'map'}, '');
             
             const activeRes = database[cartActiveTabResId];
-            
-            // Карта сама использует уже сохраненные clientLat и clientLon, 
-            // которые мы получили при входе в приложение!
             setTimeout(() => { initCheckoutMap(activeRes.lat, activeRes.lon); }, 100);
             
             document.getElementById('map-street').value = orderAddressData.street || '';
