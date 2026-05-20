@@ -233,18 +233,14 @@
         #modal-map.hidden { display: none !important; }
         #fullscreen-map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         
-        /* ЦЕНТРАЛЬНЫЙ МАРКЕР (Фиксированный сверху, как в Яндексе) */
-        /* ЦЕНТРАЛЬНЫЙ МАРКЕР (Идеально по центру любого экрана смартфона/планшета) */
+        /* ЦЕНТРАЛЬНЫЙ МАРКЕР С ТЕНЬЮ (Сбалансированная высота как в Яндексе) */
         .center-marker-container {
-            position: absolute;
-            top: 50%; /* Строго по центру по вертикали */
-            left: 50%; /* Строго по центру по горизонтали */
-            transform: translate(-50%, -100%); /* Острый носик указывает точно в центр */
-            z-index: 2000;
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            position: absolute; 
+            top: 40%; /* Подняли маркер выше, чтобы клавиатура и панель его не перекрывали */
+            left: 50%; 
+            transform: translate(-50%, -100%); /* Сдвигаем вверх, чтобы острый кончик точно указывал в центр */
+            z-index: 2000; pointer-events: none;
+            display: flex; flex-direction: column; align-items: center;
         }
         .center-marker-icon {
             position: relative;
@@ -1072,17 +1068,40 @@
 
         async function geocodeAddressFromInput() {
             const query = document.getElementById('map-street').value;
-            if (!query) return;
+            if (!query || query === 'Определение адреса...') return;
 
             try {
+                // Ищем по названию магазина/ПМК с жесткой привязкой к текущему городу
                 const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(globalCity + ', ' + query)}&accept-language=ru`);
                 const data = await response.json();
+                
                 if (data && data.length > 0) {
                     clientLat = parseFloat(data[0].lat);
                     clientLon = parseFloat(data[0].lon);
-                    setMapCenterToMarker(clientLat, clientLon); // Центрируем по новой логике
+                    
+                    // Перемещаем карту на найденную точку
+                    setMapCenterToMarker(clientLat, clientLon);
+                    
+                    // Пересчитываем стоимость доставки до новой точки
+                    if (cartActiveTabResId && database[cartActiveTabResId]) {
+                        recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
+                    }
+                } else {
+                    // Если точечный объект не найден, пробуем поискать чуть шире
+                    const responseWide = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&accept-language=ru`);
+                    const dataWide = await responseWide.json();
+                    if (dataWide && dataWide.length > 0) {
+                        clientLat = parseFloat(dataWide[0].lat);
+                        clientLon = parseFloat(dataWide[0].lng || dataWide[0].lon);
+                        setMapCenterToMarker(clientLat, clientLon);
+                        if (cartActiveTabResId && database[cartActiveTabResId]) {
+                            recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
+                        }
+                    }
                 }
-            } catch (err) {}
+            } catch (err) {
+                console.error("Ошибка геокодирования: ", err);
+            }
         }
 
         async function reverseGeocode(lat, lon) {
@@ -1110,9 +1129,8 @@
                 recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
             }
         }
-function initCheckoutMap(resLat, resLon) {
+        function initCheckoutMap(resLat, resLon) {
             if (!checkoutMap) {
-                // Инициализируем карту строго по координатам клиента с зумом 16
                 checkoutMap = L.map('fullscreen-map', {zoomControl: false}).setView([clientLat, clientLon], 16);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(checkoutMap);
                 
@@ -1122,39 +1140,76 @@ function initCheckoutMap(resLat, resLon) {
                 const centerMarkerEl = document.querySelector('.center-marker-container');
                 const bottomPanel = document.querySelector('.map-floating-controls');
 
-                // Срабатывает ТОЛЬКО когда пользователь физически тащит карту пальцем
-                checkoutMap.on('dragstart', function() {
-                    mapWasDragged = true; // Фиксируем осознанное движение
+                // ПРАВИЛЬНЫЙ КОНТРОЛЬ КЛАВИАТУРЫ КАК В ЯНДЕКСЕ
+                let isTyping = false;
+                const mapInputs = document.querySelectorAll('.map-bottom-panel input');
+                mapInputs.forEach(inp => {
+                    inp.addEventListener('focus', () => {
+                        isTyping = true;
+                    });
+                    inp.addEventListener('blur', () => {
+                        setTimeout(() => { isTyping = false; }, 300); 
+                    });
+                    // Позволяем осуществлять поиск при нажатии Enter/Готово на мобильной клавиатуре
+                    inp.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            inp.blur();
+                            geocodeAddressFromInput();
+                        }
+                    });
+                });
+
+                // Срабатывает только когда пользователь свайпает карту сам
+                checkoutMap.on('movestart', function() {
+                    if (isTyping) return; // Полный игнор скачков высоты от появления клавиатуры
+                    
                     if (centerMarkerEl) centerMarkerEl.classList.add('is-dragging');
-                    if (bottomPanel) bottomPanel.classList.add('hidden-panel'); // Прячем панель
+                    if (bottomPanel) bottomPanel.classList.add('hidden-panel'); 
                     const inputStreet = document.getElementById('map-street');
                     if (inputStreet) inputStreet.value = 'Определение адреса...'; 
                 });
 
-                // Срабатывает, когда любое движение карты полностью остановилось
+                // Срабатывает при остановке движения
                 checkoutMap.on('moveend', function() {
-                    // ЖЕЛЕЗОБЕТОННАЯ ЗАЩИТА: Если движение вызвано появлением клавиатуры или изменением размера экрана — игнорируем!
-                    if (!mapWasDragged) return; 
+                    if (isTyping) return; // Не сбрасываем адрес, если юзер просто вводит текст в инпут
                     
-                    mapWasDragged = false; // Сбрасываем флаг до следующего свайпа пальцем
                     if (centerMarkerEl) centerMarkerEl.classList.remove('is-dragging');
-                    if (bottomPanel) bottomPanel.classList.remove('hidden-panel'); // Показываем панель обратно
+                    if (bottomPanel) bottomPanel.classList.remove('hidden-panel'); 
                     
-                    // АДАПТИВНОСТЬ: Берем координаты строго из геометрического центра карты текущего устройства
+                    // Координаты строго из-под маркера (теперь на высоте 40% экрана)
                     const mapSize = checkoutMap.getSize();
-                    const pointInCenter = L.point(mapSize.x / 2, mapSize.y / 2);
-                    const latlng = checkoutMap.containerPointToLatLng(pointInCenter);
+                    const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.40);
+                    const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
                     
                     clientLat = latlng.lat; 
                     clientLon = latlng.lng;
                     reverseGeocode(clientLat, clientLon);
                 });
+                
+                setMapCenterToMarker(clientLat, clientLon);
             } else {
-                // Если карта уже создана, просто плавно перемещаем ее центр на точку клиента
-                checkoutMap.setView([clientLat, clientLon], 16, {animate: false});
+                setMapCenterToMarker(clientLat, clientLon);
                 checkoutResMarker.setLatLng([resLat, resLon]);
             }
             recalcCheckoutDelivery(resLat, resLon);
+        }
+
+        // УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы GPS-точка оказалась ровно под маркером на 40% экрана
+        function setMapCenterToMarker(lat, lon) {
+            if (!checkoutMap) return;
+            const mapSize = checkoutMap.getSize();
+            
+            // Защита от нулевого размера. Если размеры еще не получены, ставим по центру без смещения
+            if (mapSize.x === 0 || mapSize.y === 0) {
+                checkoutMap.setView([lat, lon], 16, {animate: false});
+                return;
+            }
+            
+            const targetPoint = checkoutMap.project([lat, lon], 16);
+            // Сдвигаем на 10% ниже геометрического центра (50% - 10% = 40% от верхнего края)
+            targetPoint.y += (mapSize.y * 0.10); 
+            const centerLatLng = checkoutMap.unproject(targetPoint, 16);
+            checkoutMap.setView(centerLatLng, 16, {animate: false});
         }
 
         function locateUser() {
