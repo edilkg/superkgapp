@@ -234,11 +234,12 @@
         #fullscreen-map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         
         /* ЦЕНТРАЛЬНЫЙ МАРКЕР (Фиксированный сверху, как в Яндексе) */
+        /* ЦЕНТРАЛЬНЫЙ МАРКЕР (Идеально по центру любого экрана смартфона/планшета) */
         .center-marker-container {
             position: absolute;
-            top: 240px; /* Жестко привязываем к верху, чтобы клавиатура и панели его не двигали */
-            left: 50%;
-            transform: translate(-50%, -100%); /* Острый кончик маркера будет смотреть точно в цель */
+            top: 50%; /* Строго по центру по вертикали */
+            left: 50%; /* Строго по центру по горизонтали */
+            transform: translate(-50%, -100%); /* Острый носик указывает точно в центр */
             z-index: 2000;
             pointer-events: none;
             display: flex;
@@ -1109,27 +1110,9 @@
                 recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
             }
         }
-
-        // УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы точка оказалась точно под фиксированным маркером (240px сверху)
-        function setMapCenterToMarker(lat, lon) {
-            if (!checkoutMap) return;
-            const mapSize = checkoutMap.getSize();
-            
-            // Защита от нулевого размера. Если размеры еще не получены, ставим по центру без смещения
-            if (mapSize.x === 0 || mapSize.y === 0) {
-                checkoutMap.setView([lat, lon], 16, {animate: false});
-                return;
-            }
-            
-            const targetPoint = checkoutMap.project([lat, lon], 16);
-            // Вычисляем смещение от геометрического центра карты до нашего фиксированного маркера
-            targetPoint.y += (mapSize.y / 2 - 240); 
-            const centerLatLng = checkoutMap.unproject(targetPoint, 16);
-            checkoutMap.setView(centerLatLng, 16, {animate: false});
-        }
-
-        function initCheckoutMap(resLat, resLon) {
+function initCheckoutMap(resLat, resLon) {
             if (!checkoutMap) {
+                // Инициализируем карту строго по координатам клиента с зумом 16
                 checkoutMap = L.map('fullscreen-map', {zoomControl: false}).setView([clientLat, clientLon], 16);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(checkoutMap);
                 
@@ -1141,35 +1124,34 @@
 
                 // Срабатывает ТОЛЬКО когда пользователь физически тащит карту пальцем
                 checkoutMap.on('dragstart', function() {
-                    mapWasDragged = true; // Фиксируем, что карту двигает человек пальцем
+                    mapWasDragged = true; // Фиксируем осознанное движение
                     if (centerMarkerEl) centerMarkerEl.classList.add('is-dragging');
-                    if (bottomPanel) bottomPanel.classList.add('hidden-panel'); // Прячем панель ввода данных
+                    if (bottomPanel) bottomPanel.classList.add('hidden-panel'); // Прячем панель
                     const inputStreet = document.getElementById('map-street');
                     if (inputStreet) inputStreet.value = 'Определение адреса...'; 
                 });
 
-                // Срабатывает, когда любое движение карты полностью остановлено
+                // Срабатывает, когда любое движение карты полностью остановилось
                 checkoutMap.on('moveend', function() {
-                    // ЖЕЛЕЗОБЕТОННАЯ ЗАЩИТА: Если движение вызвано клавиатурой или ресайзом окна — полностью игнорируем!
+                    // ЖЕЛЕЗОБЕТОННАЯ ЗАЩИТА: Если движение вызвано появлением клавиатуры или изменением размера экрана — игнорируем!
                     if (!mapWasDragged) return; 
                     
-                    mapWasDragged = false; // Сбрасываем флаг до следующего перетаскивания пальцем
+                    mapWasDragged = false; // Сбрасываем флаг до следующего свайпа пальцем
                     if (centerMarkerEl) centerMarkerEl.classList.remove('is-dragging');
-                    if (bottomPanel) bottomPanel.classList.remove('hidden-panel'); // Возвращаем панель обратно
+                    if (bottomPanel) bottomPanel.classList.remove('hidden-panel'); // Показываем панель обратно
                     
-                    // БЕРЕМ КООРДИНАТЫ РОВНО ИЗ-ПОД МАРКЕРА (На фиксированной высоте 240px от верха)
+                    // АДАПТИВНОСТЬ: Берем координаты строго из геометрического центра карты текущего устройства
                     const mapSize = checkoutMap.getSize();
-                    const pointUnderMarker = L.point(mapSize.x / 2, 240);
-                    const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
+                    const pointInCenter = L.point(mapSize.x / 2, mapSize.y / 2);
+                    const latlng = checkoutMap.containerPointToLatLng(pointInCenter);
                     
                     clientLat = latlng.lat; 
                     clientLon = latlng.lng;
                     reverseGeocode(clientLat, clientLon);
                 });
-                
-                setMapCenterToMarker(clientLat, clientLon);
             } else {
-                setMapCenterToMarker(clientLat, clientLon);
+                // Если карта уже создана, просто плавно перемещаем ее центр на точку клиента
+                checkoutMap.setView([clientLat, clientLon], 16, {animate: false});
                 checkoutResMarker.setLatLng([resLat, resLon]);
             }
             recalcCheckoutDelivery(resLat, resLon);
