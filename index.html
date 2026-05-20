@@ -337,6 +337,20 @@
         .mini-map-title { font-weight: 800; font-size: 15px; color: #111; margin-bottom: 2px; }
         .mini-map-desc { font-size: 13px; color: var(--text-gray); }
         .mini-map-icon { font-size: 20px; color: var(--text-gray); font-weight: bold;}
+        /* --- СТИЛИ ДЛЯ ПРИБОРОВ --- */
+        .cutlery-row {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #f5f5f5; padding: 12px 16px; border-radius: 16px;
+            margin-top: 16px;
+        }
+        .cutlery-info { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 14px; color: var(--text-dark); }
+        .cutlery-counter {
+            display: flex; align-items: center; background: var(--card-bg); border-radius: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        .cutlery-counter .c-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; font-size: 20px; transition: 0.1s; user-select: none;}
+        .cutlery-counter .c-btn:active { background: #eee; border-radius: 12px;}
+        .cutlery-counter .c-val { width: 24px; text-align: center; font-weight: 800; font-size: 15px; }
 </style>
 </head>
 <body>
@@ -411,6 +425,19 @@
         
         <div class="cart-section" style="margin-top: 0; border-radius: 0 0 20px 20px;">
             <div class="cart-items-container" id="cart-list-container" style="padding: 0;"></div>
+            
+            <div class="cutlery-row">
+                <div class="cutlery-info">
+                    <span style="font-size: 20px;">🍴</span> 
+                    <span>Приборы</span>
+                </div>
+                <div class="cutlery-counter">
+                    <div class="c-btn" onclick="updateCutlery(-1)">−</div>
+                    <div class="c-val" id="cutlery-count">0</div>
+                    <div class="c-btn" onclick="updateCutlery(1)">+</div>
+                </div>
+            </div>
+
             <textarea id="res-comment" class="full-width-input" placeholder="💬 Комментарий заведению (напр. без лука, поострее)" style="margin-top: 16px; background: #f5f5f5; resize: none; font-family: inherit;"></textarea>
         </div>
 
@@ -619,6 +646,7 @@
         if(tg) tg.expand();
         
         let totalSum = 0;
+        let cutleryCount = 0; //Переменная для приборов
         let currentDeliveryFee = 100;
         let doorDeliveryFee = 0; // НОВАЯ ПЕРЕМЕННАЯ (0 или 50) 
         let currentRestaurantId = null;
@@ -666,6 +694,17 @@
         };
 
         history.replaceState({screen: 'main'}, '');
+
+        function updateCutlery(delta) {
+            cutleryCount += delta;
+            if (cutleryCount < 0) cutleryCount = 0; // Меньше нуля быть не может
+            document.getElementById('cutlery-count').innerText = cutleryCount;
+            
+            // Легкая вибрация при клике
+            if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                window.Telegram.WebApp.HapticFeedback.selectionChanged();
+            }
+        }
 
         function showScreen(screenId) {
             ['screen-main', 'screen-menu', 'screen-cart-list', 'screen-status', 'modal-map'].forEach(id => document.getElementById(id).classList.add('hidden'));
@@ -1289,12 +1328,11 @@
                 dest_lat: clientLat, 
                 dest_lon: clientLon, 
                 restaurantName: database[cartActiveTabResId]?.title || "Ресторан",
-                // ОБНОВЛЕННАЯ СТРОКА: Учитываем доставку до двери
                 totalPrice: totalSum + (currentDeliveryFee > 0 ? currentDeliveryFee + doorDeliveryFee : 0),
                 comment: orderAddressData.comment, 
                 resComment: resComment, 
-                // НОВАЯ СТРОКА: Сообщаем курьеру, нужна ли доставка до двери
                 isDoorDelivery: doorDeliveryFee > 0 ? true : false, 
+                cutlery: cutleryCount, // НОВОЕ ПОЛЕ: передаем количество приборов
                 items: Object.values(cartItems).filter(item => item.resId === cartActiveTabResId)
             };
 
