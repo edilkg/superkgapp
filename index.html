@@ -647,8 +647,8 @@
             </div>
             
             <div class="map-bottom-panel">
-                <div class="search-wrapper">
-                    <input type="text" id="map-street" placeholder="📍 (Советская 10 или народный супермаркет)" class="full-width-input" style="background: #f0f0f0; font-weight: bold; border: 2px solid var(--main-yellow); margin-bottom: 0;">
+                <div style="position: relative; width: 100%;">
+                    <input type="text" id="map-street" placeholder="📍 (Советская 10 или народный супермаркет)" onchange="geocodeAddressFromInput()" class="full-width-input" style="background: #f0f0f0; font-weight: bold; border: 2px solid var(--main-yellow); margin-bottom: 0;">
                     <div id="search-suggestions" class="search-suggestions-container"></div>
                 </div>
                 <div style="height: 12px;"></div>
@@ -1698,13 +1698,12 @@
 
         let autocompleteTimeout = null;
 
-        // ЖИВОЙ ПОИСК АДРЕСОВ С ВЫПАДАЮЩИМ СПИСКОМ (Движок Photon на базе OpenStreetMap)
+       // ЖИВОЙ ПОИСК АДРЕСОВ (Возвращен на надежный движок Nominatim, который знает ПМК)
         function initSearchAutocomplete() {
             const inputStreet = document.getElementById('map-street');
             const suggestionsContainer = document.getElementById('search-suggestions');
             if (!inputStreet || !suggestionsContainer) return;
 
-            // Перехватываем ввод пользователя на лету
             inputStreet.addEventListener('input', function() {
                 const query = inputStreet.value.trim();
                 clearTimeout(autocompleteTimeout);
@@ -1715,43 +1714,27 @@
                     return;
                 }
 
-                // Задержка в 300мс (debounce), чтобы не перегружать сеть при быстром наборе текста
+                // Задержка 500мс
                 autocompleteTimeout = setTimeout(async function() {
                     try {
-                        // Формируем запрос с привязкой к текущему глобальному городу (Бишкек / Чолпон-Ата и т.д.)
-                        let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(globalCity + ' ' + query)}&limit=5&lang=ru`;
-                        
-                        if (clientLat && clientLon) {
-                            url += `&lat=${clientLat}&lon=${clientLon}`;
-                        }
-
-                        const response = await fetch(url);
+                        // ИСПОЛЬЗУЕМ NOMINATIM - он отлично ищет по Иссык-Кулю и Бишкеку
+                        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(globalCity + ', ' + query)}&accept-language=ru&limit=5`);
                         const data = await response.json();
 
                         suggestionsContainer.innerHTML = '';
 
-                        if (data && data.features && data.features.length > 0) {
+                        if (data && data.length > 0) {
                             suggestionsContainer.style.display = 'block';
 
-                            data.features.forEach(feature => {
-                                if (!feature || !feature.properties || !feature.geometry) return;
-
-                                const props = feature.properties;
-                                const coords = feature.geometry.coordinates; // Массив координат движка [lon, lat]
-
-                                const name = props.name || props.street || '';
-                                const house = props.housenumber || '';
-                                const city = props.city || props.village || '';
-                                const district = props.district || '';
+                            data.forEach(itemData => {
+                                const lat = parseFloat(itemData.lat);
+                                const lon = parseFloat(itemData.lon);
+                                const displayName = itemData.display_name;
                                 
-                                let mainText = name;
-                                if (house && !mainText.includes(house)) {
-                                    mainText += ', ' + house;
-                                }
-                                
-                                const subText = [city, district].filter(Boolean).join(', ');
-
-                                if (!mainText) return;
+                                // Разбиваем длинное имя на основное и подтекст для красоты
+                                const nameParts = displayName.split(', ');
+                                const mainText = nameParts[0] + (nameParts[1] ? ', ' + nameParts[1] : '');
+                                const subText = nameParts.slice(2).join(', ');
 
                                 const item = document.createElement('div');
                                 item.className = 'suggestion-item';
@@ -1759,33 +1742,33 @@
                                     <div class="suggestion-icon">📍</div>
                                     <div class="suggestion-text">
                                         <div class="suggestion-main">${mainText}</div>
-                                        <div class="suggestion-sub">${subText ? subText : globalCity}</div>
+                                        <div class="suggestion-sub">${subText}</div>
                                     </div>
                                 `;
 
-                                // Клик по выбранной подсказке из списка
-                                item.addEventListener('click', function(e) {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-
-                                    clientLat = coords[1]; // Широта
-                                    clientLon = coords[0]; // Долгота
+                                // ВАЖНО: Используем mousedown вместо click. 
+                                // Это не дает инпуту потерять фокус до того, как мы запишем в него адрес
+                                item.addEventListener('mousedown', function(e) {
+                                    e.preventDefault(); 
                                     
-                                    inputStreet.value = mainText; // Записываем адрес в инпут
+                                    clientLat = lat; 
+                                    clientLon = lon;
+                                    
+                                    inputStreet.value = mainText; 
                                     suggestionsContainer.style.display = 'none';
 
-                                    // Блокируем ложные срабатывания moveend
-                                    if (typeof mapWasDragged !== 'undefined') {
-                                        mapWasDragged = false;
-                                    }
+                                    if (typeof mapWasDragged !== 'undefined') mapWasDragged = false; 
 
-                                    // Перемещаем карту на выбранный объект
+                                    // Двигаем карту
                                     setMapCenterToMarker(clientLat, clientLon);
 
-                                    // Обновляем стоимость доставки до этой точки
+                                    // Обновляем доставку
                                     if (cartActiveTabResId && database[cartActiveTabResId]) {
                                         recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
                                     }
+                                    
+                                    // Принудительно прячем клавиатуру после выбора
+                                    inputStreet.blur();
                                 });
 
                                 suggestionsContainer.appendChild(item);
@@ -1794,14 +1777,14 @@
                             suggestionsContainer.style.display = 'none';
                         }
                     } catch (err) {
-                        console.error("Ошибка автокомплита поиска адресов:", err);
+                        console.error("Ошибка автокомплита поиска:", err);
                     }
-                }, 300);
+                }, 500);
             });
 
-            // Прячем список подсказок, если пользователь тапнул по карте мимо списка
-            document.addEventListener('click', function(e) {
-                if (e.target !== inputStreet && e.target !== suggestionsContainer && !suggestionsContainer.contains(e.target)) {
+            // Прячем список подсказок при клике в другое место
+            document.addEventListener('mousedown', function(e) {
+                if (e.target !== inputStreet && !suggestionsContainer.contains(e.target)) {
                     suggestionsContainer.style.display = 'none';
                 }
             });
