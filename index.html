@@ -351,6 +351,32 @@
         .cutlery-counter .c-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; font-size: 20px; transition: 0.1s; user-select: none;}
         .cutlery-counter .c-btn:active { background: #eee; border-radius: 12px;}
         .cutlery-counter .c-val { width: 24px; text-align: center; font-weight: 800; font-size: 15px; }
+        /* --- СТИЛИ ДЛЯ ЖЕЛТОЙ КНОПКИ (Например, "Готово" на карте) --- */
+        .btn-yellow {
+            background: var(--main-yellow);
+            color: #111;
+            border: none;
+            border-radius: 16px;
+            padding: 15px; /* Делаем кнопку высокой и удобной для пальца */
+            font-size: 18px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+            box-shadow: 0 4px 15px rgba(252, 224, 0, 0.4); /* Красивое желтое свечение */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+        .btn-yellow:active {
+            transform: scale(0.97); /* Эффект вдавливания при клике */
+        }
+        .btn-yellow.disabled {
+            background: #e0e0e0;
+            color: #888;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
 </style>
 </head>
 <body>
@@ -512,9 +538,9 @@
             </div>
             
             <div class="map-bottom-panel">
-                <input type="text" id="map-street" placeholder="📍 Улица и дом (напр. Советская 10)" onchange="geocodeAddressFromInput()" class="full-width-input" style="background: #f0f0f0; font-weight: bold; border: 2px solid var(--main-yellow);">
+                <input type="text" id="map-street" placeholder="📍 (Советская 10 или народный супермаркет)" onchange="geocodeAddressFromInput()" class="full-width-input" style="background: #f0f0f0; font-weight: bold; border: 2px solid var(--main-yellow);">
 
-               <input type="text" id="map-kv" placeholder="🏠 (гостевой дом, № дома, № кв )" class="full-width-input" style="background: #f0f0f0; margin-bottom: 12px;">
+               <input type="text" id="map-kv" placeholder="🏠 (название дома, № кв или комментарий курьеру)" class="full-width-input" style="background: #f0f0f0; margin-bottom: 12px;">
                 
                 <input type="text" id="map-comment" placeholder="💬 курьеру (ориентир, красные ворота)" class="full-width-input" style="background: #f0f0f0;">
 
@@ -1042,12 +1068,18 @@
             if (!query) return;
 
             try {
+                // Показываем заглушку, пока ищем адрес
+                document.getElementById('modal-map-price').innerText = '...'; 
+                
                 const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(globalCity + ', ' + query)}&accept-language=ru`);
                 const data = await response.json();
                 if (data && data.length > 0) {
                     clientLat = parseFloat(data[0].lat);
                     clientLon = parseFloat(data[0].lon);
-                    setMapCenterToMarker(clientLat, clientLon); // Центрируем по новой логике
+                    setMapCenterToMarker(clientLat, clientLon); 
+                    
+                    // НОВОЕ: Пересчитываем стоимость доставки до вписанного адреса
+                    recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
                 }
             } catch (err) {}
         }
@@ -1109,40 +1141,34 @@
                 const centerMarkerEl = document.querySelector('.center-marker-container');
                 const bottomPanel = document.querySelector('.map-floating-controls');
 
-                // --- НОВАЯ ЗАЩИТА ОТ КЛАВИАТУРЫ ---
-                let isTyping = false;
-                const mapInputs = document.querySelectorAll('.map-bottom-panel input');
-                mapInputs.forEach(inp => {
-                    inp.addEventListener('focus', () => isTyping = true);
-                    inp.addEventListener('blur', () => {
-                        // Ждем полсекунды, чтобы клавиатура успела плавно закрыться
-                        setTimeout(() => isTyping = false, 500); 
-                    });
-                });
-
-                checkoutMap.on('movestart', function() {
-                    if (isTyping) return; // Игнорируем скачки от клавиатуры
-                    
+                // --- ИСПРАВЛЕНИЕ БАГА С КЛАВИАТУРОЙ ---
+                function onMapInteractStart() {
                     centerMarkerEl.classList.add('is-dragging');
-                    bottomPanel.classList.add('hidden-panel'); // Прячем панель
+                    bottomPanel.classList.add('hidden-panel'); 
                     document.getElementById('map-street').value = 'Определение адреса...'; 
-                });
+                }
 
-                checkoutMap.on('moveend', function() {
-                    if (isTyping) return; // Игнорируем перерасчет адреса
-                    
+                function onMapInteractEnd() {
                     centerMarkerEl.classList.remove('is-dragging');
-                    bottomPanel.classList.remove('hidden-panel'); // Возвращаем панель
+                    bottomPanel.classList.remove('hidden-panel'); 
                     
-                    // БЕРЕМ КООРДИНАТЫ РОВНО ИЗ-ПОД МАРКЕРА (На высоте 30% экрана)
                     const mapSize = checkoutMap.getSize();
+                    if (mapSize.x === 0 || mapSize.y === 0) return;
+                    
                     const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.30);
                     const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
                     
                     clientLat = latlng.lat; 
                     clientLon = latlng.lng;
                     reverseGeocode(clientLat, clientLon);
-                });
+                }
+
+                // Теперь реагируем ТОЛЬКО на реальное движение пальцем (drag/zoom)
+                checkoutMap.on('dragstart', onMapInteractStart);
+                checkoutMap.on('zoomstart', onMapInteractStart);
+                
+                checkoutMap.on('dragend', onMapInteractEnd);
+                checkoutMap.on('zoomend', onMapInteractEnd);
                 
                 setMapCenterToMarker(clientLat, clientLon);
             } else {
@@ -1158,8 +1184,12 @@
             
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    clientLat = position.coords.latitude; clientLon = position.coords.longitude;
-                    setMapCenterToMarker(clientLat, clientLon); // Сдвигаем по новой логике (30%)
+                    clientLat = position.coords.latitude; 
+                    clientLon = position.coords.longitude;
+                    setMapCenterToMarker(clientLat, clientLon); 
+                    
+                    // НОВОЕ: Вручную запускаем перевод координат в название улицы
+                    reverseGeocode(clientLat, clientLon); 
                 },
                 (error) => {
                     if (error.code === 1) alert("Разрешите доступ к геолокации в настройках телефона");
