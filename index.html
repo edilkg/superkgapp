@@ -255,20 +255,27 @@
             pointer-events: auto; position: relative; /* ВАЖНО для выравнивания списка подсказок */
         }
 
-        /* КРАСИВЫЙ ВЫПАДАЮЩИЙ СПИСОК ПОДСКАЗОК АДРЕСА */
+        /* ИЗОЛИРОВАННЫЙ КОНТЕЙНЕР ДЛЯ ПОИСКА АДРЕСА */
+        .search-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        /* КРАСИВЫЙ ВЫПАДАЮЩИЙ СПИСОК ПОДСКАЗОК (Строго под инпутом) */
         .search-suggestions-container {
             position: absolute;
-            top: 64px; /* Располагается идеально ровно под полем ввода адреса */
-            left: 20px;
-            right: 20px;
+            top: 100%; /* Теперь отсчитывается ровно от нижней границы поля ввода */
+            left: 0;
+            right: 0;
             background: #ffffff;
             border-radius: 12px;
             box-shadow: 0 8px 24px rgba(0,0,0,0.18);
             max-height: 180px;
             overflow-y: auto;
-            z-index: 99999 !important; /* Гарантированно отображается поверх всех элементов */
+            z-index: 99999 !important; /* Всегда отображается поверх карты и кнопок */
             display: none;
             border: 1px solid #eaeaea;
+            margin-top: 4px;
         }
         .suggestion-item {
             padding: 14px 16px;
@@ -640,9 +647,13 @@
             </div>
             
             <div class="map-bottom-panel">
-                <input type="text" id="map-street" placeholder="📍 (Советская 10 или народный супермаркет)" onchange="geocodeAddressFromInput()" class="full-width-input" style="background: #f0f0f0; font-weight: bold; border: 2px solid var(--main-yellow);">
+                <div class="search-wrapper">
+                    <input type="text" id="map-street" placeholder="📍 (Советская 10 или народный супермаркет)" class="full-width-input" style="background: #f0f0f0; font-weight: bold; border: 2px solid var(--main-yellow); margin-bottom: 0;">
+                    <div id="search-suggestions" class="search-suggestions-container"></div>
+                </div>
+                <div style="height: 12px;"></div>
 
-               <input type="text" id="map-kv" placeholder="🏠 (название дома, № кв или комментарий курьеру)" class="full-width-input" style="background: #f0f0f0; margin-bottom: 12px;">
+                <input type="text" id="map-kv" placeholder="🏠 (название дома, № кв или комментарий курьеру)" class="full-width-input" style="background: #f0f0f0; margin-bottom: 12px;">
                 
                 <input type="text" id="map-comment" placeholder="💬 курьеру (ориентир, красные ворота)" class="full-width-input" style="background: #f0f0f0;">
 
@@ -1690,16 +1701,8 @@
         // ЖИВОЙ ПОИСК АДРЕСОВ С ВЫПАДАЮЩИМ СПИСКОМ (Движок Photon на базе OpenStreetMap)
         function initSearchAutocomplete() {
             const inputStreet = document.getElementById('map-street');
-            if (!inputStreet) return;
-
-            // Находим или динамически создаем контейнер для подсказок прямо под полем ввода адреса
-            let suggestionsContainer = document.getElementById('search-suggestions');
-            if (!suggestionsContainer) {
-                suggestionsContainer = document.createElement('div');
-                suggestionsContainer.id = 'search-suggestions';
-                suggestionsContainer.className = 'search-suggestions-container';
-                inputStreet.parentNode.insertBefore(suggestionsContainer, inputStreet.nextSibling);
-            }
+            const suggestionsContainer = document.getElementById('search-suggestions');
+            if (!inputStreet || !suggestionsContainer) return;
 
             // Перехватываем ввод пользователя на лету
             inputStreet.addEventListener('input', function() {
@@ -1712,10 +1715,10 @@
                     return;
                 }
 
-                // Задержка в 300мс (debounce)
+                // Задержка в 300мс (debounce), чтобы не перегружать сеть при быстром наборе текста
                 autocompleteTimeout = setTimeout(async function() {
                     try {
-                        // Запрос к API Photon с фильтрацией по текущему городу проекта
+                        // Формируем запрос с привязкой к текущему глобальному городу (Бишкек / Чолпон-Ата и т.д.)
                         let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(globalCity + ' ' + query)}&limit=5&lang=ru`;
                         
                         if (clientLat && clientLon) {
@@ -1734,7 +1737,7 @@
                                 if (!feature || !feature.properties || !feature.geometry) return;
 
                                 const props = feature.properties;
-                                const coords = feature.geometry.coordinates;
+                                const coords = feature.geometry.coordinates; // Массив координат движка [lon, lat]
 
                                 const name = props.name || props.street || '';
                                 const house = props.housenumber || '';
@@ -1761,20 +1764,25 @@
                                 `;
 
                                 // Клик по выбранной подсказке из списка
-                                item.addEventListener('click', function() {
+                                item.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+
                                     clientLat = coords[1]; // Широта
                                     clientLon = coords[0]; // Долгота
                                     
-                                    inputStreet.value = mainText; // Записываем точное название в инпут
+                                    inputStreet.value = mainText; // Записываем адрес в инпут
                                     suggestionsContainer.style.display = 'none';
 
-                                    // Отключаем флаг движения, чтобы карта не сбросила текст адреса
-                                    mapWasDragged = false; 
+                                    // Блокируем ложные срабатывания moveend
+                                    if (typeof mapWasDragged !== 'undefined') {
+                                        mapWasDragged = false;
+                                    }
 
-                                    // Центрируем карту ровно под наш маркер на 40% экрана
+                                    // Перемещаем карту на выбранный объект
                                     setMapCenterToMarker(clientLat, clientLon);
 
-                                    // Моментально обновляем стоимость доставки до этой точки
+                                    // Обновляем стоимость доставки до этой точки
                                     if (cartActiveTabResId && database[cartActiveTabResId]) {
                                         recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
                                     }
@@ -1791,7 +1799,7 @@
                 }, 300);
             });
 
-            // Закрываем окно подсказок, если юзер кликнул в любую другую область карты
+            // Прячем список подсказок, если пользователь тапнул по карте мимо списка
             document.addEventListener('click', function(e) {
                 if (e.target !== inputStreet && e.target !== suggestionsContainer && !suggestionsContainer.contains(e.target)) {
                     suggestionsContainer.style.display = 'none';
