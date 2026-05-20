@@ -310,7 +310,34 @@
         .profile-s-header { display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 15px; margin-bottom: 10px; }
 
         .status-box { background: var(--card-bg); border-radius: 20px; margin: 16px; padding: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-top: -30px; position: relative;}
-    </style>
+    /* --- БАННЕР АКТИВНОГО ЗАКАЗА --- */
+        #active-order-banner { 
+        background: #E8F5E9; border: 1px solid #4CAF50;
+        padding: 12px 16px; margin: 12px 16px 0; border-radius: 16px; display: flex;
+        justify-content: space-between; align-items: center; cursor: pointer; 
+        }
+        .banner-info { display: flex; flex-direction: column; }
+        .banner-title { font-weight: 800; color: #2E7D32; font-size: 14px; }
+        .banner-status { font-size: 12px; color: #388E3C; font-weight: 600; margin-top: 2px; }
+        /* --- СТИЛИ МИНИ-КАРТЫ НА ОФОРМЛЕНИИ ЗАКАЗА (Как в Glovo) --- */
+        .mini-map-card {
+            background: #fff; border-radius: 16px; overflow: hidden;
+            border: 1px solid #eaeaea; margin-bottom: 12px; cursor: pointer;
+            position: relative; transition: 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+        }
+        .mini-map-card:active { transform: scale(0.98); }
+        .mini-map-container {
+            width: 100%; height: 120px; background: #eee; z-index: 1; pointer-events: none; /* Отключаем взаимодействие, клик ловит карточка */
+        }
+        .mini-map-info {
+            padding: 14px 16px; display: flex; justify-content: space-between; align-items: center;
+            background: #fff; position: relative; z-index: 2; border-top: 1px solid #eee;
+        }
+        .mini-map-text { flex-grow: 1; margin-right: 12px; }
+        .mini-map-title { font-weight: 800; font-size: 15px; color: #111; margin-bottom: 2px; }
+        .mini-map-desc { font-size: 13px; color: var(--text-gray); }
+        .mini-map-icon { font-size: 20px; color: var(--text-gray); font-weight: bold;}
+</style>
 </head>
 <body>
 
@@ -396,13 +423,15 @@
             <div id="block-delivery">
                 <h3 class="section-title" style="margin-top: 0; padding: 0 0 12px 0;">Адрес доставки</h3>
                 <div id="saved-addresses-wrapper" class="hidden"><div id="saved-addresses-list"></div></div>
-                <div class="address-summary-card" onclick="openMapModal()" style="margin-bottom: 12px;">
-                    <div style="font-size: 24px; margin-right: 12px;">📍</div>
-                    <div style="flex-grow: 1;">
-                        <div id="checkout-summary-address" style="font-weight: bold; font-size: 15px;">Укажите адрес на карте</div>
-                        <div id="checkout-summary-details" style="font-size: 13px; color: var(--text-gray);">Нажмите, чтобы выбрать</div>
+                <div class="mini-map-card" onclick="openMapModal()">
+                    <div id="checkout-mini-map" class="mini-map-container"></div>
+                    <div class="mini-map-info">
+                        <div class="mini-map-text">
+                            <div id="checkout-summary-address" class="mini-map-title">Укажите адрес на карте</div>
+                            <div id="checkout-summary-details" class="mini-map-desc">Нажмите, чтобы выбрать</div>
+                        </div>
+                        <div class="mini-map-icon">›</div>
                     </div>
-                    <div style="font-size: 20px; color: var(--text-gray);">›</div>
                 </div>
                 <button class="btn-save-address" onclick="saveCurrentAddress()" style="margin-bottom: 8px;">⭐ Сохранить этот адрес</button>
                 
@@ -472,17 +501,26 @@
         </div>
     </div>
 
-    <div id="screen-status" class="hidden" style="padding-bottom: 40px;">
-        <div class="header-nav">
-            <div class="back-btn" onclick="onBackClick()">←</div>
-            <div class="header-title" id="st-header-title">Статус заказа</div>
+    <div id="screen-status" class="screen hidden">
+    <div class="header-nav">
+        <span class="back-btn" onclick="goToMainMenu()">← Главное меню</span>
+        <h2>Статус заказа</h2>
+        <div style="width: 24px;"></div>
+    </div>
+    <div style="padding: 16px;">
+        <div style="background: white; border-radius: 12px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <div style="font-size: 40px; margin-bottom: 12px;">⏳</div>
+            <h3 id="st-status-text" style="margin: 0 0 8px 0; color: #FF9800;">Обрабатывается...</h3>
+            <p style="color: var(--tg-theme-hint-color); margin: 0; font-size: 14px;">Ресторан: <b id="st-res-name">...</b></p>
+            <p style="color: var(--tg-theme-hint-color); margin: 4px 0 0 0; font-size: 14px;">Сумма: <b id="st-price">...</b></p>
         </div>
-        <div class="status-box" style="margin-top: 20px;">
-            <h3 id="st-current-status" style="color: #1976d2; text-align: center; margin-bottom: 20px;">Обрабатывается...</h3>
-            <div class="receipt-row"><span>Ресторан:</span><span id="st-res-name">...</span></div>
-            <div class="receipt-row"><span>Сумма:</span><span id="st-total" style="font-weight: bold;">0 сом</span></div>
+        
+        <div style="margin-top: 24px;">
+            <button class="main-button" style="margin-bottom: 12px;" onclick="goToMainMenu()">🏠 В главное меню</button>
+            <button class="main-button" style="background: #e0e0e0; color: #333;" onclick="startNewOrder()">🍔 Заказать еще раз</button>
         </div>
     </div>
+</div>
 
     <div id="modal-profile" class="modal-overlay hidden">
         <div class="modal-content profile-modal-content">
@@ -590,6 +628,11 @@
         let checkoutMap;
         let checkoutClientMarker;
         let checkoutResMarker; 
+        
+        // НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ МИНИ-КАРТЫ
+        let miniMap = null;
+        let miniMapMarker = null;
+
         let clientLat = null;
         let clientLon = null;
 
@@ -746,6 +789,49 @@
             document.getElementById('cart-float-btn').style.display = (totalSum > 0 && (isMainVisible || isMenuVisible)) ? 'flex' : 'none';
         }
 
+        function initMiniMap() {
+            const mapContainer = document.getElementById('checkout-mini-map');
+            if (!mapContainer) return;
+
+            let lat = clientLat;
+            let lon = clientLon;
+            
+            // Если координаты еще не определены, берем координаты ресторана
+            if (!lat || !lon) {
+                const activeRes = database[cartActiveTabResId];
+                lat = activeRes ? activeRes.lat : 42.8746;
+                lon = activeRes ? activeRes.lon : 74.5698;
+            }
+
+            if (!miniMap) {
+                // Создаем неинтерактивную карту
+                miniMap = L.map('checkout-mini-map', {
+                    zoomControl: false,
+                    dragging: false,
+                    scrollWheelZoom: false,
+                    doubleClickZoom: false,
+                    boxZoom: false,
+                    touchZoom: false,
+                    keyboard: false,
+                    attributionControl: false
+                }).setView([lat, lon], 15);
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(miniMap);
+                
+                const icon = L.icon({ 
+                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180209.png', 
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 32]
+                });
+                
+                miniMapMarker = L.marker([lat, lon], {icon: icon}).addTo(miniMap);
+            } else {
+                miniMap.setView([lat, lon], 15);
+                miniMapMarker.setLatLng([lat, lon]);
+                setTimeout(() => miniMap.invalidateSize(), 50);
+            }
+        }
+
         function openCartList() {
             let resIds = [...new Set(Object.values(cartItems).map(c => c.resId))];
             if(!cartActiveTabResId || !resIds.includes(cartActiveTabResId)) cartActiveTabResId = resIds[0];
@@ -768,8 +854,32 @@
             
             renderCartListItems(); 
             history.pushState({screen: 'cart-list'}, ''); showScreen('cart-list');
+            
+            // Запускаем инициализацию мини-карты с небольшой задержкой, чтобы DOM успел показаться
+            setTimeout(() => initMiniMap(), 100);
         }
 
+        function updateCheckoutSummaryUI() {
+            let title = "Укажите адрес на карте";
+            let details = "Нажмите, чтобы выбрать";
+
+            if (orderAddressData.street) {
+                title = orderAddressData.street;
+                // Если заполнили номер дома/квартиру, показываем их, иначе текст по умолчанию
+                details = orderAddressData.kv ? orderAddressData.kv : "Можно указать дом и квартиру";
+            }
+
+            document.getElementById('checkout-summary-address').innerText = title;
+            document.getElementById('checkout-summary-details').innerText = details;
+
+            // Живое обновление мини-карты при смене адреса
+            if (clientLat && clientLon && miniMap && miniMapMarker) {
+                miniMap.setView([clientLat, clientLon], 15);
+                miniMapMarker.setLatLng([clientLat, clientLon]);
+                setTimeout(() => miniMap.invalidateSize(), 50);
+            }
+        }
+        
         function renderCartListItems() {
             let html = '';
             for(let key in cartItems) { 
@@ -868,19 +978,6 @@
             onBackClick();
         }
 
-        function updateCheckoutSummaryUI() {
-            let title = "Укажите адрес на карте";
-            let details = "Нажмите, чтобы выбрать";
-
-            if (orderAddressData.street) {
-                title = orderAddressData.street;
-                // Если заполнили номер дома/квартиру, показываем их, иначе текст по умолчанию
-                details = orderAddressData.kv ? orderAddressData.kv : "Можно указать дом и квартиру";
-            }
-
-            document.getElementById('checkout-summary-address').innerText = title;
-            document.getElementById('checkout-summary-details').innerText = details;
-        }
 
         async function geocodeAddressFromInput() {
             const query = document.getElementById('map-street').value;
