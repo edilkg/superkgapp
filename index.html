@@ -258,7 +258,7 @@
         /* КРАСИВЫЙ ВЫПАДАЮЩИЙ СПИСОК ПОДСКАЗОК АДРЕСА */
         .search-suggestions-container {
             position: absolute;
-            top: 64px; /* Появляется ровно под полем ввода адреса */
+            top: 64px; /* Располагается идеально ровно под полем ввода адреса */
             left: 20px;
             right: 20px;
             background: #ffffff;
@@ -266,7 +266,7 @@
             box-shadow: 0 8px 24px rgba(0,0,0,0.18);
             max-height: 180px;
             overflow-y: auto;
-            z-index: 9999;
+            z-index: 99999 !important; /* Гарантированно отображается поверх всех элементов */
             display: none;
             border: 1px solid #eaeaea;
         }
@@ -1240,31 +1240,23 @@
                 const centerMarkerEl = document.querySelector('.center-marker-container');
                 const bottomPanel = document.querySelector('.map-floating-controls');
 
-                // --- НАДЕЖНАЯ ЗАЩИТА ОТ КЛАВИАТУРЫ ---
-                let isTyping = false;
-                const mapInputs = document.querySelectorAll('.map-bottom-panel input');
-                mapInputs.forEach(inp => {
-                    inp.addEventListener('focus', () => { isTyping = true; });
-                    inp.addEventListener('blur', () => {
-                        setTimeout(() => { isTyping = false; }, 400); 
-                    });
-                });
-
-                checkoutMap.on('movestart', function() {
-                    if (isTyping) return; // Игнорируем ложные скачки при открытии клавиатуры
-                    
-                    centerMarkerEl.classList.add('is-dragging');
-                    bottomPanel.classList.add('hidden-panel'); // Прячем панель
+                // Срабатывает исключительно тогда, когда пользователь двигает карту пальцем
+                checkoutMap.on('dragstart', function() {
+                    mapWasDragged = true; 
+                    if (centerMarkerEl) centerMarkerEl.classList.add('is-dragging');
+                    if (bottomPanel) bottomPanel.classList.add('hidden-panel'); 
                     document.getElementById('map-street').value = 'Определение адреса...'; 
                 });
 
+                // Вызывается только по окончании ручного перемещения карты
                 checkoutMap.on('moveend', function() {
-                    if (isTyping) return; // Не перезаписываем адрес во время ввода текста вручную
+                    if (!mapWasDragged) return; // Полный игнор программных перемещений от автокомплита
                     
-                    centerMarkerEl.classList.remove('is-dragging');
-                    bottomPanel.classList.remove('hidden-panel'); // Возвращаем панель
+                    mapWasDragged = false; 
+                    if (centerMarkerEl) centerMarkerEl.classList.remove('is-dragging');
+                    if (bottomPanel) bottomPanel.classList.remove('hidden-panel'); 
                     
-                    // БЕРЕМ КООРДИНАТЫ РОВНО ИЗ-ПОД МАРКЕРА (На высоте 40% экрана)
+                    // Извлекаем координаты из-под маркера (высота 40% видимой области)
                     const mapSize = checkoutMap.getSize();
                     const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.40);
                     const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
@@ -1306,8 +1298,11 @@
             
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    clientLat = position.coords.latitude; clientLon = position.coords.longitude;
-                    setMapCenterToMarker(clientLat, clientLon); // Сдвигаем по новой логике (30%)
+                    clientLat = position.coords.latitude; 
+                    clientLon = position.coords.longitude;
+                    mapWasDragged = false; // Блокируем перезапись события moveend
+                    setMapCenterToMarker(clientLat, clientLon);
+                    reverseGeocode(clientLat, clientLon);
                 },
                 (error) => {
                     if (error.code === 1) alert("Разрешите доступ к геолокации в настройках телефона");
@@ -1697,7 +1692,7 @@
             const inputStreet = document.getElementById('map-street');
             if (!inputStreet) return;
 
-            // Динамически создаем контейнер для подсказок прямо под полем ввода адреса
+            // Находим или динамически создаем контейнер для подсказок прямо под полем ввода адреса
             let suggestionsContainer = document.getElementById('search-suggestions');
             if (!suggestionsContainer) {
                 suggestionsContainer = document.createElement('div');
@@ -1717,13 +1712,12 @@
                     return;
                 }
 
-                // Задержка 300мс (debounce), чтобы не перегружать сеть при быстром наборе текста
+                // Задержка в 300мс (debounce)
                 autocompleteTimeout = setTimeout(async function() {
                     try {
-                        // Формируем запрос с привязкой к текущему глобальному городу (Бишкек / Чолпон-Ата и т.д.)
+                        // Запрос к API Photon с фильтрацией по текущему городу проекта
                         let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(globalCity + ' ' + query)}&limit=5&lang=ru`;
                         
-                        // Если уже известны GPS координаты, передаем их Photon для локального приоритета в поиске
                         if (clientLat && clientLon) {
                             url += `&lat=${clientLat}&lon=${clientLon}`;
                         }
@@ -1740,7 +1734,7 @@
                                 if (!feature || !feature.properties || !feature.geometry) return;
 
                                 const props = feature.properties;
-                                const coords = feature.geometry.coordinates; // Массив координат движка [lon, lat]
+                                const coords = feature.geometry.coordinates;
 
                                 const name = props.name || props.street || '';
                                 const house = props.housenumber || '';
@@ -1771,13 +1765,16 @@
                                     clientLat = coords[1]; // Широта
                                     clientLon = coords[0]; // Долгота
                                     
-                                    inputStreet.value = mainText; // Записываем адрес в инпут
+                                    inputStreet.value = mainText; // Записываем точное название в инпут
                                     suggestionsContainer.style.display = 'none';
 
-                                    // Перемещаем карту на выбранный объект
+                                    // Отключаем флаг движения, чтобы карта не сбросила текст адреса
+                                    mapWasDragged = false; 
+
+                                    // Центрируем карту ровно под наш маркер на 40% экрана
                                     setMapCenterToMarker(clientLat, clientLon);
 
-                                    // Обновляем стоимость доставки до этой точки
+                                    // Моментально обновляем стоимость доставки до этой точки
                                     if (cartActiveTabResId && database[cartActiveTabResId]) {
                                         recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
                                     }
@@ -1794,7 +1791,7 @@
                 }, 300);
             });
 
-            // Прячем список подсказок, если пользователь тапнул по карте мимо списка
+            // Закрываем окно подсказок, если юзер кликнул в любую другую область карты
             document.addEventListener('click', function(e) {
                 if (e.target !== inputStreet && e.target !== suggestionsContainer && !suggestionsContainer.contains(e.target)) {
                     suggestionsContainer.style.display = 'none';
