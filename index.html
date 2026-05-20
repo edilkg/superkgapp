@@ -233,12 +233,17 @@
         #modal-map.hidden { display: none !important; }
         #fullscreen-map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         
-        /* ЦЕНТРАЛЬНЫЙ МАРКЕР С ТЕНЬЮ (Уменьшен и с длинной ножкой) */
+        /* ЦЕНТРАЛЬНЫЙ МАРКЕР (Фиксированный сверху, как в Яндексе) */
         .center-marker-container {
-            position: absolute; top: 200px; left: 50%; 
-            transform: translate(-50%, -100%); /* Сдвигаем вверх, чтобы острый кончик точно указывал в центр */
-            z-index: 2000; pointer-events: none;
-            display: flex; flex-direction: column; align-items: center;
+            position: absolute;
+            top: 240px; /* Жестко привязываем к верху, чтобы клавиатура и панели его не двигали */
+            left: 50%;
+            transform: translate(-50%, -100%); /* Острый кончик маркера будет смотреть точно в цель */
+            z-index: 2000;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         .center-marker-icon {
             position: relative;
@@ -682,7 +687,7 @@
         let checkoutMap;
         let checkoutClientMarker;
         let checkoutResMarker; 
-        let mapWasDragged = false;
+        let mapWasDragged = false; // Флаг контроля: двигал ли юзер карту пальцем
         
         // НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ МИНИ-КАРТЫ
         let miniMap = null;
@@ -1105,7 +1110,7 @@
             }
         }
 
-        // УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы точка оказалась точно под фиксированным маркером (200px сверху)
+        // УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы точка оказалась точно под фиксированным маркером (240px сверху)
         function setMapCenterToMarker(lat, lon) {
             if (!checkoutMap) return;
             const mapSize = checkoutMap.getSize();
@@ -1117,8 +1122,8 @@
             }
             
             const targetPoint = checkoutMap.project([lat, lon], 16);
-            // Смещение от геометрического центра карты до фиксированного маркера (mapSize.y / 2 - 200)
-            targetPoint.y += (mapSize.y / 2 - 200); 
+            // Вычисляем смещение от геометрического центра карты до нашего фиксированного маркера
+            targetPoint.y += (mapSize.y / 2 - 240); 
             const centerLatLng = checkoutMap.unproject(targetPoint, 16);
             checkoutMap.setView(centerLatLng, 16, {animate: false});
         }
@@ -1136,24 +1141,25 @@
 
                 // Срабатывает ТОЛЬКО когда пользователь физически тащит карту пальцем
                 checkoutMap.on('dragstart', function() {
-                    mapWasDragged = true; // Фиксируем, что карту двигает человек
-                    centerMarkerEl.classList.add('is-dragging');
-                    bottomPanel.classList.add('hidden-panel'); // Прячем панель ввода данных
-                    document.getElementById('map-street').value = 'Определение адреса...'; 
+                    mapWasDragged = true; // Фиксируем, что карту двигает человек пальцем
+                    if (centerMarkerEl) centerMarkerEl.classList.add('is-dragging');
+                    if (bottomPanel) bottomPanel.classList.add('hidden-panel'); // Прячем панель ввода данных
+                    const inputStreet = document.getElementById('map-street');
+                    if (inputStreet) inputStreet.value = 'Определение адреса...'; 
                 });
 
-                // Срабатывает, когда любое движение карты (включая инерцию) полностью остановлено
+                // Срабатывает, когда любое движение карты полностью остановлено
                 checkoutMap.on('moveend', function() {
-                    // ЖЕЛЕЗОБЕТОННАЯ ЗАЩИТА: Если движение вызвано клавиатурой или ресайзом окна — игнорируем!
+                    // ЖЕЛЕЗОБЕТОННАЯ ЗАЩИТА: Если движение вызвано клавиатурой или ресайзом окна — полностью игнорируем!
                     if (!mapWasDragged) return; 
                     
-                    mapWasDragged = false; // Сбрасываем флаг до следующего перетаскивания
-                    centerMarkerEl.classList.remove('is-dragging');
-                    bottomPanel.classList.remove('hidden-panel'); // Возвращаем панель обратно
+                    mapWasDragged = false; // Сбрасываем флаг до следующего перетаскивания пальцем
+                    if (centerMarkerEl) centerMarkerEl.classList.remove('is-dragging');
+                    if (bottomPanel) bottomPanel.classList.remove('hidden-panel'); // Возвращаем панель обратно
                     
-                    // БЕРЕМ КООРДИНАТЫ РОВНО ИЗ-ПОД МАРКЕРА (На фиксированной высоте 200px от верха)
+                    // БЕРЕМ КООРДИНАТЫ РОВНО ИЗ-ПОД МАРКЕРА (На фиксированной высоте 240px от верха)
                     const mapSize = checkoutMap.getSize();
-                    const pointUnderMarker = L.point(mapSize.x / 2, 200);
+                    const pointUnderMarker = L.point(mapSize.x / 2, 240);
                     const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
                     
                     clientLat = latlng.lat; 
