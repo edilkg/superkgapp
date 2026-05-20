@@ -836,8 +836,21 @@
             let resIds = [...new Set(Object.values(cartItems).map(c => c.resId))];
             if(!cartActiveTabResId || !resIds.includes(cartActiveTabResId)) cartActiveTabResId = resIds[0];
             
-            // Настраиваем данные для оформления сразу в корзине
             const activeRes = database[cartActiveTabResId];
+            
+            // --- НОВОЕ: Проверяем, есть ли уже координаты от GPS в памяти ---
+            if (!clientLat) {
+                let savedGeo = localStorage.getItem('user_geo');
+                if (savedGeo) {
+                    try {
+                        let parsed = JSON.parse(savedGeo);
+                        clientLat = parsed.lat;
+                        clientLon = parsed.lon;
+                    } catch(e) {}
+                }
+            }
+
+            // Если GPS так и не дали, берем сохраненный адрес или ставим дефолт возле ресторана
             if (!clientLat) {
                 let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
                 if (saved.length > 0) {
@@ -846,7 +859,11 @@
                     clientLat = activeRes.lat + 0.005;
                     clientLon = activeRes.lon + 0.005;
                 }
+            } else if (!orderAddressData.street) {
+                // Координаты от GPS есть, но текстовый адрес еще не получен — запрашиваем
+                reverseGeocode(clientLat, clientLon);
             }
+
             document.getElementById('pickup-address').innerText = activeRes.address; 
             setDeliveryMode('delivery'); 
             renderSavedAddressesUI(); 
@@ -855,7 +872,6 @@
             renderCartListItems(); 
             history.pushState({screen: 'cart-list'}, ''); showScreen('cart-list');
             
-            // Запускаем инициализацию мини-карты с небольшой задержкой, чтобы DOM успел показаться
             setTimeout(() => initMiniMap(), 100);
         }
 
@@ -879,7 +895,7 @@
                 setTimeout(() => miniMap.invalidateSize(), 50);
             }
         }
-        
+
         function renderCartListItems() {
             let html = '';
             for(let key in cartItems) { 
@@ -1005,10 +1021,19 @@
                     if (street && house) fullAddress += ", " + house;
                     else if (house) fullAddress = house;
 
-                    if (fullAddress) document.getElementById('map-street').value = fullAddress;
+                    if (fullAddress) {
+                        document.getElementById('map-street').value = fullAddress;
+                        // --- НОВОЕ: Сразу сохраняем адрес и обновляем мини-карту ---
+                        orderAddressData.street = fullAddress;
+                        updateCheckoutSummaryUI(); 
+                    }
                 }
             } catch(e) {}
-            recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
+            
+            // Пересчитываем цену доставки только если мы уже знаем какой ресторан выбран
+            if (cartActiveTabResId && database[cartActiveTabResId]) {
+                recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
+            }
         }
 
         // НОВАЯ УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы GPS-точка оказалась ровно под маркером на 30%
@@ -1391,54 +1416,57 @@
         if (tgApp && tgApp.LocationManager) {
             tgApp.LocationManager.init(() => {
                 if (!tgApp.LocationManager.isAccessGranted) {
-                    // Если доступа нет — показываем наше красивое окно
                     geoOverlay.style.display = 'flex';
                 } else {
-                    // Если доступ уже есть (юзер ранее разрешил), просто тихо берем координаты
                     tgApp.LocationManager.getLocation((data) => {
                         if (data && data.latitude) {
                             clientLat = data.latitude;
                             clientLon = data.longitude;
                             localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                            // --- НОВОЕ: Сразу определяем улицу в фоне ---
+                            reverseGeocode(clientLat, clientLon);
                         }
                     });
                 }
             });
         } else {
-            // Резервный вариант, если открыли не через телефон, а через браузер на ПК
-            if (!localStorage.getItem('user_geo')) geoOverlay.style.display = 'flex';
+            // Резервный вариант для браузера
+            if (!localStorage.getItem('user_geo')) {
+                geoOverlay.style.display = 'flex';
+            } else {
+                let sg = JSON.parse(localStorage.getItem('user_geo'));
+                clientLat = sg.lat;
+                clientLon = sg.lon;
+                reverseGeocode(clientLat, clientLon);
+            }
         }
 
-        // 2. Обработка клика по желтой кнопке
+        // 2. Обработка клика по желтой кнопке (когда юзер разрешает GPS первый раз)
         btnConfirmGeo.addEventListener('click', () => {
             if(tgApp && tgApp.HapticFeedback) tgApp.HapticFeedback.impactOccurred('medium');
             
-            // Если Телеграм поддерживает новую функцию
             if (tgApp && tgApp.LocationManager) {
-                // Если юзер уже отказал ранее -> открываем НАСТРОЙКИ ТЕЛЕГРАМА
                 if (tgApp.LocationManager.isAccessRequested && !tgApp.LocationManager.isAccessGranted) {
-                    tgApp.LocationManager.openSettings(); // <- ТА САМАЯ ФУНКЦИЯ ИЗ ВИДЕО!
+                    tgApp.LocationManager.openSettings(); 
                     btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">🔄</span> Я включил, повторить';
                 } else {
-                    // Иначе запрашиваем локацию (ВЫЛЕЗЕТ НАТИВНОЕ ОКНО ТЕЛЕГРАМА)
                     btnConfirmGeo.innerText = "Запрашиваем...";
                     
                     tgApp.LocationManager.getLocation((data) => {
                         if (data && data.latitude) {
-                            // Юзер нажал "Разрешить"
                             clientLat = data.latitude;
                             clientLon = data.longitude;
                             localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                             geoOverlay.style.display = 'none';
                             if(tgApp.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('success');
+                            // --- НОВОЕ: Сразу переводим точку в название улицы ---
+                            reverseGeocode(clientLat, clientLon);
                         } else {
-                            // Юзер нажал "Запретить" или GPS выключен -> меняем кнопку
                             btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Открыть настройки';
                         }
                     });
                 }
             } 
-            // Резервный вариант для браузера
             else {
                 btnConfirmGeo.innerText = "Определяем...";
                 navigator.geolocation.getCurrentPosition(
@@ -1447,6 +1475,8 @@
                         clientLon = pos.coords.longitude;
                         localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                         geoOverlay.style.display = 'none';
+                        // --- НОВОЕ: Сразу переводим точку в название улицы ---
+                        reverseGeocode(clientLat, clientLon);
                     },
                     (err) => {
                         alert("Включите GPS в шторке телефона!");
@@ -1459,7 +1489,7 @@
 
         // 3. Обработка кнопки "Ввести вручную"
         btnSkipGeo.addEventListener('click', () => {
-            geoOverlay.style.display = 'none'; // Просто закрываем окно
+            geoOverlay.style.display = 'none'; 
         });
 </script>
 </body>
