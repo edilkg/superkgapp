@@ -1011,9 +1011,12 @@
             
             const activeRes = database[cartActiveTabResId];
             
-            // Карта сама использует уже сохраненные clientLat и clientLon, 
-            // которые мы получили при входе в приложение!
-            setTimeout(() => { initCheckoutMap(activeRes.lat, activeRes.lon); }, 100);
+            // ИСПРАВЛЕНИЕ: Заставляем карту пересчитать свои размеры после снятия 'hidden', 
+            // иначе при повторном открытии она ломается (серый экран).
+            setTimeout(() => { 
+                if (checkoutMap) checkoutMap.invalidateSize(); 
+                initCheckoutMap(activeRes.lat, activeRes.lon); 
+            }, 50);
             
             document.getElementById('map-street').value = orderAddressData.street || '';
             document.getElementById('map-kv').value = orderAddressData.kv || '';
@@ -1076,9 +1079,18 @@
         }
 
         // НОВАЯ УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы GPS-точка оказалась ровно под маркером на 30%
+        // НОВАЯ УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы GPS-точка оказалась ровно под маркером на 30%
         function setMapCenterToMarker(lat, lon) {
             if (!checkoutMap) return;
             const mapSize = checkoutMap.getSize();
+            
+            // ИСПРАВЛЕНИЕ: Защита от нулевого размера. Если размеры еще не получены, 
+            // ставим по центру без смещения, чтобы координаты не "сбивались".
+            if (mapSize.x === 0 || mapSize.y === 0) {
+                checkoutMap.setView([lat, lon], 16, {animate: false});
+                return;
+            }
+            
             const targetPoint = checkoutMap.project([lat, lon], 16);
             // Сдвигаем на 20% ниже центра (50% - 20% = 30% от верхнего края)
             targetPoint.y += (mapSize.y * 0.20); 
