@@ -1240,6 +1240,7 @@
                 recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
             }
         }
+
         function initCheckoutMap(resLat, resLon) {
             if (!checkoutMap) {
                 checkoutMap = L.map('fullscreen-map', {zoomControl: false}).setView([clientLat, clientLon], 16);
@@ -1267,9 +1268,9 @@
                     if (centerMarkerEl) centerMarkerEl.classList.remove('is-dragging');
                     if (bottomPanel) bottomPanel.classList.remove('hidden-panel'); 
                     
-                    // Извлекаем координаты из-под маркера (высота 40% видимой области)
+                    // Извлекаем координаты из-под маркера (теперь точно на высоте 25% видимой области)
                     const mapSize = checkoutMap.getSize();
-                    const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.40);
+                    const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.25);
                     const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
                     
                     clientLat = latlng.lat; 
@@ -1285,7 +1286,7 @@
             recalcCheckoutDelivery(resLat, resLon);
         }
 
-        // УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы GPS-точка оказалась ровно под маркером на 40% экрана
+        // УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы GPS-точка оказалась ровно под маркером на 25% экрана
         function setMapCenterToMarker(lat, lon) {
             if (!checkoutMap) return;
             const mapSize = checkoutMap.getSize();
@@ -1297,8 +1298,8 @@
             }
             
             const targetPoint = checkoutMap.project([lat, lon], 16);
-            // Сдвигаем на 10% ниже геометрического центра (50% - 10% = 40% от верхнего края)
-            targetPoint.y += (mapSize.y * 0.10); 
+            // Сдвигаем на 25% ниже геометрического центра (50% - 25% = 25% от верхнего края)
+            targetPoint.y += (mapSize.y * 0.25); 
             const centerLatLng = checkoutMap.unproject(targetPoint, 16);
             checkoutMap.setView(centerLatLng, 16, {animate: false});
         }
