@@ -1790,8 +1790,85 @@
             });
         }
 
-        // Запускаем живую поисковую систему автокомплита
-        initSearchAutocomplete();
+        // ЖИВОЙ ПОИСК АДРЕСОВ (Строго по Кыргызстану)
+        function initSearchAutocomplete() {
+            const inputStreet = document.getElementById('map-street');
+            const suggestionsContainer = document.getElementById('search-suggestions');
+            if (!inputStreet || !suggestionsContainer) return;
+
+            inputStreet.addEventListener('input', function() {
+                const query = inputStreet.value.trim();
+                clearTimeout(autocompleteTimeout);
+
+                if (query.length < 2 || query === 'Определение адреса...') {
+                    suggestionsContainer.style.display = 'none';
+                    return;
+                }
+
+                autocompleteTimeout = setTimeout(async function() {
+                    try {
+                        // ДОБАВИЛИ &countrycodes=kg – ТЕПЕРЬ ТОЛЬКО КЫРГЫЗСТАН
+                        let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kg&accept-language=ru&limit=5`;
+                        
+                        // Если есть GPS, используем его для приоритета, но ограничиваем страной
+                        if (clientLat && clientLon) {
+                            url += `&lat=${clientLat}&lon=${clientLon}&bounded=1`;
+                        }
+
+                        const response = await fetch(url);
+                        const data = await response.json();
+
+                        suggestionsContainer.innerHTML = '';
+
+                        if (data && data.length > 0) {
+                            suggestionsContainer.style.display = 'block';
+
+                            data.forEach(itemData => {
+                                const lat = parseFloat(itemData.lat);
+                                const lon = parseFloat(itemData.lon);
+                                const displayName = itemData.display_name;
+                                
+                                // Красиво обрезаем адрес (убираем лишние страны/области если нужно)
+                                const nameParts = displayName.split(', ');
+                                const mainText = nameParts[0] + (nameParts[1] ? ', ' + nameParts[1] : '');
+                                const subText = nameParts.slice(2, 4).join(', '); // Показываем район/город
+
+                                const item = document.createElement('div');
+                                item.className = 'suggestion-item';
+                                item.innerHTML = `
+                                    <div class="suggestion-icon">📍</div>
+                                    <div class="suggestion-text">
+                                        <div class="suggestion-main">${mainText}</div>
+                                        <div class="suggestion-sub">${subText}</div>
+                                    </div>
+                                `;
+
+                                item.addEventListener('mousedown', function(e) {
+                                    e.preventDefault();
+                                    clientLat = lat;
+                                    clientLon = lon;
+                                    inputStreet.value = mainText;
+                                    suggestionsContainer.style.display = 'none';
+
+                                    if (typeof mapWasDragged !== 'undefined') mapWasDragged = false;
+                                    setMapCenterToMarker(clientLat, clientLon);
+
+                                    if (cartActiveTabResId && database[cartActiveTabResId]) {
+                                        recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
+                                    }
+                                    inputStreet.blur();
+                                });
+                                suggestionsContainer.appendChild(item);
+                            });
+                        } else {
+                            suggestionsContainer.style.display = 'none';
+                        }
+                    } catch (err) {
+                        console.error("Ошибка поиска:", err);
+                    }
+                }, 500);
+            });
+        }
 </script>
 </body>
 </html>
