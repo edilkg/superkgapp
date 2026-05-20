@@ -379,6 +379,54 @@
             box-shadow: none;
             cursor: not-allowed;
         }
+        
+        /* СТИЛИ ДЛЯ ВЫПАДАЮЩЕГО СПИСКА ПОДСКАЗОК ПОИСКА */
+        .search-suggestions-container {
+            position: absolute;
+            top: 100%; /* Появляется ровно под полем ввода адреса */
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 5px;
+            z-index: 9999; /* Отображается поверх карты и всех панелей */
+            display: none;
+        }
+        .suggestion-item {
+            padding: 12px 14px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+            color: #333333;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+        .suggestion-item:active {
+            background-color: #f5f5f5;
+        }
+        .suggestion-icon {
+            margin-right: 10px;
+            font-size: 15px;
+        }
+        .suggestion-text {
+            display: flex;
+            flex-direction: column;
+        }
+        .suggestion-main {
+            font-weight: 500;
+            color: #111111;
+        }
+        .suggestion-sub {
+            font-size: 11px;
+            color: #777777;
+            margin-top: 2px;
+        }
 </style>
 </head>
 <body>
@@ -415,6 +463,9 @@
 
         <div class="search-container">
             <input type="text" id="search-input" class="search-bar" placeholder="🔍 Найти ресторан или блюдо..." oninput="handleSearch()">
+            <div class="search-suggestions-container" id="search-suggestions">
+                <!-- Список подсказок поиска будет здесь -->
+            </div>
         </div>
         
         <div class="main-categories">
@@ -1601,6 +1652,120 @@
         btnSkipGeo.addEventListener('click', () => {
             geoOverlay.style.display = 'none'; 
         });
+
+        let autocompleteTimeout = null;
+
+        // ИНИЦИАЛИЗАЦИЯ ЖИВОГО ПОИСКА С ВАРИАНТАМИ ОТВЕТОВ
+        function initSearchAutocomplete() {
+            const inputStreet = document.getElementById('map-street');
+            if (!inputStreet) return;
+
+            // Динамически создаем контейнер подсказаок, чтобы не ломать твою HTML верстку
+            let suggestionsContainer = document.getElementById('search-suggestions');
+            if (!suggestionsContainer) {
+                suggestionsContainer = document.createElement('div');
+                suggestionsContainer.id = 'search-suggestions';
+                suggestionsContainer.className = 'search-suggestions-container';
+                inputStreet.parentNode.insertBefore(suggestionsContainer, inputStreet.nextSibling);
+            }
+
+            // Отслеживаем ввод текста пользователем
+            inputStreet.addEventListener('input', function() {
+                const query = inputStreet.value.trim();
+                
+                clearTimeout(autocompleteTimeout);
+
+                if (query.length < 2 || query === 'Определение адреса...') {
+                    suggestionsContainer.style.display = 'none';
+                    suggestionsContainer.innerHTML = '';
+                    return;
+                }
+
+                // Ждем 400 миллисекунд после затухания ввода
+                autocompleteTimeout = setTimeout(async function() {
+                    try {
+                        // Посылаем запрос к Photon API с привязкой к текущему выбранному городу глобально
+                        let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(globalCity + ' ' + query)}&limit=5&lang=ru`;
+                        
+                        // Если есть текущие GPS координаты, передаем их для локального приоритета поиска
+                        if (clientLat && clientLon) {
+                            url += `&lat=${clientLat}&lon=${clientLon}`;
+                        }
+
+                        const response = await fetch(url);
+                        const data = await response.json();
+
+                        suggestionsContainer.innerHTML = '';
+
+                        if (data && data.features && data.features.length > 0) {
+                            suggestionsContainer.style.display = 'block';
+
+                            data.features.forEach(feature => {
+                                if (!feature || !feature.properties || !feature.geometry) return;
+
+                                const props = feature.properties;
+                                const coords = feature.geometry.coordinates; // Массив [lon, lat]
+                                
+                                // Формируем красивый текст подсказки
+                                const name = props.name || props.street || '';
+                                const city = props.city || props.className || '';
+                                const district = props.district || '';
+                                const subText = [city, district].filter(Boolean).join(', ');
+
+                                if (!name) return; // Пропускаем пустые совпадения
+
+                                const item = document.createElement('div');
+                                item.className = 'suggestion-item';
+                                item.innerHTML = `
+                                    <div class="suggestion-icon">📍</div>
+                                    <div class="suggestion-text">
+                                        <div class="suggestion-main">${name}</div>
+                                        <div class="suggestion-sub">${subText ? subText : globalCity}</div>
+                                    </div>
+                                `;
+
+                                // Логика клика на выбранный вариант из списка
+                                item.addEventListener('click', function() {
+                                    clientLat = coords[1];
+                                    clientLon = coords[0];
+                                    
+                                    // Подставляем адрес в поле ввода
+                                    inputStreet.value = name + (subText ? `, ${subText}` : '');
+                                    suggestionsContainer.style.display = 'none';
+
+                                    // Плавно центрируем карту ровно под наш поднятый маркер (40% экрана)
+                                    if (typeof setMapCenterToMarker === 'function') {
+                                        setMapCenterToMarker(clientLat, clientLon);
+                                    } else if (checkoutMap) {
+                                        checkoutMap.setView([clientLat, clientLon], 16, {animate: true});
+                                    }
+
+                                    // Моментально обновляем расчет стоимости доставки до выбранной точки
+                                    if (cartActiveTabResId && database[cartActiveTabResId]) {
+                                        recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
+                                    }
+                                });
+
+                                suggestionsContainer.appendChild(item);
+                            });
+                        } else {
+                            suggestionsContainer.style.display = 'none';
+                        }
+                    } catch (err) {
+                        console.error("Ошибка автокомплита поиска адресов:", err);
+                    }
+                }, 400);
+            });
+
+            // Закрываем выпадающий список, если пользователь кликнул мимо него
+            document.addEventListener('click', function(e) {
+                if (e.target !== inputStreet && e.target !== suggestionsContainer && !suggestionsContainer.contains(e.target)) {
+                    suggestionsContainer.style.display = 'none';
+                }
+            });
+        }
+        // Автоматический запуск автокомплита при загрузке страницы
+        initSearchAutocomplete();
 </script>
 </body>
 </html>
