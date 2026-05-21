@@ -1181,7 +1181,8 @@
             // БЛОКИРУЕМ двойной запрос, если юзер только что кликнул по подсказке из списка
             if (window.isAddressSelectedFromList) return;
 
-            const query = document.getElementById('map-street').value;
+            const inputStreet = document.getElementById('map-street');
+            const query = inputStreet.value;
             if (!query || query === 'Определение адреса...') return;
 
             try {
@@ -1193,11 +1194,17 @@
                     clientLat = parseFloat(data[0].lat);
                     clientLon = parseFloat(data[0].lon);
                     
-                    setMapCenterToMarker(clientLat, clientLon);
+                    inputStreet.blur(); // 1. Скрываем клавиатуру
                     
-                    if (cartActiveTabResId && database[cartActiveTabResId]) {
-                        recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
-                    }
+                    // 2. Ждем 400мс пока экран растянется, обновляем карту и центрируем
+                    setTimeout(() => {
+                        if (checkoutMap) checkoutMap.invalidateSize(); 
+                        setMapCenterToMarker(clientLat, clientLon);
+                        
+                        if (cartActiveTabResId && database[cartActiveTabResId]) {
+                            recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
+                        }
+                    }, 400);
                 } else {
                     // Если объект не найден, ищем шире по всему Кыргызстану
                     const responseWide = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kg&accept-language=ru`);
@@ -1205,10 +1212,18 @@
                     if (dataWide && dataWide.length > 0) {
                         clientLat = parseFloat(dataWide[0].lat);
                         clientLon = parseFloat(dataWide[0].lng || dataWide[0].lon);
-                        setMapCenterToMarker(clientLat, clientLon);
-                        if (cartActiveTabResId && database[cartActiveTabResId]) {
-                            recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
-                        }
+                        
+                        inputStreet.blur(); // 1. Скрываем клавиатуру
+                        
+                        // 2. Ждем растягивания экрана и центрируем
+                        setTimeout(() => {
+                            if (checkoutMap) checkoutMap.invalidateSize();
+                            setMapCenterToMarker(clientLat, clientLon);
+                            
+                            if (cartActiveTabResId && database[cartActiveTabResId]) {
+                                recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
+                            }
+                        }, 400);
                     }
                 }
             } catch (err) {
@@ -1698,10 +1713,10 @@
             geoOverlay.style.display = 'none'; 
         });
 
-        window.isAddressSelectedFromList = false; // Глобальный флаг защиты от двойного поиска
+       window.isAddressSelectedFromList = false; // Глобальный флаг защиты от двойного поиска
         let autocompleteTimeout = null;
 
-        // ЕДИНАЯ ФУНКЦИЯ ПОИСКА (БЕЗ ЗАДЕРЖЕК И ЛАГОВ)
+        // ЕДИНАЯ ФУНКЦИЯ ПОИСКА (БЕЗ ЗАДЕРЖЕК И ЛАГОВ С ИСПРАВЛЕННЫМ ЦЕНТРИРОВАНИЕМ)
         function initSearchAutocomplete() {
             const inputStreet = document.getElementById('map-street');
             const suggestionsContainer = document.getElementById('search-suggestions');
@@ -1764,16 +1779,21 @@
                                     suggestionsContainer.style.display = 'none';
 
                                     if (typeof mapWasDragged !== 'undefined') mapWasDragged = false;
-                                    setMapCenterToMarker(clientLat, clientLon);
+                                    
+                                    inputStreet.blur(); // Скрываем клавиатуру СНАЧАЛА
+                                    
+                                    // 4. ЖДЕМ СКРЫТИЯ КЛАВИАТУРЫ (400мс) И ТОЛЬКО ПОТОМ ДВИГАЕМ КАРТУ
+                                    setTimeout(() => {
+                                        if (checkoutMap) checkoutMap.invalidateSize(); // Заставляем карту пересчитать свои новые (полные) размеры
+                                        setMapCenterToMarker(clientLat, clientLon);
 
-                                    if (cartActiveTabResId && database[cartActiveTabResId]) {
-                                        recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
-                                    }
+                                        if (cartActiveTabResId && database[cartActiveTabResId]) {
+                                            recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
+                                        }
+                                    }, 400);
                                     
-                                    inputStreet.blur(); // Скрываем клавиатуру
-                                    
-                                    // Сбрасываем защитный флаг через полсекунды
-                                    setTimeout(() => { window.isAddressSelectedFromList = false; }, 500);
+                                    // Сбрасываем защитный флаг через секунду
+                                    setTimeout(() => { window.isAddressSelectedFromList = false; }, 1000);
                                 });
                                 suggestionsContainer.appendChild(item);
                             });
