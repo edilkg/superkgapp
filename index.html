@@ -221,7 +221,7 @@
         .cart-item-title { font-size: 14px; font-weight: 700; margin-bottom: 4px;}
         .cart-item-price { font-size: 14px; font-weight: 800;}
         .cart-item-counter { display: flex; align-items: center; background: var(--bg-color); border-radius: 12px;}
-        .cart-item-counter div { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer;}
+        .cart-item-counter div { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer;}
 
         /* ПОЛНОЭКРАННАЯ КАРТА (Стиль Yandex) */
         #modal-map { background: var(--bg-color); z-index: 2500; position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; }
@@ -1178,28 +1178,29 @@
 
 
         async function geocodeAddressFromInput() {
+            // БЛОКИРУЕМ двойной запрос, если юзер только что кликнул по подсказке из списка
+            if (window.isAddressSelectedFromList) return;
+
             const query = document.getElementById('map-street').value;
             if (!query || query === 'Определение адреса...') return;
 
             try {
-                // Ищем по названию магазина/ПМК с жесткой привязкой к текущему городу
-                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(globalCity + ', ' + query)}&accept-language=ru`);
+                // Ищем по названию магазина/ПМК с жесткой привязкой к текущему городу и стране (KG)
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(globalCity + ', ' + query)}&countrycodes=kg&accept-language=ru`);
                 const data = await response.json();
                 
                 if (data && data.length > 0) {
                     clientLat = parseFloat(data[0].lat);
                     clientLon = parseFloat(data[0].lon);
                     
-                    // Перемещаем карту на найденную точку
                     setMapCenterToMarker(clientLat, clientLon);
                     
-                    // Пересчитываем стоимость доставки до новой точки
                     if (cartActiveTabResId && database[cartActiveTabResId]) {
                         recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
                     }
                 } else {
-                    // Если точечный объект не найден, пробуем поискать чуть шире
-                    const responseWide = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&accept-language=ru`);
+                    // Если объект не найден, ищем шире по всему Кыргызстану
+                    const responseWide = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=kg&accept-language=ru`);
                     const dataWide = await responseWide.json();
                     if (dataWide && dataWide.length > 0) {
                         clientLat = parseFloat(dataWide[0].lat);
@@ -1697,9 +1698,10 @@
             geoOverlay.style.display = 'none'; 
         });
 
+        window.isAddressSelectedFromList = false; // Глобальный флаг защиты от двойного поиска
         let autocompleteTimeout = null;
 
-        // ЕДИНАЯ ФУНКЦИЯ ПОИСКА (Строго по Кыргызстану, без дублей)
+        // ЕДИНАЯ ФУНКЦИЯ ПОИСКА (БЕЗ ЗАДЕРЖЕК И ЛАГОВ)
         function initSearchAutocomplete() {
             const inputStreet = document.getElementById('map-street');
             const suggestionsContainer = document.getElementById('search-suggestions');
@@ -1714,9 +1716,13 @@
                     return;
                 }
 
+                // 1. МГНОВЕННЫЙ ОТКЛИК: Сразу показываем пользователю, что поиск пошел
+                suggestionsContainer.innerHTML = '<div class="suggestion-item" style="justify-content: center; color: #888; font-size: 13px;">⏳ Ищем адреса...</div>';
+                suggestionsContainer.style.display = 'block';
+
+                // 2. Ускорили срабатывание (с 500мс до 250мс)
                 autocompleteTimeout = setTimeout(async function() {
                     try {
-                        // Поиск строго по Кыргызстану с привязкой к городу
                         let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(globalCity + ', ' + query)}&countrycodes=kg&accept-language=ru&limit=5`;
                         
                         const response = await fetch(url);
@@ -1748,6 +1754,10 @@
 
                                 item.addEventListener('mousedown', function(e) {
                                     e.preventDefault();
+                                    
+                                    // 3. БЛОКИРУЕМ ЛОЖНЫЙ ЗАПУСК onchange
+                                    window.isAddressSelectedFromList = true;
+                                    
                                     clientLat = lat;
                                     clientLon = lon;
                                     inputStreet.value = mainText;
@@ -1759,17 +1769,22 @@
                                     if (cartActiveTabResId && database[cartActiveTabResId]) {
                                         recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
                                     }
-                                    inputStreet.blur();
+                                    
+                                    inputStreet.blur(); // Скрываем клавиатуру
+                                    
+                                    // Сбрасываем защитный флаг через полсекунды
+                                    setTimeout(() => { window.isAddressSelectedFromList = false; }, 500);
                                 });
                                 suggestionsContainer.appendChild(item);
                             });
                         } else {
-                            suggestionsContainer.style.display = 'none';
+                            suggestionsContainer.innerHTML = '<div class="suggestion-item" style="justify-content: center; color: #888; font-size: 13px;">Ничего не найдено</div>';
                         }
                     } catch (err) {
                         console.error("Ошибка поиска:", err);
+                        suggestionsContainer.style.display = 'none';
                     }
-                }, 500);
+                }, 250);
             });
 
             // Закрытие списка при клике мимо
