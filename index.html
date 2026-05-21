@@ -1017,14 +1017,26 @@
             
             const activeRes = database[cartActiveTabResId];
             
-            // Если координат нет, ставим дефолт возле ресторана
+            // --- ОБНОВЛЕНО: Сначала проверяем автоматически сохраненную последнюю точку ---
             if (!clientLat) {
-                let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-                if (saved.length > 0) {
-                    selectSavedAddressData(saved[0]);
+                const lastLat = localStorage.getItem('tamak_last_lat');
+                const lastLon = localStorage.getItem('tamak_last_lon');
+                const lastStreet = localStorage.getItem('tamak_last_street');
+
+                if (lastLat && lastLon) {
+                    clientLat = parseFloat(lastLat);
+                    clientLon = parseFloat(lastLon);
+                    orderAddressData.street = lastStreet || '';
                 } else {
-                    clientLat = activeRes.lat + 0.005;
-                    clientLon = activeRes.lon + 0.005;
+                    // Если последней точки нет, проверяем список избранных (Saved) адресов
+                    let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+                    if (saved.length > 0) {
+                        selectSavedAddressData(saved[0]);
+                    } else {
+                        // И только если вообще всё пусто — ставим дефолт возле ресторана
+                        clientLat = activeRes.lat + 0.005;
+                        clientLon = activeRes.lon + 0.005;
+                    }
                 }
             }
             
@@ -1039,6 +1051,13 @@
             updateCheckoutSummaryUI();
             
             renderCartListItems(); 
+
+            // Автозаполнение сохраненного номера телефона
+            const savedPhone = localStorage.getItem('tamak_client_phone');
+            if (savedPhone) {
+                document.getElementById('client-phone').value = savedPhone;
+            }
+
             history.pushState({screen: 'cart-list'}, ''); showScreen('cart-list');
             
             setTimeout(() => initMiniMap(), 100);
@@ -1227,30 +1246,38 @@
                 const data = await response.json();
                 
                 if (data && data.address) {
-                    // Теперь ищем всё подряд: от улицы до района и города
-                    let street = data.address.road || data.address.pedestrian || data.address.residential || 
-                                 data.address.neighbourhood || data.address.suburb || data.address.village || 
-                                 data.address.town || data.address.city || "";
-                    
+                    let street = data.address.road || data.address.pedestrian || data.address.village || "";
                     let house = data.address.house_number || data.address.building || "";
-                    
                     let fullAddress = street;
-                    if (street && house) fullAddress += ", " + house;
-                    else if (house) fullAddress = house;
-
-                    // Если хоть что-то нашли — записываем в инпут
-                    if (fullAddress) {
-                        const inputStreet = document.getElementById('map-street');
-                        if (inputStreet) inputStreet.value = fullAddress;
-                        
-                        orderAddressData.street = fullAddress;
-                        updateCheckoutSummaryUI(); 
+                    
+                    if (street && house) {
+                        fullAddress += ", " + house;
+                    } else if (house) {
+                        fullAddress = house;
                     }
+
+                    // Определяем элемент один раз (как советовал VS Code)
+                    const inputStreet = document.getElementById('map-street');
+
+                    if (fullAddress) {
+                        // Если нашли точный адрес (улица/дом)
+                        if (inputStreet) inputStreet.value = fullAddress;
+                        orderAddressData.street = fullAddress;
+                    } else {
+                        // FALLBACK: Если улицу не нашли, берем город, село или пишем "Адрес не определен"
+                        const fallback = data.address.city || data.address.town || data.address.village || "Адрес не определён";
+                        if (inputStreet) inputStreet.value = fallback;
+                        orderAddressData.street = fallback;
+                    }
+                    
+                    // Обновляем текст на мини-карте
+                    updateCheckoutSummaryUI(); 
                 }
             } catch(e) {
                 console.error("Ошибка определения адреса:", e);
             }
             
+            // Пересчитываем цену доставки
             if (cartActiveTabResId && database[cartActiveTabResId]) {
                 recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
             }
@@ -1489,6 +1516,16 @@
             const clientPhone = document.getElementById('client-phone').value;
             if (!clientPhone) return alert("Пожалуйста, укажите ваш номер телефона для курьера!");
 
+            // Сохраняем номер телефона в память телефона для следующих заказов
+            localStorage.setItem('tamak_client_phone', clientPhone);
+
+            // --- НОВОЕ: Автоматически сохраняем координаты и улицу текущего заказа ---
+            if (clientLat && clientLon) {
+                localStorage.setItem('tamak_last_lat', clientLat);
+                localStorage.setItem('tamak_last_lon', clientLon);
+                localStorage.setItem('tamak_last_street', orderAddressData.street || '');
+            }
+
             const resComment = document.getElementById('res-comment').value; // Забираем коммент
 
             const payBtn = document.getElementById('main-pay-btn');
@@ -1517,8 +1554,6 @@
                 cutlery: cutleryCount, // НОВОЕ ПОЛЕ: передаем количество приборов
                 items: Object.values(cartItems).filter(item => item.resId === cartActiveTabResId)
             };
-
-            // Дальше остальной код функции (if(tg)... try { fetch... ) оставляем без изменений!
 
             if(tg) tg.HapticFeedback.notificationOccurred('success');
             

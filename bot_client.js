@@ -15,6 +15,7 @@ module.exports = function setupClientBot(bot, supabase, ADMIN_GROUP_ID) {
 
     // Обработка кнопок администратора (одобрение курьеров)
     // Эта кнопка нажимается в админской группе, но обрабатывается главным ботом
+
     bot.action(/approve_(.+)/, async (ctx) => {
         const courierId = ctx.match[1];
         
