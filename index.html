@@ -1017,7 +1017,7 @@
             
             const activeRes = database[cartActiveTabResId];
             
-            // --- НОВОЕ: Проверяем, есть ли уже координаты от GPS в памяти ---
+            // Проверяем, есть ли уже координаты от GPS в памяти
             if (!clientLat) {
                 let savedGeo = localStorage.getItem('user_geo');
                 if (savedGeo) {
@@ -1038,8 +1038,10 @@
                     clientLat = activeRes.lat + 0.005;
                     clientLon = activeRes.lon + 0.005;
                 }
-            } else if (!orderAddressData.street) {
-                // Координаты от GPS есть, но текстовый адрес еще не получен — запрашиваем
+            }
+            
+            // ЖЕЛЕЗОБЕТОННО: Если текстового адреса еще нет, но координаты есть — всегда запрашиваем адрес
+            if (!orderAddressData.street && clientLat && clientLon) {
                 reverseGeocode(clientLat, clientLon);
             }
 
@@ -1236,20 +1238,26 @@
                 const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=ru`);
                 const data = await response.json();
                 if (data && data.address) {
-                    let street = data.address.road || data.address.pedestrian || data.address.village || "";
+                    // Расширили поиск: в Кыргызстане часто нет улицы (road), но есть микрорайон, жилмассив или село
+                    let street = data.address.road || data.address.pedestrian || data.address.residential || data.address.neighbourhood || data.address.suburb || data.address.village || data.address.city || "";
                     let house = data.address.house_number || data.address.building || "";
+
                     let fullAddress = street;
                     if (street && house) fullAddress += ", " + house;
                     else if (house) fullAddress = house;
 
                     if (fullAddress) {
-                        document.getElementById('map-street').value = fullAddress;
-                        // --- НОВОЕ: Сразу сохраняем адрес и обновляем мини-карту ---
+                        const inputStreet = document.getElementById('map-street');
+                        if (inputStreet) inputStreet.value = fullAddress;
+                        
+                        // Сразу сохраняем адрес и мгновенно обновляем мини-карту
                         orderAddressData.street = fullAddress;
                         updateCheckoutSummaryUI(); 
                     }
                 }
-            } catch(e) {}
+            } catch(e) {
+                console.error("Ошибка reverse geocode:", e);
+            }
             
             // Пересчитываем цену доставки только если мы уже знаем какой ресторан выбран
             if (cartActiveTabResId && database[cartActiveTabResId]) {
