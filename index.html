@@ -94,12 +94,12 @@
         .search-container { padding: 12px 16px; background-color: var(--card-bg); }
         .search-bar { width: 100%; box-sizing: border-box; background-color: var(--bg-color); padding: 12px 16px; border-radius: 12px; color: var(--text-dark); font-size: 14px; border: none; }
         
-        .main-categories { display: flex; overflow-x: auto; padding: 0 16px 12px 16px; background-color: var(--card-bg); gap: 8px; scrollbar-width: none; align-items: flex-start;}
+        .main-categories { display: flex; overflow-x: auto; padding: 16px 16px 8px 16px; background-color: var(--card-bg); gap: 16px; scrollbar-width: none; align-items: flex-start;}
         .main-categories::-webkit-scrollbar { display: none; }
-        .cat-circle { width: 85px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: 0.2s;}
-        .cat-circle img { width: 64px; height: 64px; border-radius: 16px; object-fit: cover; margin-bottom: 6px; background: #eee; }
-        .cat-text { font-size: 11px; font-weight: 600; color: #333; padding: 4px 6px; border-radius: 12px; background: transparent; transition: 0.2s; white-space: normal; text-align: center; line-height: 1.2; width: 100%; box-sizing: border-box;}
-        .cat-circle.active .cat-text { background: var(--text-dark); color: white; }
+        .cat-circle { width: 68px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: transform 0.15s ease;}
+        .cat-circle:active { transform: scale(0.92); }
+        .cat-circle img { width: 54px; height: 54px; object-fit: contain; margin-bottom: 8px; background: transparent; border-radius: 0; filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.08)); }
+        .cat-text { font-size: 12px; font-weight: 600; color: var(--text-dark); background: transparent; white-space: nowrap; text-align: center; line-height: 1;}
 
         .filters-row { display: flex; overflow-x: auto; padding: 0 16px 16px 16px; background: var(--card-bg); gap: 8px; scrollbar-width: none; border-bottom: 1px solid #eee; }
         .filters-row::-webkit-scrollbar { display: none; }
@@ -107,7 +107,7 @@
         .filter-btn.active { background: #fffde7; border: 1px solid var(--main-yellow); color: #bcaaa4; }
 
         .restaurant-list { padding: 16px; }
-        .res-card { background: var(--card-bg); border-radius: 20px; overflow: hidden; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); cursor: pointer; }
+        .res-card { background: var(--card-bg); border-radius: 20px; overflow: hidden; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); cursor: pointer; }
         .res-img { width: 100%; height: 160px; object-fit: cover; }
         .res-info { padding: 5px 14px; }
         .res-name { font-size: 18px; font-weight: 700; margin-bottom: 6px; display: flex; justify-content: space-between;}
@@ -134,7 +134,7 @@
         .item-card { background: var(--card-bg); border-radius: 16px; display: flex; flex-direction: column; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.03);}
         .img-wrap { position: relative; border-radius: 16px 16px 0 0; overflow: hidden; height: 140px; background: #eee; }
         .item-img { width: 100%; height: 100%; object-fit: cover; }
-        .item-info { padding: 10px 12px; display: flex; flex-direction: column; flex-grow: 1; }
+        .item-info { padding: 10px 5px; display: flex; flex-direction: column; flex-grow: 1; }
         .item-price { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
         .item-name { font-size: 13px; color: #333; margin-bottom: 4px; line-height: 1.3; font-weight: 600;}
 
@@ -613,10 +613,38 @@
         </div>
         
         <div class="main-categories">
-            <div class="cat-circle" onclick="toggleFilter(this, 'fastfood')"><img src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=100"><span class="cat-text">Фастфуд</span></div>
-            <div class="cat-circle" onclick="toggleFilter(this, 'sushi')"><img src="https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=100"><span class="cat-text">Суши-роллы</span></div>
-            <div class="cat-circle" onclick="toggleFilter(this, 'national')"><img src="https://images.unsplash.com/photo-1529042410759-befb1204b468?w=100"><span class="cat-text">Национальная</span></div>
-            <div class="cat-circle" onclick="toggleFilter(this, 'pizza')"><img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?w=100"><span class="cat-text">Пиццы</span></div>
+            <div class="cat-circle" onclick="toggleFilter(this, 'burgers')">
+                <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/burger.png" alt="Бургеры">
+                <span class="cat-text">Бургеры</span>
+            </div>
+            <div class="cat-circle" onclick="toggleFilter(this, 'sushi')">
+                <img src="https://cdn-icons-png.flaticon.com/512/2254/2254488.png" alt="Суши">
+                <span class="cat-text">Суши</span>
+            </div>
+            <div class="cat-circle" onclick="toggleFilter(this, 'shawarma')">
+                <img src="https://cdn-icons-png.flaticon.com/512/7594/7594695.png" alt="Шаурма">
+                <span class="cat-text">Шаурма</span>
+            </div>
+            <div class="cat-circle" onclick="toggleFilter(this, 'desserts')">
+                <img src="https://cdn-icons-png.flaticon.com/512/3173/3173420.png" alt="Десерты">
+                <span class="cat-text">Десерты</span>
+            </div>
+            <div class="cat-circle" onclick="toggleFilter(this, 'pizza')">
+                <img src="https://cdn-icons-png.flaticon.com/512/3132/3132693.png" alt="Пицца">
+                <span class="cat-text">Пицца</span>
+            </div>
+            <div class="cat-circle" onclick="toggleFilter(this, 'sandwiches')">
+                <img src="https://cdn-icons-png.flaticon.com/512/6518/6518098.png" alt="Сэндвичи">
+                <span class="cat-text">Сэндвичи</span>
+            </div>
+            <div class="cat-circle" onclick="toggleFilter(this, 'hotdog')">
+                <img src="https://cdn-icons-png.flaticon.com/512/3075/3075944.png" alt="Хот-Дог">
+                <span class="cat-text">Хот-Дог</span>
+            </div>
+            <div class="cat-circle" onclick="toggleFilter(this, 'shashlik')">
+                <img src="https://cdn-icons-png.flaticon.com/512/3350/3350616.png" alt="Шашлык">
+                <span class="cat-text">Шашлык</span>
+            </div>
         </div>
         
         <div class="restaurant-list" id="restaurant-list"></div>
