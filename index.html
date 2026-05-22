@@ -140,6 +140,25 @@
         .item-price { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
         .item-name { font-size: 13px; color: #333; margin-bottom: 4px; line-height: 1.3; font-weight: 600;}
 
+
+        /* Новая кнопка "Добавить" */
+.btn-add {
+    width: 100%;
+    padding: 10px;
+    background: #FCE000; /* Цвет "Тамак" */
+    border: none;
+    border-radius: 12px;
+    font-weight: 800;
+    font-size: 14px;
+    cursor: pointer;
+    transition: 0.2s;
+    text-align: center;
+}
+.btn-add:active {
+    transform: scale(0.95);
+    background: #e6ca00;
+}
+
         /* --- КНОПКИ В КАРТОЧКАХ БЛЮД (Стиль Clickfood) --- */
         .item-action { margin-top: 12px; display: flex; justify-content: center; }
         .item-counter { display: flex; align-items: center; justify-content: space-between; border-radius: 14px; height: 38px; width: 100%; transition: 0.2s; overflow: hidden;}
@@ -1065,57 +1084,50 @@ function filterMenu(resId, category, btn) {
             renderRestaurantMenu(filteredItems);
         }
 
-        function renderRestaurantMenu() {
-            const res = database[currentRestaurantId];
-            const categories = [...new Set(res.items.map(item => item.category))];
-            
-            let html = '';
-            
-            // Проходимся по каждой категории и создаем для нее свой блок с блюдами
-            categories.forEach(cat => {
-                // Добавляем заголовок категории с ID (для скролла)
-                html += `<h3 id="cat-${cat}" class="cat-section-title">${cat}</h3>`;
-                html += `<div class="products-grid">`;
-                
-                // Фильтруем блюда только для этой категории
-                const items = res.items.filter(i => i.category === cat);
-                
-                items.forEach(item => {
-                    let count = cartItems[item.id] ? cartItems[item.id].count : 0;
-                    let weightHtml = item.weight ? `<span style="color: #888; font-size: 13px; font-weight: 500; margin-left: 6px;">• ${item.weight}</span>` : '';
+        function renderRestaurantMenu(itemsToRender) {
+    const res = database[currentRestaurantId];
+    const items = itemsToRender || res.items;
+    let html = '';
+    
+    // Группируем блюда по категориям для сохранения скроллинга
+    const categories = [...new Set(items.map(item => item.category))];
+    
+    categories.forEach(cat => {
+        html += `<h3 id="cat-${cat}" class="cat-section-title">${cat}</h3>`;
+        html += `<div class="products-grid">`;
+        
+        items.filter(i => i.category === cat).forEach(item => {
+            let count = cartItems[item.id] ? cartItems[item.id].count : 0;
+            let weightHtml = item.weight ? `<span style="color: #888; font-size: 13px; font-weight: 500; margin-left: 6px;">• ${item.weight}</span>` : '';
 
-                    html += `
-                    <div class="item-card">
-                        <div class="img-wrap" onclick="openProductModal('${item.id}')" style="cursor: pointer;">
-                            <img src="${item.img}" class="item-img">
-                        </div>
-                        <div class="item-info">
-                            <div style="flex-grow: 1; cursor: pointer;" onclick="openProductModal('${item.id}')">
-                                <div class="item-price">${item.price} сом ${weightHtml}</div>
-                                <div class="item-name">${item.name}</div>
-                            </div>
-                            <div class="item-action">
-                                ${count > 0 
-                                    ? `<div class="item-counter active">
-                                        <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', -1)">−</div>
-                                        <div class="c-val">${count}</div>
-                                        <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">+</div>
-                                       </div>` 
-                                    : `<div class="item-counter inactive">
-                                        <div class="btn-pm" style="color:#ccc; cursor:default;" onclick="event.stopPropagation()">−</div>
-                                        <div class="c-val" style="color:#888;">0</div>
-                                        <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">+</div>
-                                       </div>`
-                                }
-                            </div>
-                        </div>
-                    </div>`;
-                });
-                html += `</div>`; // Закрываем сетку блюд текущей категории
-            });
-            
-            document.getElementById('all-products-container').innerHTML = html;
-        }
+            html += `
+            <div class="item-card">
+                <div class="img-wrap" onclick="openProductModal('${item.id}')" style="cursor: pointer;">
+                    <img src="${item.img}" class="item-img">
+                </div>
+                <div class="item-info">
+                    <div style="flex-grow: 1; cursor: pointer;" onclick="openProductModal('${item.id}')">
+                        <div class="item-price">${item.price} сом ${weightHtml}</div>
+                        <div class="item-name">${item.name}</div>
+                    </div>
+                    <div class="item-action">
+                        ${count > 0 
+                            ? `<div class="item-counter active">
+                                <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', -1)">−</div>
+                                <div class="c-val">${count}</div>
+                                <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">+</div>
+                               </div>` 
+                            : `<button class="btn-add" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">Добавить</button>`
+                        }
+                    </div>
+                </div>
+            </div>`;
+        });
+        html += `</div>`;
+    });
+    
+    document.getElementById('all-products-container').innerHTML = html;
+}
 
         function updateCart(itemId, delta) {
             if(tg) tg.HapticFeedback.impactOccurred('light'); 
