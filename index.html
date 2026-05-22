@@ -45,17 +45,17 @@
         /* Горизонтальное меню категорий */
 /* Горизонтальное меню категорий */
         #category-bar {
-            display: flex;
-            overflow-x: auto;
-            white-space: nowrap;
-            padding: 10px;
-            background: white;
-            gap: 10px;
-            position: sticky;
-            top: 60px; /* Прилипает ровно под шапку */
-            z-index: 50;
-            border-bottom: 1px solid #eee;
-        }
+    display: flex;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: 10px;
+    background: white;
+    gap: 10px;
+    position: sticky;
+    top: 0; /* Теперь он прилипает к самому верху экрана */
+    z-index: 50;
+    border-bottom: 1px solid #eee;
+}
         #category-bar button {
             padding: 8px 16px;
             border-radius: 20px;
@@ -84,7 +84,7 @@
         input, textarea, select { font-family: inherit; outline: none; }
         #map { height: 250px; border-radius: 16px; margin: 16px; z-index: 1; border: 1px solid #eee; }
 
-        .header-nav { display: flex; align-items: center; padding: 12px 16px; background: var(--card-bg); position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 3px rgba(0,0,0,0.05);}
+        .header-nav { display: flex; align-items: center; padding: 12px 16px; background: var(--card-bg); position: relative; top: 0; z-index: 100; box-shadow: 0 1px 3px rgba(0,0,0,0.05);}
         .back-btn { font-size: 24px; margin-right: 16px; cursor: pointer; }
         .logo-img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; margin-right: 12px; background: var(--main-yellow); padding: 2px;}
         .header-address { flex-grow: 1; display: flex; flex-direction: column; }
@@ -2081,7 +2081,7 @@ function filterMenu(resId, category, btn) {
             // Проверяем позицию каждого заголовка категории
             headers.forEach(header => {
                 // Если заголовок дошел до верха экрана (с учетом высоты шапки ~180px)
-                if (header.getBoundingClientRect().top <= 180) {
+                if (header.getBoundingClientRect().top <= 60) {
                     activeCategory = header.innerText;
                 }
             });
