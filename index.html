@@ -43,9 +43,40 @@
 }
         
         /* Горизонтальное меню категорий */
-#category-bar { display: flex; overflow-x: auto; padding: 10px; gap: 10px; background: white; border-bottom: 1px solid #eee; position: sticky; top: 0; z-index: 50; }
-        #category-bar button { padding: 8px 16px; border-radius: 20px; border: none; background: #f0f0f0; white-space: nowrap; }
-        #category-bar button.active { background: #FCE000; font-weight: bold; }
+/* Горизонтальное меню категорий */
+        #category-bar {
+            display: flex;
+            overflow-x: auto;
+            white-space: nowrap;
+            padding: 10px;
+            background: white;
+            gap: 10px;
+            position: sticky;
+            top: 60px; /* Прилипает ровно под шапку */
+            z-index: 50;
+            border-bottom: 1px solid #eee;
+        }
+        #category-bar button {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: none;
+            background: #f0f0f0;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        #category-bar button.active {
+            background: #FCE000;
+            font-weight: bold;
+        }
+        /* ВАЖНО: Добавили scroll-margin-top для плавного скролла */
+        .cat-section-title { 
+            font-size: 20px; 
+            font-weight: 800; 
+            padding: 10px 16px 0 16px; 
+            margin: 0; 
+            margin-top: 15px;
+            scroll-margin-top: 120px; 
+        }
 
         :root { --bg-color: #F8F8F8; --card-bg: #FFFFFF; --main-yellow: #FCE000; --text-dark: #1A1A1A; --text-gray: #999999; }
         body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); margin: 0; padding: 0; padding-bottom: 120px !important; user-select: none; color: var(--text-dark); scroll-behavior: smooth;}
@@ -991,20 +1022,37 @@
             document.getElementById('menu-logo').src = res.logo;
 
             // Горизонтальные категории
-            const catBar = document.getElementById('category-bar') || document.createElement('div');
-            catBar.id = 'category-bar';
-            
-            const categories = ['Все', ...new Set(res.items.map(item => item.category))];
-            catBar.innerHTML = categories.map((cat, i) => 
-                `<button class="${i === 0 ? 'active' : ''}" onclick="filterMenu('${resId}', '${cat}', this)">${cat}</button>`
-            ).join('');
-            
-            // Вставляем бар перед списком блюд (если его еще нет)
-            const list = document.getElementById('all-products-container');
-            if (!document.getElementById('category-bar')) list.parentNode.insertBefore(catBar, list);
+            let catBar = document.getElementById('category-bar');
+            if (!catBar) {
+                catBar = document.createElement('div');
+                catBar.id = 'category-bar';
+                const list = document.getElementById('all-products-container');
+                list.parentNode.insertBefore(catBar, list);
+            }
 
-            renderRestaurantMenu(); // Рисуем все меню при открытии
+            // Извлекаем уникальные категории (кнопку "Все" убрали, так как теперь мы просто скроллим)
+            const categories = [...new Set(res.items.map(item => item.category))];
+            catBar.innerHTML = categories.map((cat, i) => 
+                `<button class="${i === 0 ? 'active' : ''}" onclick="scrollToCategory('${cat}', this)">${cat}</button>`
+            ).join('');
+
+            renderRestaurantMenu(); // Отрисовываем ВСЁ меню сразу
+            
+            history.pushState({screen: 'menu', page: 'menu', resId: resId}, '');
             showScreen('menu');
+        }
+
+        // 2. НОВАЯ ФУНКЦИЯ ПЛАВНОГО СКРОЛЛА (ВМЕСТО ФИЛЬТРАЦИИ)
+        function scrollToCategory(category, btn) {
+            // Подсвечиваем нажатую кнопку
+            document.querySelectorAll('#category-bar button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Плавно скроллим к заголовку нужной категории
+            const section = document.getElementById('cat-' + category);
+            if (section) {
+                section.scrollIntoView({ behavior: 'smooth' });
+            }
         }
 
 // И обязательно добавь эту функцию фильтрации рядом
@@ -1017,31 +1065,56 @@ function filterMenu(resId, category, btn) {
             renderRestaurantMenu(filteredItems);
         }
 
-        function renderRestaurantMenu(itemsToRender) {
-            const items = itemsToRender || database[currentRestaurantId].items;
-            let html = `<div class="products-grid">`;
+        function renderRestaurantMenu() {
+            const res = database[currentRestaurantId];
+            const categories = [...new Set(res.items.map(item => item.category))];
             
-            items.forEach(item => {
-                let count = cartItems[item.id] ? cartItems[item.id].count : 0;
-                html += `
-                <div class="item-card">
-                    <div class="img-wrap" onclick="openProductModal('${item.id}')"><img src="${item.img}" class="item-img"></div>
-                    <div class="item-info">
-                        <div onclick="openProductModal('${item.id}')">
-                            <div class="item-price">${item.price} сом</div>
-                            <div class="item-name">${item.name}</div>
+            let html = '';
+            
+            // Проходимся по каждой категории и создаем для нее свой блок с блюдами
+            categories.forEach(cat => {
+                // Добавляем заголовок категории с ID (для скролла)
+                html += `<h3 id="cat-${cat}" class="cat-section-title">${cat}</h3>`;
+                html += `<div class="products-grid">`;
+                
+                // Фильтруем блюда только для этой категории
+                const items = res.items.filter(i => i.category === cat);
+                
+                items.forEach(item => {
+                    let count = cartItems[item.id] ? cartItems[item.id].count : 0;
+                    let weightHtml = item.weight ? `<span style="color: #888; font-size: 13px; font-weight: 500; margin-left: 6px;">• ${item.weight}</span>` : '';
+
+                    html += `
+                    <div class="item-card">
+                        <div class="img-wrap" onclick="openProductModal('${item.id}')" style="cursor: pointer;">
+                            <img src="${item.img}" class="item-img">
                         </div>
-                        <div class="item-action">
-                            <div class="item-counter ${count > 0 ? 'active' : 'inactive'}">
-                                <div class="btn-pm" onclick="updateCart('${item.id}', -1)">−</div>
-                                <div class="c-val">${count}</div>
-                                <div class="btn-pm" onclick="updateCart('${item.id}', 1)">+</div>
+                        <div class="item-info">
+                            <div style="flex-grow: 1; cursor: pointer;" onclick="openProductModal('${item.id}')">
+                                <div class="item-price">${item.price} сом ${weightHtml}</div>
+                                <div class="item-name">${item.name}</div>
+                            </div>
+                            <div class="item-action">
+                                ${count > 0 
+                                    ? `<div class="item-counter active">
+                                        <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', -1)">−</div>
+                                        <div class="c-val">${count}</div>
+                                        <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">+</div>
+                                       </div>` 
+                                    : `<div class="item-counter inactive">
+                                        <div class="btn-pm" style="color:#ccc; cursor:default;" onclick="event.stopPropagation()">−</div>
+                                        <div class="c-val" style="color:#888;">0</div>
+                                        <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">+</div>
+                                       </div>`
+                                }
                             </div>
                         </div>
-                    </div>
-                </div>`;
+                    </div>`;
+                });
+                html += `</div>`; // Закрываем сетку блюд текущей категории
             });
-            document.getElementById('all-products-container').innerHTML = html + `</div>`;
+            
+            document.getElementById('all-products-container').innerHTML = html;
         }
 
         function updateCart(itemId, delta) {
@@ -1950,6 +2023,46 @@ function filterMenu(resId, category, btn) {
 
         // ЗАПУСКАЕМ ОДИН РАЗ
         initSearchAutocomplete();
+
+        // ==========================================
+        // УМНЫЙ СКРОЛЛ КАТЕГОРИЙ (SCROLL SPY)
+        // ==========================================
+        window.addEventListener('scroll', function() {
+            // Работаем только если открыт экран меню ресторана
+            if (document.getElementById('screen-menu').classList.contains('hidden')) return;
+
+            const headers = document.querySelectorAll('.cat-section-title');
+            let activeCategory = null;
+
+            // Проверяем позицию каждого заголовка категории
+            headers.forEach(header => {
+                // Если заголовок дошел до верха экрана (с учетом высоты шапки ~180px)
+                if (header.getBoundingClientRect().top <= 180) {
+                    activeCategory = header.innerText;
+                }
+            });
+
+            // Если категория определилась, обновляем верхнее меню
+            if (activeCategory) {
+                const buttons = document.querySelectorAll('#category-bar button');
+                buttons.forEach(btn => {
+                    // Находим нужную кнопку и проверяем, не активна ли она уже
+                    if (btn.innerText === activeCategory && !btn.classList.contains('active')) {
+                        
+                        // Снимаем желтый цвет со всех кнопок
+                        buttons.forEach(b => b.classList.remove('active'));
+                        
+                        // Красим текущую кнопку
+                        btn.classList.add('active');
+                        
+                        // МАГИЯ: Автоматически прокручиваем горизонтальную полосу, чтобы кнопка была по центру
+                        const categoryBar = document.getElementById('category-bar');
+                        const scrollLeftPos = btn.offsetLeft - (categoryBar.offsetWidth / 2) + (btn.offsetWidth / 2);
+                        categoryBar.scrollTo({ left: scrollLeftPos, behavior: 'smooth' });
+                    }
+                });
+            }
+        });
 </script>
 </body>
 </html>
