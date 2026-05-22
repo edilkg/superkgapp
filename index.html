@@ -42,6 +42,11 @@
     border: none; font-size: 15px; padding: 10px; cursor: pointer; font-weight: 500;
 }
         
+        /* Горизонтальное меню категорий */
+#category-bar { display: flex; overflow-x: auto; padding: 10px; gap: 10px; background: white; border-bottom: 1px solid #eee; position: sticky; top: 0; z-index: 50; }
+        #category-bar button { padding: 8px 16px; border-radius: 20px; border: none; background: #f0f0f0; white-space: nowrap; }
+        #category-bar button.active { background: #FCE000; font-weight: bold; }
+
         :root { --bg-color: #F8F8F8; --card-bg: #FFFFFF; --main-yellow: #FCE000; --text-dark: #1A1A1A; --text-gray: #999999; }
         body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); margin: 0; padding: 0; padding-bottom: 120px !important; user-select: none; color: var(--text-dark); scroll-behavior: smooth;}
         .hidden { display: none !important; }
@@ -51,7 +56,7 @@
         .header-nav { display: flex; align-items: center; padding: 12px 16px; background: var(--card-bg); position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 3px rgba(0,0,0,0.05);}
         .back-btn { font-size: 24px; margin-right: 16px; cursor: pointer; }
         .logo-img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; margin-right: 12px; background: var(--main-yellow); padding: 2px;}
-        .header-address { flex-grow: 1; display: flex; flex-direction: column; cursor: pointer;}
+        .header-address { flex-grow: 1; display: flex; flex-direction: column; }
         .header-address span:first-child { font-size: 11px; color: var(--text-gray); }
         .header-address span:last-child { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 4px; }
 
@@ -514,10 +519,10 @@
     <div id="screen-main">
         <div class="header-nav">
             <img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=100" class="logo-img">
-            <div class="header-address" onclick="openAddressModal()">
-                <span>Доставка по городу</span>
-                <span><span id="hdr-addr">Чолпон-Ата</span> ▾</span>
-            </div>
+            <div class="header-address">
+    <span>Доставка в городе</span>
+    <span id="current-city-display">Чолпон-Ата</span>
+</div>
         </div>
 
         <div class="search-container">
@@ -814,26 +819,101 @@
 
         const database = {
             // ЧОЛПОН-АТА И БОСТЕРИ
-            'asian1': { lat: 42.6482, lon: 77.0855, city: 'Чолпон-Ата', title: 'Дракон Суши', logo: imgs.asian, address: 'ул. Советская, 15', hours: '10:00 - 23:00', rating: 4.7, img: imgs.asian, items: [{id: 'a1', name: 'Филадельфия', price: 350, weight: '250 г', img: imgs.asian}, {id: 'a2', name: 'Сет Самурай', price: 1200, weight: '1000 г', img: imgs.asian}] },
-            'fast1': { lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', title: 'Burger Spot', logo: imgs.fastfood, address: 'ул. Горького, 2', hours: '11:00 - 02:00', rating: 4.2, img: imgs.fastfood, items: [{id: 'f1', name: 'Чизбургер', price: 250, weight: '300 г', img: imgs.fastfood}, {id: 'f2', name: 'Кола', price: 80, weight: '0.5 л', img: imgs.fastfood}] },
-            'piz1': { lat: 42.6346, lon: 77.1950, city: 'Бостери', title: 'Roma Pizza', logo: imgs.pizza, address: 'Бостери, Центр', hours: '10:00 - 22:00', rating: 4.8, img: imgs.pizza, items: [{id: 'p1', name: 'Маргарита', price: 450, weight: '500 г', img: imgs.pizza}, {id: 'p2', name: 'Пепперони', price: 550, weight: '550 г', img: imgs.pizza}] },
             
-            // БИШКЕК (СЮДА ДОБАВЛЕНЫ НАПИТКИ!)
-            'bish1': { lat: 42.8746, lon: 74.5698, city: 'Бишкек', title: 'Фаиза', logo: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', address: 'ул. Жибек Жолу, 555', hours: '09:00 - 23:00', rating: 4.9, img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', 
+            'asian1': { lat: 42.6482, lon: 77.0855, city: 'Чолпон-Ата', title: 'Дракон Суши', logo: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=300', address: 'ул. Советская, 15', hours: '10:00 - 23:00', img: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=300', 
                 items: [
-                    {id: 'b1', name: 'Лагман Гуйру', price: 280, weight: '450 г', desc: 'Традиционный уйгурский лагман с обжаренным мясом (говядина), свежими овощами и домашней тянутой лапшой.', img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400'}, 
-                    {id: 'b2', name: 'Самса с мясом', price: 80, weight: '120 г', desc: 'Хрустящая слоеная самса из тандыра с сочной рубленой говядиной, луком и специями.', img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400'},
-                    {id: 'b3', name: 'Coca-Cola', price: 90, weight: '0.5 л', desc: 'Классическая охлажденная кола в пластиковой бутылке.', img: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=400'},
-                    {id: 'b4', name: 'Лимонад Дюшес', price: 120, weight: '1 л', desc: 'Освежающий грушевый лимонад, идеально к горячим блюдам.', img: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=400'}
+                    {id: 'a1', name: 'Филадельфия', price: 350, weight: '250 г', category: 'Суши', img: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=150'}, 
+                    {id: 'a2', name: 'Сет Самурай', price: 1200, weight: '1000 г', category: 'Сеты', img: 'https://images.unsplash.com/photo-1553621042-f6e147245754?w=150'}
                 ] 
             },
-            'bish2': { lat: 42.8700, lon: 74.5900, city: 'Бишкек', title: 'KFC Азия Молл', logo: imgs.fastfood, address: 'пр. Ч. Айтматова, 3', hours: '10:00 - 00:00', rating: 4.5, img: imgs.fastfood, items: [{id: 'k1', name: 'Баскет Дуэт', price: 650, weight: '800 г', img: imgs.fastfood}, {id: 'k2', name: 'Крылышки (5 шт)', price: 220, weight: '200 г', img: imgs.fastfood}] },
+            'shashlyk_park': { 
+    lat: 42.645767, 
+    lon: 77.076932, 
+    city: 'Чолпон-Ата', 
+    title: 'Шашлык Парк', 
+    logo: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', 
+    address: 'ул. Советская, 132', 
+    hours: '10:00 - 24:00', 
+    img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=600', 
+    items: [
+        // Шашлыки
+        {id: 'sp1', name: 'Окорочка', price: 370, category: 'Шашлыки', img: 'https://images.unsplash.com/photo-1598103434642-1e948c3d8205?w=300'},
+        {id: 'sp2', name: 'Крылышки', price: 380, category: 'Шашлыки', img: 'https://images.unsplash.com/photo-1567620832903-9fc6debc209f?w=300'},
+        {id: 'sp3', name: 'Филе куриное', price: 390, category: 'Шашлыки', img: 'https://images.unsplash.com/photo-1598103434642-1e948c3d8205?w=300'},
+        {id: 'sp4', name: 'Люля кебаб', price: 300, category: 'Шашлыки', img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300'},
+        {id: 'sp5', name: 'Баранина ребро', price: 560, category: 'Шашлыки', img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300'},
+        
+        // Салаты
+        {id: 'sp6', name: 'Цезарь с курицей', price: 510, category: 'Салаты', img: 'https://images.unsplash.com/photo-1550304943-4f24f54ddde9?w=300'},
+        {id: 'sp7', name: 'Греческий', price: 370, category: 'Салаты', img: 'https://images.unsplash.com/photo-1540189549336-e6e99c3675fe?w=300'},
+        
+        // Супы
+        {id: 'sp8', name: 'Шорпо баранина', price: 370, category: 'Супы', img: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=300'},
+        {id: 'sp9', name: 'Солянка', price: 390, category: 'Супы', img: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=300'},
+
+        // Пиццы
+        {id: 'sp10', name: 'Пепперони 30см', price: 495, category: 'Пиццы', img: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=300'},
+        {id: 'sp11', name: 'Маргарита 30см', price: 414, category: 'Пиццы', img: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=300'}
+    ]
+},
+            'fast1': { lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', title: 'Burger Spot', logo: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300', address: 'ул. Горького, 2', hours: '11:00 - 02:00', img: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300', 
+                items: [
+                    {id: 'f1', name: 'Чизбургер', price: 250, weight: '300 г', category: 'Бургеры', img: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=150'}, 
+                    {id: 'f2', name: 'Кола', price: 80, weight: '0.5 л', category: 'Напитки', img: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=150'}
+                ] 
+            },
+            'piz1': { lat: 42.6346, lon: 77.1950, city: 'Бостери', title: 'Roma Pizza', logo: 'https://images.unsplash.com/photo-1513104890138-7c049485aa4c?w=300', address: 'Бостери, Центр', hours: '10:00 - 22:00', img: 'https://images.unsplash.com/photo-1513104890138-7c049485aa4c?w=300', 
+                items: [
+                    {id: 'p1', name: 'Маргарита', price: 450, weight: '500 г', category: 'Пицца', img: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=150'}, 
+                    {id: 'p2', name: 'Пепперони', price: 550, weight: '550 г', category: 'Пицца', img: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=150'}
+                ] 
+            },
+            
+            // БИШКЕК
+            'bish1': { lat: 42.8746, lon: 74.5698, city: 'Бишкек', title: 'Фаиза', logo: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', address: 'ул. Жибек Жолу, 555', hours: '09:00 - 23:00', img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', 
+                items: [
+                    {id: 'b1', name: 'Лагман Гуйру', price: 280, weight: '450 г', category: 'Горячее', desc: 'Традиционный уйгурский лагман с обжаренным мясом (говядина), свежими овощами и домашней тянутой лапшой.', img: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400'}, 
+                    {id: 'b2', name: 'Самса с мясом', price: 80, weight: '120 г', category: 'Выпечка', desc: 'Хрустящая слоеная самса из тандыра с сочной рубленой говядиной, луком и специями.', img: 'https://images.unsplash.com/photo-1601000938259-9e92002320b2?w=400'},
+                    {id: 'b3', name: 'Coca-Cola', price: 90, weight: '0.5 л', category: 'Напитки', desc: 'Классическая охлажденная кола в пластиковой бутылке.', img: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=400'},
+                    {id: 'b4', name: 'Лимонад Дюшес', price: 120, weight: '1 л', category: 'Напитки', desc: 'Освежающий грушевый лимонад, идеально к горячим блюдам.', img: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=400'}
+                ] 
+            },
+            'bish2': { lat: 42.8700, lon: 74.5900, city: 'Бишкек', title: 'KFC Азия Молл', logo: 'https://images.unsplash.com/photo-1513639776629-7b61b0ac49cb?w=300', address: 'пр. Ч. Айтматова, 3', hours: '10:00 - 00:00', img: 'https://images.unsplash.com/photo-1513639776629-7b61b0ac49cb?w=300', 
+                items: [
+                    {id: 'k1', name: 'Баскет Дуэт', price: 650, weight: '800 г', category: 'Курица', img: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=150'}, 
+                    {id: 'k2', name: 'Крылышки (5 шт)', price: 220, weight: '200 г', category: 'Снеки', img: 'https://images.unsplash.com/photo-1569691899455-88464f6d3cb1?w=150'}
+                ] 
+            },
             
             // БАЛЫКЧЫ
-            'bal1': { lat: 42.4600, lon: 76.1800, city: 'Балыкчы', title: 'Балыкчы Гриль', logo: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', address: 'ул. Фрунзе, 42', hours: '11:00 - 23:00', rating: 4.6, img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', items: [{id: 'bal1', name: 'Форель на мангале', price: 600, weight: '350 г', img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300'}, {id: 'bal2', name: 'Баранина мякоть', price: 350, weight: '200 г', img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300'}] }
+            'bal1': { lat: 42.4600, lon: 76.1800, city: 'Балыкчы', title: 'Балыкчы Гриль', logo: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', address: 'ул. Фрунзе, 42', hours: '11:00 - 23:00', img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', 
+                items: [
+                    {id: 'bal1', name: 'Форель на мангале', price: 600, weight: '350 г', category: 'Рыба', img: 'https://images.unsplash.com/photo-1537047902294-62a40c20a6ae?w=150'}, 
+                    {id: 'bal2', name: 'Баранина мякоть', price: 350, weight: '200 г', category: 'Мясо', img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=150'}
+                ] 
+            }
         };
 
         history.replaceState({screen: 'main'}, '');
+
+        function checkOpenStatus(hoursString) {
+    // Формат hoursString должен быть "10:00 - 24:00" или "09:00 - 23:00"
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    const parts = hoursString.split(' - ');
+    const openHour = parseInt(parts[0]);
+    let closeHour = parseInt(parts[1]);
+    
+    // Если написано 24:00, считаем как 24 для удобства
+    if (closeHour === 24) closeHour = 0; 
+
+    const isOpen = currentHour >= openHour && (closeHour === 0 || currentHour < closeHour);
+    
+    return isOpen ? 
+        '<span style="color: #27ae60;">● Открыто</span>' : 
+        '<span style="color: #c0392b;">● Закрыто</span>';
+}
 
         function updateCutlery(delta) {
             cutleryCount += delta;
@@ -886,7 +966,17 @@
             Object.keys(database).forEach(key => {
                 const res = database[key];
                 if(res.city !== globalCity) return;
-                html += `<div class="res-card" onclick="openMenu('${key}')"><img src="${res.img}" class="res-img"><div class="res-info"><div class="res-name"><span>${res.title}</span><span>★ ${res.rating}</span></div><div class="res-desc">${res.address}</div></div></div>`;
+                const statusHTML = checkOpenStatus(res.hours);
+                
+                html += `
+                    <div class="res-card" onclick="openMenu('${key}')">
+                        <img src="${res.img}" class="res-img">
+                        <div class="res-info">
+                            <div class="res-name"><span>${res.title}</span></div>
+                            <div style="font-size: 11px; margin-top: 2px;">${statusHTML}</div>
+                            <div class="res-desc">${res.address}</div>
+                        </div>
+                    </div>`;
             });
             list.innerHTML = html;
         }
@@ -899,45 +989,54 @@
             const res = database[resId];
             document.getElementById('menu-title').innerText = res.title;
             document.getElementById('menu-logo').src = res.logo;
-            renderRestaurantMenu();
-            history.pushState({screen: 'menu', page: 'menu', resId: resId}, '');
+
+            // Горизонтальные категории
+            const catBar = document.getElementById('category-bar') || document.createElement('div');
+            catBar.id = 'category-bar';
+            
+            const categories = ['Все', ...new Set(res.items.map(item => item.category))];
+            catBar.innerHTML = categories.map((cat, i) => 
+                `<button class="${i === 0 ? 'active' : ''}" onclick="filterMenu('${resId}', '${cat}', this)">${cat}</button>`
+            ).join('');
+            
+            // Вставляем бар перед списком блюд (если его еще нет)
+            const list = document.getElementById('all-products-container');
+            if (!document.getElementById('category-bar')) list.parentNode.insertBefore(catBar, list);
+
+            renderRestaurantMenu(); // Рисуем все меню при открытии
             showScreen('menu');
         }
 
-        function renderRestaurantMenu() {
-            const res = database[currentRestaurantId];
-            let html = `<h3 class="cat-section-title">Меню</h3><div class="products-grid">`;
-            
-            res.items.forEach(item => {
-                let count = cartItems[item.id] ? cartItems[item.id].count : 0;
-                
-                // Формируем текст с весом или литрами (серым цветом, с точкой)
-                let weightHtml = item.weight ? `<span style="color: #888; font-size: 13px; font-weight: 500; margin-left: 6px;">• ${item.weight}</span>` : '';
+// И обязательно добавь эту функцию фильтрации рядом
+function filterMenu(resId, category, btn) {
+            document.querySelectorAll('#category-bar button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
 
+            const res = database[resId];
+            const filteredItems = category === 'Все' ? res.items : res.items.filter(i => i.category === category);
+            renderRestaurantMenu(filteredItems);
+        }
+
+        function renderRestaurantMenu(itemsToRender) {
+            const items = itemsToRender || database[currentRestaurantId].items;
+            let html = `<div class="products-grid">`;
+            
+            items.forEach(item => {
+                let count = cartItems[item.id] ? cartItems[item.id].count : 0;
                 html += `
                 <div class="item-card">
-                    <div class="img-wrap" onclick="openProductModal('${item.id}')" style="cursor: pointer;">
-                        <img src="${item.img}" class="item-img">
-                    </div>
+                    <div class="img-wrap" onclick="openProductModal('${item.id}')"><img src="${item.img}" class="item-img"></div>
                     <div class="item-info">
-                        <div style="flex-grow: 1; cursor: pointer;" onclick="openProductModal('${item.id}')">
-                            <div class="item-price">${item.price} сом ${weightHtml}</div>
+                        <div onclick="openProductModal('${item.id}')">
+                            <div class="item-price">${item.price} сом</div>
                             <div class="item-name">${item.name}</div>
                         </div>
-                        
                         <div class="item-action">
-                            ${count > 0 
-                                ? `<div class="item-counter active">
-                                    <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', -1)">−</div>
-                                    <div class="c-val">${count}</div>
-                                    <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">+</div>
-                                   </div>` 
-                                : `<div class="item-counter inactive">
-                                    <div class="btn-pm" style="color:#ccc; cursor:default;" onclick="event.stopPropagation()">−</div>
-                                    <div class="c-val" style="color:#888;">0</div>
-                                    <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">+</div>
-                                   </div>`
-                            }
+                            <div class="item-counter ${count > 0 ? 'active' : 'inactive'}">
+                                <div class="btn-pm" onclick="updateCart('${item.id}', -1)">−</div>
+                                <div class="c-val">${count}</div>
+                                <div class="btn-pm" onclick="updateCart('${item.id}', 1)">+</div>
+                            </div>
                         </div>
                     </div>
                 </div>`;
