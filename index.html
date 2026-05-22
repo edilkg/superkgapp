@@ -122,7 +122,7 @@
         .city-item.active { background: #fffcf0; color: #111; }
         .city-item.active::after { content: '✓'; color: var(--text-dark); font-size: 18px; }
 
-        .cart-btn { position: fixed; bottom: 85px; left: 16px; right: 16px; background: var(--main-yellow); border-radius: 16px; padding: 18px; display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); z-index: 900; cursor: pointer; }
+        .cart-btn { position: fixed; bottom: 15px; left: 16px; right: 16px; background: var(--main-yellow); border-radius: 16px; padding: 18px; display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); z-index: 900; cursor: pointer; }
 
         .res-header-info { display: flex; align-items: center; gap: 12px; flex-grow: 1; justify-content: center; margin-right: 40px;}
         .res-header-logo { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
@@ -141,32 +141,64 @@
         .item-name { font-size: 13px; color: #333; margin-bottom: 4px; line-height: 1.3; font-weight: 600;}
 
 
-        /* Новая кнопка "Добавить" */
+/* Унифицированный контейнер для кнопки и счетчика */
+.btn-add, .item-counter {
+    height: 42px;             /* Единая высота */
+    width: 100%;              /* Занимают всю ширину карточки */
+    border-radius: 14px;      /* Единый радиус */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;   /* Чтобы padding не ломал размер */
+    transition: 0.2s;
+    cursor: pointer;
+}
+
+/* Кнопка "Добавить" */
 .btn-add {
-    width: 100%;
-    padding: 10px;
-    background: #FCE000; /* Цвет "Тамак" */
-    border: none;
-    border-radius: 12px;
+    background: #FCE000;
     font-weight: 800;
     font-size: 14px;
-    cursor: pointer;
-    transition: 0.2s;
+    border: none;
     text-align: center;
 }
 .btn-add:active {
-    transform: scale(0.95);
+    transform: scale(0.98);
     background: #e6ca00;
 }
 
-        /* --- КНОПКИ В КАРТОЧКАХ БЛЮД (Стиль Clickfood) --- */
-        .item-action { margin-top: 12px; display: flex; justify-content: center; }
-        .item-counter { display: flex; align-items: center; justify-content: space-between; border-radius: 14px; height: 38px; width: 100%; transition: 0.2s; overflow: hidden;}
-        .item-counter.active { background: var(--main-yellow); box-shadow: 0 4px 12px rgba(252, 224, 0, 0.3); }
-        .item-counter.inactive { background: #f0f0f0; }
-        .item-counter .btn-pm { width: 44px; height: 100%; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 22px; cursor: pointer; color: var(--text-dark); transition: 0.1s;}
-        .item-counter .btn-pm:active { background: rgba(0,0,0,0.05); }
-        .item-counter .c-val { font-size: 16px; font-weight: 800; pointer-events: none; text-align: center; flex-grow: 1; }
+/* Счетчик (Плюс/Минус) */
+.item-counter {
+    overflow: hidden;
+    background: #f0f0f0; /* Состояние по умолчанию */
+}
+.item-counter.active { 
+    background: #FCE000; /* Тот же цвет, что у кнопки "Добавить" */
+    box-shadow: 0 4px 12px rgba(252, 224, 0, 0.2); 
+}
+
+/* Кнопки плюс и минус */
+.item-counter .btn-pm { 
+    width: 60px;              /* Большая площадь для нажатия */
+    height: 100%; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    font-weight: bold; 
+    font-size: 24px; 
+    color: var(--text-dark); 
+    transition: 0.1s;
+}
+.item-counter .btn-pm:active { background: rgba(0,0,0,0.05); }
+
+/* Цифра в центре */
+.item-counter .c-val { 
+    font-size: 16px; 
+    font-weight: 800; 
+    pointer-events: none; 
+    text-align: center; 
+    flex-grow: 1; /* Цифра занимает всё место между кнопками */
+}
 
         /* --- МОДАЛКА БЛЮДА (85vh, НОВЫЙ ДИЗАЙН) --- */
         .pm-overlay { 
