@@ -99,7 +99,7 @@
         .cat-circle { width: 68px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: transform 0.15s ease;}
         .cat-circle:active { transform: scale(0.92); }
         .cat-circle img { width: 68px; height: 68px; object-fit: contain; margin-bottom: 8px; background: transparent; border-radius: 0; filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.08)); }
-        .cat-text { font-size: 12px; font-weight: 600; color: var(--text-dark); background: transparent; white-space: nowrap; text-align: center; line-height: 1;}
+        .cat-text { font-size: 10px; font-weight: 600; color: var(--text-dark); background: transparent; white-space: nowrap; text-align: center; line-height: 1;}
 
         .filters-row { display: flex; overflow-x: auto; padding: 0 16px 16px 16px; background: var(--card-bg); gap: 8px; scrollbar-width: none; border-bottom: 1px solid #eee; }
         .filters-row::-webkit-scrollbar { display: none; }
@@ -618,33 +618,35 @@
                 <span class="cat-text">Бургеры</span>
             </div>
             <div class="cat-circle" onclick="toggleFilter(this, 'sushi')">
-                <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/sushi.png" alt="Суши">
+                <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/sushissss.png" alt="Суши">
                 <span class="cat-text">Суши</span>
             </div>
             <div class="cat-circle" onclick="toggleFilter(this, 'shawarma')">
                 <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/pngtree-crispy-shawarma-wrap-png-image_13507904.png" alt="Шаурма">
                 <span class="cat-text">Шаурма</span>
             </div>
+            <div class="cat-circle" onclick="toggleFilter(this, 'shashlik')">
+                <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/shashluk-removebg-preview.png" alt="Шашлык">
+                <span class="cat-text">Шашлыки</span>
+            </div>
+            <div class="cat-circle" onclick="toggleFilter(this, 'pizza')">
+                <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/pngtree-yummy-stretchy-cheese-pepperoni-pizza-png-image_19960043.png" alt="Пицца">
+                <span class="cat-text">Пиццa</span>
+            </div>
             <div class="cat-circle" onclick="toggleFilter(this, 'desserts')">
                 <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/desert_-removebg-preview.png" alt="Десерты">
                 <span class="cat-text">Десерты</span>
             </div>
-            <div class="cat-circle" onclick="toggleFilter(this, 'pizza')">
-                <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/pngtree-yummy-stretchy-cheese-pepperoni-pizza-png-image_19960043.png" alt="Пицца">
-                <span class="cat-text">Пицца</span>
-            </div>
-            <div class="cat-circle" onclick="toggleFilter(this, 'sandwiches')">
+            
+            <!-- <div class="cat-circle" onclick="toggleFilter(this, 'sandwiches')">
                 <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/pngtree-yummy-stretchy-cheese-pepperoni-pizza-png-image_19960043.png" alt="Сэндвичи">
                 <span class="cat-text">Сэндвичи</span>
-            </div>
+            </div> -->
             <!-- <div class="cat-circle" onclick="toggleFilter(this, 'hotdog')">
                 <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/pngimg.com%20-%20hot-dog_PNG10435.png" alt="Хот-Дог">
                 <span class="cat-text">Хот-Дог</span>
             </div> -->
-            <div class="cat-circle" onclick="toggleFilter(this, 'shashlik')">
-                <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/shashluk-removebg-preview.png" alt="Шашлык">
-                <span class="cat-text">Шашлык</span>
-            </div>
+            
         </div>
         
         <div class="restaurant-list" id="restaurant-list"></div>
