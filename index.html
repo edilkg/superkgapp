@@ -99,7 +99,7 @@
         .cat-circle { width: 68px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: transform 0.15s ease;}
         .cat-circle:active { transform: scale(0.92); }
         .cat-circle img { width: 68px; height: 68px; object-fit: contain; margin-bottom: 8px; background: transparent; border-radius: 0; filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.08)); }
-        .cat-text { font-size: 10px; font-weight: 600; color: var(--text-dark); background: transparent; white-space: nowrap; text-align: center; line-height: 1;}
+        .cat-text { font-size: 11px; font-weight: 600; color: var(--text-dark); background: transparent; white-space: nowrap; text-align: center; line-height: 1;}
 
         .filters-row { display: flex; overflow-x: auto; padding: 0 16px 16px 16px; background: var(--card-bg); gap: 8px; scrollbar-width: none; border-bottom: 1px solid #eee; }
         .filters-row::-webkit-scrollbar { display: none; }
@@ -880,6 +880,10 @@
     </div>
 
     <script>
+        const supabaseUrl = 'https://dtxybpdjbdmqrvsdwvvk.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHlicGRqYmRtcXJ2c2R3dnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwODI5OTYsImV4cCI6MjA5MTY1ODk5Nn0.WFWBrwvxqEgfR9tzusvFcvfPN_mS4SmwvsWlyH13LEs'; 
+        const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
         let globalCity = "Чолпон-Ата";
         
         function getDistance(lat1, lon1, lat2, lon2) {
@@ -930,79 +934,37 @@
         };
 
         const database = {
-            // ЧОЛПОН-АТА И БОСТЕРИ
-            
-            'asian1': { lat: 42.6482, lon: 77.0855, city: 'Чолпон-Ата', title: 'Дракон Суши', logo: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=300', address: 'ул. Советская, 15', hours: '10:00 - 23:00', img: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=300', 
-                items: [
-                    {id: 'a1', name: 'Филадельфия', price: 350, weight: '250 г', category: 'Суши', img: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=150'}, 
-                    {id: 'a2', name: 'Сет Самурай', price: 1200, weight: '1000 г', category: 'Сеты', img: 'https://images.unsplash.com/photo-1553621042-f6e147245754?w=150'}
-                ] 
+            // Твой реальный ресторан из базы (Дракон Суши)
+            '5521273499': { 
+                lat: 42.6482, lon: 77.0855, city: 'Чолпон-Ата', 
+                title: 'Дракон Суши', 
+                logo: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=300', 
+                address: 'ул. Советская, 15', 
+                hours: '10:00 - 23:00', 
+                img: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=300', 
+                items: [] // Блюда прилетят из базы!
             },
-            'shashlyk_park': { 
-    lat: 42.645767, 
-    lon: 77.076932, 
-    city: 'Чолпон-Ата', 
-    title: 'Шашлык Парк', 
-    logo: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', 
-    address: 'ул. Советская, 132', 
-    hours: '10:00 - 24:00', 
-    img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=600', 
-    items: [
-        // Шашлыки
-        {id: 'sp1', name: 'Окорочка', price: 370, category: 'Шашлыки', img: 'https://images.unsplash.com/photo-1598103434642-1e948c3d8205?w=300'},
-        {id: 'sp2', name: 'Крылышки', price: 380, category: 'Шашлыки', img: 'https://images.unsplash.com/photo-1567620832903-9fc6debc209f?w=300'},
-        {id: 'sp3', name: 'Филе куриное', price: 390, category: 'Шашлыки', img: 'https://images.unsplash.com/photo-1598103434642-1e948c3d8205?w=300'},
-        {id: 'sp4', name: 'Люля кебаб', price: 300, category: 'Шашлыки', img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300'},
-        {id: 'sp5', name: 'Баранина ребро', price: 560, category: 'Шашлыки', img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300'},
-        
-        // Салаты
-        {id: 'sp6', name: 'Цезарь с курицей', price: 510, category: 'Салаты', img: 'https://images.unsplash.com/photo-1550304943-4f24f54ddde9?w=300'},
-        {id: 'sp7', name: 'Греческий', price: 370, category: 'Салаты', img: 'https://images.unsplash.com/photo-1540189549336-e6e99c3675fe?w=300'},
-        
-        // Супы
-        {id: 'sp8', name: 'Шорпо баранина', price: 370, category: 'Супы', img: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=300'},
-        {id: 'sp9', name: 'Солянка', price: 390, category: 'Супы', img: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=300'},
+            
+            // Шашлык Парк (Ты задал ему ID 101 в Supabase)
+            '101': { 
+                lat: 42.645767, lon: 77.076932, city: 'Чолпон-Ата', 
+                title: 'Шашлык Парк', 
+                logo: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', 
+                address: 'ул. Советская, 132', 
+                hours: '10:00 - 24:00', 
+                img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=600', 
+                items: [] // Блюда прилетят из базы!
+            },
 
-        // Пиццы
-        {id: 'sp10', name: 'Пепперони 30см', price: 495, category: 'Пиццы', img: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=300'},
-        {id: 'sp11', name: 'Маргарита 30см', price: 414, category: 'Пиццы', img: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=300'}
-    ]
-},
-            'fast1': { lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', title: 'Burger Spot', logo: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300', address: 'ул. Горького, 2', hours: '11:00 - 02:00', img: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300', 
-                items: [
-                    {id: 'f1', name: 'Чизбургер', price: 250, weight: '300 г', category: 'Бургеры', img: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=150'}, 
-                    {id: 'f2', name: 'Кола', price: 80, weight: '0.5 л', category: 'Напитки', img: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=150'}
-                ] 
-            },
-            'piz1': { lat: 42.6346, lon: 77.1950, city: 'Бостери', title: 'Roma Pizza', logo: 'https://images.unsplash.com/photo-1513104890138-7c049485aa4c?w=300', address: 'Бостери, Центр', hours: '10:00 - 22:00', img: 'https://images.unsplash.com/photo-1513104890138-7c049485aa4c?w=300', 
-                items: [
-                    {id: 'p1', name: 'Маргарита', price: 450, weight: '500 г', category: 'Пицца', img: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=150'}, 
-                    {id: 'p2', name: 'Пепперони', price: 550, weight: '550 г', category: 'Пицца', img: 'https://images.unsplash.com/photo-1628840042765-356cda07504e?w=150'}
-                ] 
-            },
-            
-            // БИШКЕК
-            'bish1': { lat: 42.8746, lon: 74.5698, city: 'Бишкек', title: 'Фаиза', logo: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', address: 'ул. Жибек Жолу, 555', hours: '09:00 - 23:00', img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', 
-                items: [
-                    {id: 'b1', name: 'Лагман Гуйру', price: 280, weight: '450 г', category: 'Горячее', desc: 'Традиционный уйгурский лагман с обжаренным мясом (говядина), свежими овощами и домашней тянутой лапшой.', img: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400'}, 
-                    {id: 'b2', name: 'Самса с мясом', price: 80, weight: '120 г', category: 'Выпечка', desc: 'Хрустящая слоеная самса из тандыра с сочной рубленой говядиной, луком и специями.', img: 'https://images.unsplash.com/photo-1601000938259-9e92002320b2?w=400'},
-                    {id: 'b3', name: 'Coca-Cola', price: 90, weight: '0.5 л', category: 'Напитки', desc: 'Классическая охлажденная кола в пластиковой бутылке.', img: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=400'},
-                    {id: 'b4', name: 'Лимонад Дюшес', price: 120, weight: '1 л', category: 'Напитки', desc: 'Освежающий грушевый лимонад, идеально к горячим блюдам.', img: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=400'}
-                ] 
-            },
-            'bish2': { lat: 42.8700, lon: 74.5900, city: 'Бишкек', title: 'KFC Азия Молл', logo: 'https://images.unsplash.com/photo-1513639776629-7b61b0ac49cb?w=300', address: 'пр. Ч. Айтматова, 3', hours: '10:00 - 00:00', img: 'https://images.unsplash.com/photo-1513639776629-7b61b0ac49cb?w=300', 
-                items: [
-                    {id: 'k1', name: 'Баскет Дуэт', price: 650, weight: '800 г', category: 'Курица', img: 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58?w=150'}, 
-                    {id: 'k2', name: 'Крылышки (5 шт)', price: 220, weight: '200 г', category: 'Снеки', img: 'https://images.unsplash.com/photo-1569691899455-88464f6d3cb1?w=150'}
-                ] 
-            },
-            
-            // БАЛЫКЧЫ
-            'bal1': { lat: 42.4600, lon: 76.1800, city: 'Балыкчы', title: 'Балыкчы Гриль', logo: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', address: 'ул. Фрунзе, 42', hours: '11:00 - 23:00', img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=300', 
-                items: [
-                    {id: 'bal1', name: 'Форель на мангале', price: 600, weight: '350 г', category: 'Рыба', img: 'https://images.unsplash.com/photo-1537047902294-62a40c20a6ae?w=150'}, 
-                    {id: 'bal2', name: 'Баранина мякоть', price: 350, weight: '200 г', category: 'Мясо', img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=150'}
-                ] 
+            // Лагманкана (Ты задал ему ID 102 в Supabase)
+            '102': { 
+                lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', 
+                title: 'Лагманкана', 
+                logo: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', 
+                address: 'Центр', 
+                hours: '09:00 - 23:00', 
+                img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', 
+                items: [] // Блюда прилетят из базы!
             }
         };
 
@@ -1096,31 +1058,70 @@
 
         function handleSearch() {}
 
-        function openMenu(resId) {
+        async function openMenu(resId) {
             currentRestaurantId = resId;
             const res = database[resId];
+            
             document.getElementById('menu-title').innerText = res.title;
             document.getElementById('menu-logo').src = res.logo;
 
-            // Горизонтальные категории
-            let catBar = document.getElementById('category-bar');
-            if (!catBar) {
-                catBar = document.createElement('div');
-                catBar.id = 'category-bar';
-                const list = document.getElementById('all-products-container');
-                list.parentNode.insertBefore(catBar, list);
-            }
-
-            // Извлекаем уникальные категории (кнопку "Все" убрали, так как теперь мы просто скроллим)
-            const categories = [...new Set(res.items.map(item => item.category))];
-            catBar.innerHTML = categories.map((cat, i) => 
-                `<button class="${i === 0 ? 'active' : ''}" onclick="scrollToCategory('${cat}', this)">${cat}</button>`
-            ).join('');
-
-            renderRestaurantMenu(); // Отрисовываем ВСЁ меню сразу
+            // 1. Показываем экран меню и лоадер, пока данные летят с сервера
+            const container = document.getElementById('all-products-container');
+            container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: 800; color: #999;">⏳ Загрузка меню...</div>';
             
+            // Очищаем старые категории
+            let catBar = document.getElementById('category-bar');
+            if (catBar) catBar.innerHTML = '';
+
             history.pushState({screen: 'menu', page: 'menu', resId: resId}, '');
             showScreen('menu');
+
+            try {
+                // 2. СКАЧИВАЕМ ДАННЫЕ ИЗ SUPABASE
+                const { data, error } = await supabaseClient
+                    .from('menu')
+                    .select('*')
+                    .eq('restaurant_id', resId)
+                    .eq('is_available', true); // Берем только то, что есть в наличии
+
+                if (error) throw error;
+
+                // 3. Адаптируем данные из базы под твой код корзины
+                res.items = data.map(item => ({
+                    id: item.id.toString(), // ID конвертируем в строку
+                    name: item.name,
+                    price: item.price,
+                    weight: item.weight || '',
+                    category: item.category,
+                    desc: item.description || '',
+                    img: item.img_url
+                }));
+
+                // Если меню пока пустое
+                if (res.items.length === 0) {
+                    container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: 800; color: #999;">Меню скоро появится 🍽️</div>';
+                    return;
+                }
+
+                // 4. Отрисовываем горизонтальные кнопки категорий
+                if (!catBar) {
+                    catBar = document.createElement('div');
+                    catBar.id = 'category-bar';
+                    container.parentNode.insertBefore(catBar, container);
+                }
+
+                const categories = [...new Set(res.items.map(item => item.category))];
+                catBar.innerHTML = categories.map((cat, i) => 
+                    `<button class="${i === 0 ? 'active' : ''}" onclick="scrollToCategory('${cat}', this)">${cat}</button>`
+                ).join('');
+
+                // 5. Отрисовываем сами карточки блюд твоей старой функцией!
+                renderRestaurantMenu();
+
+            } catch (err) {
+                console.error("Ошибка загрузки меню:", err);
+                container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: bold; color: #d32f2f;">❌ Ошибка соединения. Попробуйте позже.</div>';
+            }
         }
 
         // 2. НОВАЯ ФУНКЦИЯ ПЛАВНОГО СКРОЛЛА (ВМЕСТО ФИЛЬТРАЦИИ)
