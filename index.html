@@ -841,9 +841,6 @@
                 <div class="pm-section-title">Состав</div>
                 <div class="pm-text" id="pm-composition">Состав блюда...</div>
                 
-                <div class="pm-section-title">Описание</div>
-                <div class="pm-text" id="pm-desc">Описание блюда...</div>
-                
                 <div class="pm-counter-full">
                     <div class="pm-btn" onclick="changeProductModalCount(-1)">−</div>
                     <div class="pm-val" id="pm-count">0</div>
@@ -1849,9 +1846,11 @@ function filterMenu(resId, category, btn) {
             document.getElementById('pm-price').innerText = currentModalItem.price + ' сом';
             
             // Если в базе нет данных, подставляем заглушки
-            document.getElementById('pm-weight').innerText = currentModalItem.weight || '350 г';
-            document.getElementById('pm-composition').innerText = currentModalItem.composition || 'Ингредиенты не указаны';
-            document.getElementById('pm-desc').innerText = currentModalItem.desc || 'Очень вкусное и сытное блюдо.';
+            // Если в базе нет данных, подставляем заглушки
+            document.getElementById('pm-weight').innerText = currentModalItem.weight || ''; 
+            
+            // Берем описание (description) из базы данных и вставляем его в поле "Состав"
+            document.getElementById('pm-composition').innerText = currentModalItem.desc || 'Состав не указан';
             
             updateProductModalUI();
             
