@@ -928,7 +928,28 @@
         }
 
         const tg = window.Telegram?.WebApp || null;
-        if(tg) tg.expand();
+        if (tg) {
+            tg.expand();
+            
+            // ПЕРЕХВАТ НАЖАТИЯ "НАЗАД" ОТ TELEGRAM
+            if (tg.BackButton) {
+                tg.BackButton.onClick(function() {
+                    // Если открыта модалка блюда — просто скрываем её
+                    const productModal = document.getElementById('modal-product');
+                    const addressModal = document.getElementById('modal-address');
+                    
+                    if (productModal && !productModal.classList.contains('hidden')) {
+                        productModal.classList.add('hidden');
+                    } 
+                    else if (addressModal && !addressModal.classList.contains('hidden')) {
+                        addressModal.classList.add('hidden');
+                    }
+                    else {
+                        window.history.back(); // Делаем системный шаг назад
+                    }
+                });
+            }
+        }
         
         let totalSum = 0;
         let cutleryCount = 0; //Переменная для приборов
