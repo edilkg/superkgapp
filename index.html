@@ -1509,15 +1509,25 @@ function filterMenu(resId, category, btn) {
             cartItems[key].count += delta; 
             if(cartItems[key].count <= 0) delete cartItems[key]; 
             recalcTotal();
-            if(totalSum === 0) { showScreen('main'); return; }
+            if(totalSum === 0) { 
+                // Если корзина пуста, делаем системный шаг назад, чтобы не ломать историю
+                history.back(); 
+                return; 
+            }
             renderCartListItems();
         }
 
         function openClearCartModal() { document.getElementById('modal-clear-cart').classList.remove('hidden'); }
         function executeClearCart() {
             for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; } 
-            recalcTotal(); document.getElementById('modal-clear-cart').classList.add('hidden');
-            if(totalSum === 0) { showScreen('main'); } else { renderCartListItems(); }
+            recalcTotal(); 
+            document.getElementById('modal-clear-cart').classList.add('hidden');
+            if(totalSum === 0) { 
+                // Возвращаемся системно
+                history.back(); 
+            } else { 
+                renderCartListItems(); 
+            }
         }
 
         const availableCities = ['Бишкек', 'Чолпон-Ата', 'Балыкчы', 'Бостери'];
@@ -2321,7 +2331,18 @@ document.addEventListener('input', function(event) {
         });
     }
 });
+function goToMainMenu() {
+            // Надежно очищаем всю историю переходов и возвращаемся в самое начало
+            history.go(-(history.length - 1));
+            setTimeout(() => {
+                history.replaceState({screen: 'main'}, '');
+                showScreen('main');
+            }, 50);
+        }
 
+        function startNewOrder() {
+            goToMainMenu();
+        }
 </script>
 </body>
 </html>
