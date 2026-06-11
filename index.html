@@ -100,7 +100,18 @@
         .cat-circle:active { transform: scale(0.92); }
         .cat-circle img { width: 68px; height: 68px; object-fit: contain; margin-bottom: 8px; background: transparent; border-radius: 0; filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.08)); }
         .cat-text { font-size: 11px; font-weight: 600; color: var(--text-dark); background: transparent; white-space: nowrap; text-align: center; line-height: 1;}
-
+        /* ДОБАВИТЬ ЭТО: Стили для выбранных категорий */
+        .cat-circle.active .cat-text { 
+            background: var(--main-yellow); 
+            color: #111; 
+            padding: 6px 10px; 
+            border-radius: 12px;
+            transition: 0.2s;
+        }
+        .cat-circle.active img {
+            transform: scale(0.95);
+            transition: 0.2s;
+        }
         .filters-row { display: flex; overflow-x: auto; padding: 0 16px 16px 16px; background: var(--card-bg); gap: 8px; scrollbar-width: none; border-bottom: 1px solid #eee; }
         .filters-row::-webkit-scrollbar { display: none; }
         .filter-btn { background: var(--bg-color); padding: 8px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: 0.2s; border: 1px solid transparent;}
@@ -136,7 +147,7 @@
         .item-img { width: 100%; height: 100%; object-fit: cover; }
         .item-info { padding: 10px 5px; display: flex; flex-direction: column; flex-grow: 1; }
         .item-price { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
-        .item-name { font-size: 13px; color: #333; margin-bottom: 4px; line-height: 1.3; font-weight: 600;}
+        .item-name { font-size: 15px; color: #333; margin-bottom: 4px; line-height: 1.3; font-weight: 600;}
 
 
 /* Унифицированный контейнер для кнопки и счетчика */
@@ -951,15 +962,14 @@
             // Твой реальный ресторан из базы (Дракон Суши)
             '5521273499': { 
                 lat: 42.6482, lon: 77.0855, city: 'Чолпон-Ата', 
-                title: 'Дракон Суши', 
+                title: 'Барашек', 
                 logo: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=300', 
                 address: 'ул. Советская, 15', 
                 hours: '10:00 - 23:00', 
                 img: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=300', 
-                items: [] // Блюда прилетят из базы!
+                tags: ['shashlik', 'pizza'], // <--- Теги для фильтра
+                items: [] 
             },
-            
-            // Шашлык Парк (Ты задал ему ID 101 в Supabase)
             '101': { 
                 lat: 42.645767, lon: 77.076932, city: 'Чолпон-Ата', 
                 title: 'Шашлык Парк', 
@@ -967,10 +977,9 @@
                 address: 'ул. Советская, 132', 
                 hours: '10:00 - 24:00', 
                 img: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=600', 
-                items: [] // Блюда прилетят из базы!
+                tags: ['shashlik', 'pizza', 'desserts'],
+                items: [] 
             },
-
-            // Лагманкана (Ты задал ему ID 102 в Supabase)
             '102': { 
                 lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', 
                 title: 'Лагманкана', 
@@ -978,10 +987,30 @@
                 address: 'Центр', 
                 hours: '09:00 - 23:00', 
                 img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', 
-                items: [] // Блюда прилетят из базы!
+                tags: [],
+                items: [] 
+            },
+            '103': { 
+                lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', 
+                title: 'Кунжут Фаст Фуд', 
+                logo: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', 
+                address: 'Центр', 
+                hours: '09:00 - 23:00', 
+                img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', 
+                tags: ['burgers', 'sushi', 'shawarma', 'pizza'],
+                items: [] 
+            },
+            '104': { 
+                lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', 
+                title: 'Бай манты', 
+                logo: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', 
+                address: 'Центр', 
+                hours: '09:00 - 23:00', 
+                img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', 
+                tags: [],
+                items: [] 
             }
         };
-
         history.replaceState({screen: 'main'}, '');
 
         function checkOpenStatus(hoursString) {
@@ -1047,27 +1076,112 @@
             }
         });
 
-        function renderRestaurants() {
-            const list = document.getElementById('restaurant-list');
-            if(!list) return;
-            let html = '';
-            Object.keys(database).forEach(key => {
-                const res = database[key];
-                if(res.city !== globalCity) return;
-                const statusHTML = checkOpenStatus(res.hours);
-                
-                html += `
-                    <div class="res-card" onclick="openMenu('${key}')">
-                        <img src="${res.img}" class="res-img" loading="lazy">
-                        <div class="res-info">
-                            <div class="res-name"><span>${res.title}</span>
-                                <div style="font-size: 13px; margin-top: 2px;">${statusHTML}</div></div>
-                            <div class="res-desc">${res.address}</div>
-                        </div>
-                    </div>`;
-            });
-            list.innerHTML = html;
+        // ДОБАВИТЬ: Массив для хранения выбранных категорий
+        let activeFilters = [];
+
+        // ДОБАВИТЬ: Функция, которая срабатывает при клике на шаурму, бургеры и т.д.
+        function toggleFilter(element, tag) {
+            // Переключаем визуальное выделение кнопки (желтый цвет)
+            element.classList.toggle('active');
+            
+            // Добавляем тег в память, если его нет. Если есть - удаляем (снимаем фильтр)
+            if (activeFilters.includes(tag)) {
+                activeFilters = activeFilters.filter(t => t !== tag);
+            } else {
+                activeFilters.push(tag);
+            }
+            
+            // Вибрация (Haptic) для мобилок
+            if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                window.Telegram.WebApp.HapticFeedback.selectionChanged();
+            }
+            
+            // Мгновенно перерисовываем список ресторанов
+            renderRestaurants();
         }
+
+// --- ОБНОВЛЕННАЯ ЛОГИКА ВЫБОРА ГОРОДА И ПОИСКА ---
+
+// --- ОБНОВЛЕННАЯ ЛОГИКА ВЫБОРА ГОРОДА И ПОИСКА (АДАПТИРОВАНО ПОД БАЗУ FOODKG) ---
+
+function selectCityFast(city) { // В твоем HTML функция в модалке называется selectCityFast
+    globalCity = city;
+    document.getElementById('current-city-display').innerText = city;
+    closeAddressModal();
+    
+    // Очищаем строку поиска при смене города
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) searchInput.value = '';
+    
+    // Перерисовываем список
+    renderRestaurants();
+}
+
+// У тебя в HTML уже прописан oninput="handleSearch()", так что пишем саму функцию:
+function handleSearch() {
+    const query = document.getElementById('search-input').value;
+    renderRestaurants(query);
+}
+
+function renderRestaurants(searchQuery = '') {
+    const list = document.getElementById('restaurant-list');
+    if (!list) return; 
+    
+    list.innerHTML = '';
+    let hasResults = false;
+
+    // Перебираем твой объект database
+    for (let id in database) {
+        const res = database[id];
+        
+        // 1. Проверяем, совпадает ли город
+        const matchesCity = res.city === globalCity;
+        
+        // 2. Проверяем, совпадает ли текст поиска (по названию)
+        const matchesSearch = res.title.toLowerCase().includes(searchQuery.toLowerCase());
+        
+        // 3. Проверяем, совпадают ли выбранные фильтры (бургеры, суши и т.д.)
+        let matchesTags = true;
+        if (activeFilters.length > 0) {
+            matchesTags = activeFilters.some(tag => res.tags && res.tags.includes(tag));
+        }
+
+        // Если ресторан подходит по всем трем условиям — рисуем его
+        if (matchesCity && matchesSearch && matchesTags) {
+            hasResults = true;
+            
+            const div = document.createElement('div');
+            div.className = 'res-card';
+            div.onclick = () => openMenu(id); // Твоя функция открытия меню
+            
+            div.innerHTML = `
+                <img src="${res.img}" class="res-img" alt="${res.title}">
+                <div class="res-info">
+                    <div class="res-name">
+                        <span>${res.title}</span>
+                    </div>
+                    <div class="res-desc">${res.address}</div>
+                    <div class="res-meta">
+                        ${checkOpenStatus(res.hours)}
+                        <span style="color: #666;">• 🛵 От 100 сом</span>
+                    </div>
+                </div>
+            `;
+            list.appendChild(div);
+        }
+    }
+
+    // Если ничего не найдено (ни по городу, ни по фильтру, ни по поиску)
+    if (!hasResults) {
+        list.innerHTML = `
+            <div style="padding: 40px 20px; text-align: center; color: var(--text-gray);">
+                <div style="font-size: 40px; margin-bottom: 10px;">🍽️</div>
+                Ничего не найдено
+            </div>
+        `;
+    }
+}
+
         renderRestaurants();
 
         function handleSearch() {}
@@ -1396,14 +1510,6 @@ function filterMenu(resId, category, btn) {
             }
         }
 
-        function selectCityFast(cityName) {
-            // Быстрый выбор города в 1 клик
-            globalCity = cityName;
-            document.getElementById('hdr-addr').innerText = globalCity;
-            closeAddressModal(); // Сразу прячем окно
-            renderRestaurants(); // Обновляем рестораны
-            if(tg) tg.HapticFeedback.selectionChanged(); // Легкая вибрация
-        }
 
         function openProfileModal() {
             renderSavedAddressesInProfile();
@@ -2154,6 +2260,34 @@ function filterMenu(resId, category, btn) {
                 });
             }
         });
+        /* --- МОМЕНТАЛЬНЫЙ ПОИСК РЕСТОРАНОВ (Оптимизировано для Supabase) --- */
+document.addEventListener('input', function(event) {
+    // Проверяем, что юзер печатает именно в поле поиска (input)
+    if (event.target.tagName.toLowerCase() === 'input') {
+        const query = event.target.value.toLowerCase().trim();
+        
+        // Ищем ТОЛЬКО твои актуальные карточки (класс .res-card из твоего кода)
+        const restaurants = document.querySelectorAll('.res-card');
+        
+        restaurants.forEach(card => {
+            // Берем название ресторана (оно у тебя лежит внутри класса .res-name)
+            const nameElement = card.querySelector('.res-name span');
+            
+            // Защита от падений: если вдруг название не загрузилось, пропускаем
+            if (!nameElement) return; 
+            
+            const restaurantName = nameElement.innerText.toLowerCase();
+            
+            // Если имя ресторана содержит введенные буквы — показываем, если нет — скрываем
+            if (restaurantName.includes(query)) {
+                card.style.display = ''; // Показываем
+            } else {
+                card.style.display = 'none'; // Скрываем
+            }
+        });
+    }
+});
+
 </script>
 </body>
 </html>
