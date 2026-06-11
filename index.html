@@ -1068,6 +1068,19 @@
             ['screen-main', 'screen-menu', 'screen-cart-list', 'screen-status', 'modal-map'].forEach(id => document.getElementById(id).classList.add('hidden'));
             document.getElementById('screen-'+screenId).classList.remove('hidden');
             document.getElementById('cart-float-btn').style.display = (totalSum > 0 && ['main', 'menu'].includes(screenId)) ? 'flex' : 'none';
+
+            // Обязательно закрываем все открытые модалки при смене экрана, чтобы ничего не зависло
+            document.getElementById('modal-product').classList.add('hidden');
+            document.getElementById('modal-address').classList.add('hidden');
+
+            // --- МАГИЯ КНОПКИ "НАЗАД" ДЛЯ TELEGRAM ---
+            if (tg && tg.BackButton) {
+                if (screenId === 'main') {
+                    tg.BackButton.hide(); // На главной прячем стрелочку
+                } else {
+                    tg.BackButton.show(); // На странице ресторана или корзины - показываем
+                }
+            }
         }
 
         function onNavClick(type) {
