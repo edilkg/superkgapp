@@ -1922,7 +1922,8 @@ function filterMenu(resId, category, btn) {
                         cityDisplay.innerText = fullAddress;
                     }
                     
-                    updateCheckoutSummaryUI(); 
+                    updateCheckoutSummaryUI();
+                    renderRestaurants();
                 }
             } catch(e) {
                 console.error("Ошибка определения адреса:", e);
