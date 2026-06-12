@@ -1124,7 +1124,8 @@
             } else if (st.modal) {
                 if (st.modal === 'map') {
                     document.getElementById('modal-map').classList.remove('hidden');
-                    setTimeout(() => { if(checkoutMap) checkoutMap.invalidateSize(); }, 50);
+                    // Увеличиваем задержку для защиты от серых квадратов
+                    setTimeout(() => { if(checkoutMap) checkoutMap.invalidateSize(); }, 300);
                 } else if (st.modal === 'profile') {
                     document.getElementById('modal-profile').classList.remove('hidden');
                 } else if (st.modal === 'address') {
@@ -1619,14 +1620,14 @@ function filterMenu(resId, category, btn) {
             
             const activeRes = database[cartActiveTabResId];
             
-            // Защита: если корзина пустая и открыли с главной, берем GPS юзера или дефолтные координаты
             const resLat = activeRes ? activeRes.lat : (clientLat || 42.6482);
             const resLon = activeRes ? activeRes.lon : (clientLon || 77.0855);
             
+            // ЗАЩИТА ОТ ЛАГОВ КАРТЫ: Увеличили задержку до 300мс
             setTimeout(() => { 
                 if (checkoutMap) checkoutMap.invalidateSize(); 
                 initCheckoutMap(resLat, resLon); 
-            }, 50);
+            }, 300);
             
             document.getElementById('map-street').value = orderAddressData.street || '';
             document.getElementById('map-kv').value = orderAddressData.kv || '';
@@ -2014,8 +2015,14 @@ function filterMenu(resId, category, btn) {
                 (position) => {
                     clientLat = position.coords.latitude; 
                     clientLon = position.coords.longitude;
-                    mapWasDragged = false; // Блокируем перезапись события moveend
+                    mapWasDragged = false; 
+                    
+                    // ЗАЩИТА: Заставляем карту пересчитать свой размер после закрытия окна с разрешением
+                    if (checkoutMap) checkoutMap.invalidateSize();
+                    
                     setMapCenterToMarker(clientLat, clientLon);
+                    
+                    renderRestaurants(); // МГНОВЕННО ОБНОВЛЯЕМ
                     reverseGeocode(clientLat, clientLon);
                 },
                 (error) => {
