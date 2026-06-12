@@ -1227,7 +1227,7 @@ function renderRestaurants(searchQuery = '') {
                     
                     // Выводим красивую строку (toFixed(1) оставляет только 1 цифру после точки, например 1.5 км)
                     deliveryText = `<div class="res-desc" style="color: #E65100; font-weight: 700; font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px;">
-                        <span>📍 ${straightDist.toFixed(1)} км</span> | 
+                        <span>📍 ${straightDist.toFixed(1)} км от вас</span> | 
                         <span>🛵 ${fee} сом</span> | 
                         <span>🕓 ${minTime}-${maxTime} мин</span>
                     </div>`;
