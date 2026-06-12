@@ -617,9 +617,7 @@
             <div style="font-size: 72px; line-height: 1; margin-bottom: 16px;">🗺️</div>
             <h2 style="font-size: 24px; font-weight: 800; color: #111; margin: 0 0 12px 0;">Укажите адрес доставки</h2>
             <p style="font-size: 15px; color: #666; line-height: 1.4; margin: 0 0 24px 0; padding: 0 10px;">Разрешите доступ к геолокации, чтобы мы могли отображать актуальное меню и цены.</p>
-            <button onclick="manualGPSRetry()" style="margin-top: 16px; width: 100%; padding: 14px; background: var(--main-yellow, #f1c40f); color: #000000; border: none; border-radius: 12px; font-weight: bold; font-size: 14px; cursor: pointer;">
-            📍 Определить местоположение
-        </button>
+            
             <button id="btn-geo-confirm" style="width: 100%; background: var(--main-yellow); color: #111; border: none; border-radius: 16px; height: 56px; font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; margin-bottom: 12px; transition: 0.2s;">
                 <span style="font-size: 20px;">📍</span> Текущее местоположение
             </button>
@@ -950,13 +948,8 @@
         }
 
         const tg = window.Telegram?.WebApp || null;
-if (tg) {
-    tg.expand();
-}
-
-// === ВОТ СЮДА КОНКРЕТНО ДОБАВЛЕНА ПЕРЕМЕННАЯ ===
-let isWaitingForGPS = false;
-// ==============================================
+        if (tg) {
+            tg.expand();
             
             // ПЕРЕХВАТ НАЖАТИЯ "НАЗАД" ОТ TELEGRAM
             if (tg.BackButton) {
@@ -1950,40 +1943,7 @@ function filterMenu(resId, category, btn) {
                 recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
             }
         }
-
-        // 1. Флажок: ждем ли мы возвращения юзера из настроек?
-let isWaitingForGPS = false;
-
-// 2. Функция, которую ты вызываешь, когда гео выключено (чтобы показать окно)
-function showGPSModal() {
-    isWaitingForGPS = true; // Включаем режим ожидания
-    
-    // Показываем окно (замени 'gps-modal' на ID твоего окна)
-    const modal = document.getElementById('gps-modal');
-    if (modal) modal.style.display = 'flex'; 
-}
-
-// 3. САМАЯ ГЛАВНАЯ МАГИЯ: Слушаем возврат в Telegram
-document.addEventListener("visibilitychange", function() {
-    // Если приложение снова стало видимым И мы ждали включения GPS
-    if (document.visibilityState === 'visible' && isWaitingForGPS) {
-        console.log("📱 Юзер вернулся в Telegram! Автоматически проверяем GPS...");
         
-        // Немного ждем (500мс), чтобы датчик GPS телефона успел "проснуться"
-        setTimeout(() => {
-            // Вызываем твою основную функцию получения координат
-            // Замени locateUser() на название твоей функции (напр. getUserLocation)
-            locateUser(); 
-        }, 500);
-    }
-});
-
-function manualGPSRetry() {
-    console.log("👇 Юзер нажал кнопку проверки GPS");
-    
-    // Снова вызываем функцию получения локации
-    locateUser(); 
-}
 
         function initCheckoutMap(resLat, resLon) {
             if (!checkoutMap) {
@@ -2049,34 +2009,23 @@ function manualGPSRetry() {
         }
 
         function locateUser() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                // --- ИЗМЕНЕНИЕ ТУТ (БЛОК УСПЕХА) ---
-                // Координаты успешно поймали! Выключаем режим ожидания и прячем окно
-                isWaitingForGPS = false;
-                const modal = document.getElementById('gps-modal'); 
-                if (modal) modal.style.display = 'none';
-                // ----------------------------------
-
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-                // ... ТВОЙ ОСТАЛЬНОЙ РАБОЧИЙ КОД (карта, маркеры, адреса, цены) оставляешь без изменений ...
-            },
-            (error) => {
-                // --- ИЗМЕНЕНИЕ ТУТ (БЛОК ОШИБКИ) ---
-                // Ошибка! GPS на телефоне выключен. Включаем режим ожидания и показываем окно
-                isWaitingForGPS = true;
-                const modal = document.getElementById('gps-modal'); 
-                if (modal) modal.style.display = 'flex';
-                // ----------------------------------
-
-                console.log("Геолокация недоступна, ждем включения тумблера...");
-                // ... ТВОЙ ОСТАЛЬНОЙ КОД ОБРАБОТКИ ОШИБКИ оставляешь без изменений ...
-            }
-        );
-    }
-}
+            if (!navigator.geolocation) return alert("Браузер не поддерживает GPS");
+            if(tg) tg.HapticFeedback.impactOccurred('medium');
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    clientLat = position.coords.latitude; 
+                    clientLon = position.coords.longitude;
+                    mapWasDragged = false; // Блокируем перезапись события moveend
+                    setMapCenterToMarker(clientLat, clientLon);
+                    reverseGeocode(clientLat, clientLon);
+                },
+                (error) => {
+                    if (error.code === 1) alert("Разрешите доступ к геолокации в настройках телефона");
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
 
         function recalcCheckoutDelivery(resLat, resLon) {
             // Считаем расстояние по прямой
@@ -2692,32 +2641,8 @@ function goToMainMenu() {
         }
 
         function startNewOrder() {
-    goToMainMenu();
-}
-
-// ==========================================
-// ДОБАВЛЯЕМ ЭТОТ БЛОК В САМЫЙ КОНЕЦ СКРИПТА:
-// ==========================================
-
-// 1. Автоматическая магия: отслеживаем, когда юзер вернулся в Telegram из настроек
-document.addEventListener("visibilitychange", function() {
-    if (document.visibilityState === 'visible' && isWaitingForGPS) {
-        console.log("📱 Юзер вернулся в приложение! Проверяем GPS...");
-        // Даем датчику телефона 500 миллисекунд, чтобы проснуться
-        setTimeout(() => {
-            locateUser(); 
-        }, 500);
-    }
-});
-
-// 2. Функция для твоей ручной кнопки "Определить местоположение" (подстраховка)
-function manualGPSRetry() {
-    console.log("👇 Юзер нажал на кнопку ручной проверки GPS");
-    locateUser();
-}
-// ==========================================
-
-</script>
+            goToMainMenu();
+        }
 </script>
 </body>
 </html>
