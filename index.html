@@ -2410,6 +2410,55 @@ function filterMenu(resId, category, btn) {
             geoOverlay.style.display = 'none'; 
         });
 
+        // 4. АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПРИ ВОЗВРАТЕ ИЗ НАСТРОЕК (Без кнопок)
+        document.addEventListener("visibilitychange", function() {
+            // Срабатывает, когда пользователь возвращается в Telegram (вкладка становится видимой)
+            if (document.visibilityState === 'visible') {
+                
+                // Проверяем, висит ли на экране окно запроса геолокации
+                if (geoOverlay.style.display !== 'none') {
+                    
+                    // Меняем текст, чтобы юзер видел, что приложение не зависло, а "думает"
+                    btnConfirmGeo.innerText = "Проверяем гео...";
+
+                    if (tgApp && tgApp.LocationManager) {
+                        tgApp.LocationManager.getLocation((data) => {
+                            if (data && data.latitude) {
+                                // Если гео включили, берем координаты
+                                clientLat = data.latitude;
+                                clientLon = data.longitude;
+                                localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                                
+                                // Убираем окно запроса
+                                geoOverlay.style.display = 'none';
+                                
+                                // Переводим координаты в улицу
+                                reverseGeocode(clientLat, clientLon);
+                            } else {
+                                // Если вернулся, но так и не включил гео, возвращаем исходный текст кнопки
+                                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Открыть настройки';
+                            }
+                        });
+                    } else if (navigator.geolocation) {
+                        // Резервный метод для браузера
+                        navigator.geolocation.getCurrentPosition(
+                            (pos) => {
+                                clientLat = pos.coords.latitude;
+                                clientLon = pos.coords.longitude;
+                                localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                                geoOverlay.style.display = 'none';
+                                reverseGeocode(clientLat, clientLon);
+                            },
+                            (err) => {
+                                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Текущее местоположение';
+                            },
+                            { enableHighAccuracy: true, timeout: 5000 }
+                        );
+                    }
+                }
+            }
+        });
+
        window.isAddressSelectedFromList = false; // Глобальный флаг защиты от двойного поиска
         let autocompleteTimeout = null;
 
