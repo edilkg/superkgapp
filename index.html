@@ -2321,93 +2321,129 @@ function filterMenu(resId, category, btn) {
             if(event.target.classList.contains('pm-overlay')) closeProductModal();
         }
         // ==========================================
-        // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (КАК У CLICK FOOD)
+        // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (LOCATIONMANAGER + ШПИОН + ФОЛБЭК)
         // ==========================================
         const geoOverlay = document.getElementById('geo-modal-overlay');
         const btnConfirmGeo = document.getElementById('btn-geo-confirm');
         const btnSkipGeo = document.getElementById('btn-geo-skip');
         
-        // Подключаем API Телеграма
         const tgApp = window.Telegram?.WebApp;
+        let isWaitingForSettings = false; // Флажок для шпиона
 
-        // 1. Проверяем при входе, есть ли уже доступ к геолокации
+        // 1. Единый контроллер мгновенного обновления интерфейса
+        function processFoundLocation(lat, lon) {
+            clientLat = lat;
+            clientLon = lon;
+            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+            
+            if (geoOverlay) geoOverlay.style.display = 'none';
+            
+            // Мгновенно обновляем шапку и карточки ресторанов
+            const cityDisplay = document.getElementById('current-city-display');
+            if (cityDisplay) cityDisplay.innerText = "📍 Загрузка адреса...";
+            
+            renderRestaurants(); 
+            
+            // Если открыта карта - мгновенно центрируем
+            if (typeof checkoutMap !== 'undefined' && checkoutMap) {
+                setMapCenterToMarker(clientLat, clientLon);
+                if (typeof cartActiveTabResId !== 'undefined' && cartActiveTabResId && database[cartActiveTabResId]) {
+                    recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
+                }
+            }
+            
+            // Запускаем фоновый поиск названия улицы
+            if (typeof reverseGeocode === 'function') reverseGeocode(clientLat, clientLon); 
+        }
+
+        // 2. Инициализация при запуске (тихое обновление)
         if (tgApp && tgApp.LocationManager) {
             tgApp.LocationManager.init(() => {
                 if (!tgApp.LocationManager.isAccessGranted) {
-                    geoOverlay.style.display = 'flex';
+                    // Если прав нет, но есть кеш - используем кеш, иначе просим права
+                    if (localStorage.getItem('user_geo')) {
+                        let sg = JSON.parse(localStorage.getItem('user_geo'));
+                        processFoundLocation(sg.lat, sg.lon);
+                    } else {
+                        if (geoOverlay) geoOverlay.style.display = 'flex';
+                    }
                 } else {
+                    // Если права есть - забираем новые координаты автоматом
                     tgApp.LocationManager.getLocation((data) => {
                         if (data && data.latitude) {
-                            clientLat = data.latitude;
-                            clientLon = data.longitude;
-                            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                            // --- НОВОЕ: Сразу определяем улицу в фоне ---
-                            reverseGeocode(clientLat, clientLon);
+                            processFoundLocation(data.latitude, data.longitude);
                         }
                     });
                 }
             });
         } else {
-            // Резервный вариант для браузера
+            // Фолбэк для работы вне мобильного Telegram
             if (!localStorage.getItem('user_geo')) {
-                geoOverlay.style.display = 'flex';
+                if (geoOverlay) geoOverlay.style.display = 'flex';
             } else {
                 let sg = JSON.parse(localStorage.getItem('user_geo'));
-                clientLat = sg.lat;
-                clientLon = sg.lon;
-                reverseGeocode(clientLat, clientLon);
+                processFoundLocation(sg.lat, sg.lon);
             }
         }
 
-        // 2. Обработка клика по желтой кнопке (когда юзер разрешает GPS первый раз)
-        btnConfirmGeo.addEventListener('click', () => {
-            if(tgApp && tgApp.HapticFeedback) tgApp.HapticFeedback.impactOccurred('medium');
-            
-            if (tgApp && tgApp.LocationManager) {
-                if (tgApp.LocationManager.isAccessRequested && !tgApp.LocationManager.isAccessGranted) {
-                    tgApp.LocationManager.openSettings(); 
-                    btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">🔄</span> Я включил, повторить';
-                } else {
-                    btnConfirmGeo.innerText = "Запрашиваем...";
-                    
-                    tgApp.LocationManager.getLocation((data) => {
-                        if (data && data.latitude) {
-                            clientLat = data.latitude;
-                            clientLon = data.longitude;
-                            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                            geoOverlay.style.display = 'none';
-                            if(tgApp.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('success');
-                            // --- НОВОЕ: Сразу переводим точку в название улицы ---
-                            reverseGeocode(clientLat, clientLon);
+        // 3. Клик по кнопке (Переход в настройки ИЛИ запасное ручное продолжение)
+        if (btnConfirmGeo) {
+            btnConfirmGeo.addEventListener('click', () => {
+                if(tgApp && tgApp.HapticFeedback) tgApp.HapticFeedback.impactOccurred('medium');
+                
+                if (tgApp && tgApp.LocationManager) {
+                    tgApp.LocationManager.init(() => {
+                        if (!tgApp.LocationManager.isAccessGranted) {
+                            // КЛИК 1: ПРАВ НЕТ. Открываем настройки и превращаем кнопку в "Продолжить"
+                            tgApp.LocationManager.openSettings(); 
+                            isWaitingForSettings = true; 
+                            
+                            btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">✅</span> Продолжить';
+                            btnConfirmGeo.style.background = '#4CAF50'; 
+                            btnConfirmGeo.style.color = '#ffffff';
                         } else {
-                            btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Открыть настройки';
+                            // КЛИК 2: ПРАВА ЕСТЬ (Юзер нажал "Продолжить" вручную). Забираем координаты
+                            btnConfirmGeo.innerText = "Загрузка...";
+                            tgApp.LocationManager.getLocation((data) => {
+                                if (data && data.latitude) {
+                                    if(tgApp.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('success');
+                                    processFoundLocation(data.latitude, data.longitude);
+                                }
+                            });
+                        }
+                    });
+                } else {
+                    alert("Функция работает только внутри Telegram");
+                }
+            });
+        }
+
+        // 4. Кнопка "Ввести вручную"
+        if (btnSkipGeo) {
+            btnSkipGeo.addEventListener('click', () => {
+                if (geoOverlay) geoOverlay.style.display = 'none'; 
+                if (typeof openMapModal === 'function') openMapModal(); 
+            });
+        }
+
+        // 5. МАГИЯ ШПИОНА (Автоматическое обновление при возврате из настроек)
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && isWaitingForSettings) {
+                if (tgApp && tgApp.LocationManager) {
+                    tgApp.LocationManager.init(() => {
+                        // Тихо проверяем, дал ли юзер права в настройках пока нас не было
+                        if (tgApp.LocationManager.isAccessGranted) {
+                            isWaitingForSettings = false; // Выключаем шпиона
+                            tgApp.LocationManager.getLocation((data) => {
+                                if (data && data.latitude) {
+                                    if(tgApp.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('success');
+                                    processFoundLocation(data.latitude, data.longitude); // Моментально обновляем интерфейс!
+                                }
+                            });
                         }
                     });
                 }
-            } 
-            else {
-                btnConfirmGeo.innerText = "Определяем...";
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                        clientLat = pos.coords.latitude;
-                        clientLon = pos.coords.longitude;
-                        localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                        geoOverlay.style.display = 'none';
-                        // --- НОВОЕ: Сразу переводим точку в название улицы ---
-                        reverseGeocode(clientLat, clientLon);
-                    },
-                    (err) => {
-                        alert("Включите GPS в шторке телефона!");
-                        btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Текущее местоположение';
-                    },
-                    { enableHighAccuracy: true, timeout: 10000 }
-                );
             }
-        });
-
-        // 3. Обработка кнопки "Ввести вручную"
-        btnSkipGeo.addEventListener('click', () => {
-            geoOverlay.style.display = 'none'; 
         });
 
        window.isAddressSelectedFromList = false; // Глобальный флаг защиты от двойного поиска
