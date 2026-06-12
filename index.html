@@ -1124,8 +1124,7 @@
             } else if (st.modal) {
                 if (st.modal === 'map') {
                     document.getElementById('modal-map').classList.remove('hidden');
-                    // Увеличиваем задержку для защиты от серых квадратов
-                    setTimeout(() => { if(checkoutMap) checkoutMap.invalidateSize(); }, 300);
+                    setTimeout(() => { if(checkoutMap) checkoutMap.invalidateSize(); }, 50);
                 } else if (st.modal === 'profile') {
                     document.getElementById('modal-profile').classList.remove('hidden');
                 } else if (st.modal === 'address') {
@@ -1211,7 +1210,8 @@ function renderRestaurants(searchQuery = '') {
             // --- НОВАЯ ЛОГИКА РАСЧЕТА ДОСТАВКИ ДЛЯ КАРТОЧКИ ---
             let deliveryText = `<div class="res-desc">${res.address}</div>`; // По умолчанию показываем адрес
             
-           if (clientLat && clientLon) {
+            // Если мы уже узнали координаты юзера, считаем цену
+            if (clientLat && clientLon) {
                 const straightDist = getDistance(res.lat, res.lon, clientLat, clientLon);
                 const MAX_DISTANCE_KM = 15; 
                 
@@ -1620,14 +1620,14 @@ function filterMenu(resId, category, btn) {
             
             const activeRes = database[cartActiveTabResId];
             
+            // Защита: если корзина пустая и открыли с главной, берем GPS юзера или дефолтные координаты
             const resLat = activeRes ? activeRes.lat : (clientLat || 42.6482);
             const resLon = activeRes ? activeRes.lon : (clientLon || 77.0855);
             
-            // ЗАЩИТА ОТ ЛАГОВ КАРТЫ: Увеличили задержку до 300мс
             setTimeout(() => { 
                 if (checkoutMap) checkoutMap.invalidateSize(); 
                 initCheckoutMap(resLat, resLon); 
-            }, 300);
+            }, 50);
             
             document.getElementById('map-street').value = orderAddressData.street || '';
             document.getElementById('map-kv').value = orderAddressData.kv || '';
@@ -1772,32 +1772,20 @@ function filterMenu(resId, category, btn) {
             const priceElement = document.getElementById('modal-map-price');
             const submitButton = document.querySelector('#modal-map .btn-yellow');
             
-            // Если мы на главной (ресторан еще не выбран)
+            // ЕСЛИ МЫ НА ГЛАВНОЙ СТРАНИЦЕ (ресторан еще не выбран)
             if (!cartActiveTabResId || !database[cartActiveTabResId]) {
                 currentDeliveryFee = 0;
                 priceElement.innerText = 'Укажите адрес';
                 priceElement.style.color = '#888';
                 priceElement.style.fontSize = '14px';
+                
                 submitButton.classList.remove('disabled');
                 submitButton.style.pointerEvents = 'auto';
-                submitButton.innerText = 'Сохранить адрес';
+                submitButton.innerText = 'Сохранить адрес'; // МЕНЯЕМ ТЕКСТ КНОПКИ
                 return;
             }
 
-            // ЕСЛИ GPS ЮЗЕРА ЕЩЕ НЕ ОПРЕДЕЛЕН (ФОЛБЭК)
-            if (!clientLat || !clientLon) {
-                currentDeliveryFee = 0;
-                priceElement.innerText = 'Укажите точку на карте';
-                priceElement.style.color = '#888';
-                priceElement.style.fontSize = '14px';
-                submitButton.classList.remove('disabled');
-                submitButton.style.pointerEvents = 'auto';
-                submitButton.innerText = 'Сохранить адрес';
-                updateReceipt();
-                return;
-            }
-
-            // ЕСЛИ GPS ЕСТЬ - СЧИТАЕМ ЦЕНУ И ДИСТАНЦИЮ
+            // ЕСЛИ МЫ В КОРЗИНЕ (считаем доставку)
             const straightDist = getDistance(resLat, resLon, clientLat, clientLon);
             const MAX_DISTANCE_KM = 15; 
 
@@ -1806,6 +1794,7 @@ function filterMenu(resId, category, btn) {
                 priceElement.innerText = 'Вне зоны доставки';
                 priceElement.style.color = '#d32f2f'; 
                 priceElement.style.fontSize = '14px'; 
+                
                 submitButton.classList.add('disabled');
                 submitButton.style.pointerEvents = 'none';
                 submitButton.innerText = 'Слишком далеко';
@@ -1814,9 +1803,10 @@ function filterMenu(resId, category, btn) {
                 priceElement.innerText = currentDeliveryFee + ' сом';
                 priceElement.style.color = '#E65100';
                 priceElement.style.fontSize = '20px';
+                
                 submitButton.classList.remove('disabled');
                 submitButton.style.pointerEvents = 'auto';
-                submitButton.innerText = 'Готово'; 
+                submitButton.innerText = 'Готово'; // МЕНЯЕМ ТЕКСТ ОБРАТНО
             }
             updateReceipt();
         }
@@ -1933,27 +1923,20 @@ function filterMenu(resId, category, btn) {
                         const fallback = data.address.city || data.address.town || data.address.village || "Адрес не определён";
                         if (inputStreet) inputStreet.value = fallback;
                         orderAddressData.street = fallback;
-                        fullAddress = fallback; 
+                        fullAddress = fallback; // Сохраняем для шапки
                     }
                     
+                    // --- ОБНОВЛЯЕМ АДРЕС В ШАПКЕ ГЛАВНОЙ СТРАНИЦЫ ---
                     const cityDisplay = document.getElementById('current-city-display');
-                    if (cityDisplay) cityDisplay.innerText = fullAddress;
+                    if (cityDisplay) {
+                        cityDisplay.innerText = fullAddress;
+                    }
                     
                     updateCheckoutSummaryUI();
                     renderRestaurants();
                 }
             } catch(e) {
                 console.error("Ошибка определения адреса:", e);
-                // АНТИКРАШ: Если сервер адресов упал, ставим заглушку, чтобы интерфейс не завис
-                const inputStreet = document.getElementById('map-street');
-                if (inputStreet) inputStreet.value = "📍 Местоположение найдено";
-                orderAddressData.street = "Текущая геопозиция";
-                
-                const cityDisplay = document.getElementById('current-city-display');
-                if (cityDisplay) cityDisplay.innerText = "📍 Точка на карте";
-                
-                updateCheckoutSummaryUI();
-                renderRestaurants(); // Цены пересчитаются в любом случае!
             }
             
             if (cartActiveTabResId && database[cartActiveTabResId]) {
@@ -1962,24 +1945,17 @@ function filterMenu(resId, category, btn) {
         }
 
         function initCheckoutMap(resLat, resLon) {
-            // ВАЖНО: Используем локальные переменные для отображения карты по умолчанию, 
-            // НЕ перезаписывая глобальные clientLat/clientLon, чтобы не было фейковых цен!
-            let mapCenterLat = clientLat || 42.6482; // Центр Чолпон-Аты
-            let mapCenterLon = clientLon || 77.0855;
-            
-            let targetResLat = resLat || 42.6482;
-            let targetResLon = resLon || 77.0855;
-
             if (!checkoutMap) {
-                checkoutMap = L.map('fullscreen-map', {zoomControl: false}).setView([mapCenterLat, mapCenterLon], 16);
+                checkoutMap = L.map('fullscreen-map', {zoomControl: false}).setView([clientLat, clientLon], 16);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(checkoutMap);
                 
                 const resIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180209.png', iconSize: [32, 32] });
-                checkoutResMarker = L.marker([targetResLat, targetResLon], {icon: resIcon}).addTo(checkoutMap).bindPopup("Ресторан");
+                checkoutResMarker = L.marker([resLat, resLon], {icon: resIcon}).addTo(checkoutMap).bindPopup("Ресторан");
                 
                 const centerMarkerEl = document.querySelector('.center-marker-container');
                 const bottomPanel = document.querySelector('.map-floating-controls');
 
+                // Срабатывает исключительно тогда, когда пользователь двигает карту пальцем
                 checkoutMap.on('dragstart', function() {
                     mapWasDragged = true; 
                     if (centerMarkerEl) centerMarkerEl.classList.add('is-dragging');
@@ -1987,13 +1963,15 @@ function filterMenu(resId, category, btn) {
                     document.getElementById('map-street').value = 'Определение адреса...'; 
                 });
 
+                // Вызывается только по окончании ручного перемещения карты
                 checkoutMap.on('moveend', function() {
-                    if (!mapWasDragged) return; 
+                    if (!mapWasDragged) return; // Полный игнор программных перемещений от автокомплита
                     
                     mapWasDragged = false; 
                     if (centerMarkerEl) centerMarkerEl.classList.remove('is-dragging');
                     if (bottomPanel) bottomPanel.classList.remove('hidden-panel'); 
                     
+                    // Извлекаем координаты из-под маркера (теперь точно на высоте 25% видимой области)
                     const mapSize = checkoutMap.getSize();
                     const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.25);
                     const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
@@ -2003,14 +1981,12 @@ function filterMenu(resId, category, btn) {
                     reverseGeocode(clientLat, clientLon);
                 });
                 
-                setMapCenterToMarker(mapCenterLat, mapCenterLon);
+                setMapCenterToMarker(clientLat, clientLon);
             } else {
-                setMapCenterToMarker(mapCenterLat, mapCenterLon);
-                checkoutResMarker.setLatLng([targetResLat, targetResLon]);
+                setMapCenterToMarker(clientLat, clientLon);
+                checkoutResMarker.setLatLng([resLat, resLon]);
             }
-            
-            // Запускаем проверку цены (если GPS нет, она выдаст 0)
-            recalcCheckoutDelivery(targetResLat, targetResLon);
+            recalcCheckoutDelivery(resLat, resLon);
         }
 
         // УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы GPS-точка оказалась ровно под маркером на 25% экрана
@@ -2039,14 +2015,8 @@ function filterMenu(resId, category, btn) {
                 (position) => {
                     clientLat = position.coords.latitude; 
                     clientLon = position.coords.longitude;
-                    mapWasDragged = false; 
-                    
-                    // ЗАЩИТА: Заставляем карту пересчитать свой размер после закрытия окна с разрешением
-                    if (checkoutMap) checkoutMap.invalidateSize();
-                    
+                    mapWasDragged = false; // Блокируем перезапись события moveend
                     setMapCenterToMarker(clientLat, clientLon);
-                    
-                    renderRestaurants(); // МГНОВЕННО ОБНОВЛЯЕМ
                     reverseGeocode(clientLat, clientLon);
                 },
                 (error) => {
@@ -2351,39 +2321,16 @@ function filterMenu(resId, category, btn) {
             if(event.target.classList.contains('pm-overlay')) closeProductModal();
         }
         // ==========================================
-        // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (МГНОВЕННОЕ ОБНОВЛЕНИЕ БЕЗ ПЕРЕЗАГРУЗКИ)
+        // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (КАК У CLICK FOOD)
         // ==========================================
         const geoOverlay = document.getElementById('geo-modal-overlay');
         const btnConfirmGeo = document.getElementById('btn-geo-confirm');
         const btnSkipGeo = document.getElementById('btn-geo-skip');
         
+        // Подключаем API Телеграма
         const tgApp = window.Telegram?.WebApp;
 
-        // Единый контроллер: срабатывает, как только телефон дал координаты
-        function processFoundLocation(lat, lon) {
-            clientLat = lat;
-            clientLon = lon;
-            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-            if (geoOverlay) geoOverlay.style.display = 'none';
-            
-            // 1. Моментально даем визуальный отклик клиенту в шапке
-            document.getElementById('current-city-display').innerText = "📍 Загрузка адреса...";
-            
-            // 2. МОМЕНТАЛЬНО обновляем цены и дистанцию в карточках ресторанов (Без перезагрузки!)
-            renderRestaurants(); 
-            
-            // 3. Если карта открыта, моментально центрируем её на юзере и пересчитываем доставку
-            if (checkoutMap) {
-                setMapCenterToMarker(clientLat, clientLon);
-                if (cartActiveTabResId && database[cartActiveTabResId]) {
-                    recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
-                }
-            }
-            
-            // 4. Запускаем фоновый поиск названия улицы (когда загрузится, просто заменит текст в шапке)
-            reverseGeocode(clientLat, clientLon);
-        }
-
+        // 1. Проверяем при входе, есть ли уже доступ к геолокации
         if (tgApp && tgApp.LocationManager) {
             tgApp.LocationManager.init(() => {
                 if (!tgApp.LocationManager.isAccessGranted) {
@@ -2391,20 +2338,28 @@ function filterMenu(resId, category, btn) {
                 } else {
                     tgApp.LocationManager.getLocation((data) => {
                         if (data && data.latitude) {
-                            processFoundLocation(data.latitude, data.longitude);
+                            clientLat = data.latitude;
+                            clientLon = data.longitude;
+                            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                            // --- НОВОЕ: Сразу определяем улицу в фоне ---
+                            reverseGeocode(clientLat, clientLon);
                         }
                     });
                 }
             });
         } else {
+            // Резервный вариант для браузера
             if (!localStorage.getItem('user_geo')) {
                 geoOverlay.style.display = 'flex';
             } else {
                 let sg = JSON.parse(localStorage.getItem('user_geo'));
-                processFoundLocation(sg.lat, sg.lon);
+                clientLat = sg.lat;
+                clientLon = sg.lon;
+                reverseGeocode(clientLat, clientLon);
             }
         }
 
+        // 2. Обработка клика по желтой кнопке (когда юзер разрешает GPS первый раз)
         btnConfirmGeo.addEventListener('click', () => {
             if(tgApp && tgApp.HapticFeedback) tgApp.HapticFeedback.impactOccurred('medium');
             
@@ -2417,11 +2372,15 @@ function filterMenu(resId, category, btn) {
                     
                     tgApp.LocationManager.getLocation((data) => {
                         if (data && data.latitude) {
+                            clientLat = data.latitude;
+                            clientLon = data.longitude;
+                            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                            geoOverlay.style.display = 'none';
                             if(tgApp.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('success');
-                            // Сразу запускаем мгновенное обновление
-                            processFoundLocation(data.latitude, data.longitude);
+                            // --- НОВОЕ: Сразу переводим точку в название улицы ---
+                            reverseGeocode(clientLat, clientLon);
                         } else {
-                            btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Включите GPS в телефоне';
+                            btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Открыть настройки';
                         }
                     });
                 }
@@ -2429,9 +2388,13 @@ function filterMenu(resId, category, btn) {
             else {
                 btnConfirmGeo.innerText = "Определяем...";
                 navigator.geolocation.getCurrentPosition(
-                    (pos) => { 
-                        // Сразу запускаем мгновенное обновление
-                        processFoundLocation(pos.coords.latitude, pos.coords.longitude); 
+                    (pos) => {
+                        clientLat = pos.coords.latitude;
+                        clientLon = pos.coords.longitude;
+                        localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                        geoOverlay.style.display = 'none';
+                        // --- НОВОЕ: Сразу переводим точку в название улицы ---
+                        reverseGeocode(clientLat, clientLon);
                     },
                     (err) => {
                         alert("Включите GPS в шторке телефона!");
@@ -2442,9 +2405,9 @@ function filterMenu(resId, category, btn) {
             }
         });
 
+        // 3. Обработка кнопки "Ввести вручную"
         btnSkipGeo.addEventListener('click', () => {
             geoOverlay.style.display = 'none'; 
-            openMapModal(); 
         });
 
        window.isAddressSelectedFromList = false; // Глобальный флаг защиты от двойного поиска
