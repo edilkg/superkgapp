@@ -1772,20 +1772,32 @@ function filterMenu(resId, category, btn) {
             const priceElement = document.getElementById('modal-map-price');
             const submitButton = document.querySelector('#modal-map .btn-yellow');
             
-            // ЕСЛИ МЫ НА ГЛАВНОЙ СТРАНИЦЕ (ресторан еще не выбран)
+            // Если мы на главной (ресторан еще не выбран)
             if (!cartActiveTabResId || !database[cartActiveTabResId]) {
                 currentDeliveryFee = 0;
                 priceElement.innerText = 'Укажите адрес';
                 priceElement.style.color = '#888';
                 priceElement.style.fontSize = '14px';
-                
                 submitButton.classList.remove('disabled');
                 submitButton.style.pointerEvents = 'auto';
-                submitButton.innerText = 'Сохранить адрес'; // МЕНЯЕМ ТЕКСТ КНОПКИ
+                submitButton.innerText = 'Сохранить адрес';
                 return;
             }
 
-            // ЕСЛИ МЫ В КОРЗИНЕ (считаем доставку)
+            // ЕСЛИ GPS ЮЗЕРА ЕЩЕ НЕ ОПРЕДЕЛЕН (ФОЛБЭК)
+            if (!clientLat || !clientLon) {
+                currentDeliveryFee = 0;
+                priceElement.innerText = 'Укажите точку на карте';
+                priceElement.style.color = '#888';
+                priceElement.style.fontSize = '14px';
+                submitButton.classList.remove('disabled');
+                submitButton.style.pointerEvents = 'auto';
+                submitButton.innerText = 'Сохранить адрес';
+                updateReceipt();
+                return;
+            }
+
+            // ЕСЛИ GPS ЕСТЬ - СЧИТАЕМ ЦЕНУ И ДИСТАНЦИЮ
             const straightDist = getDistance(resLat, resLon, clientLat, clientLon);
             const MAX_DISTANCE_KM = 15; 
 
@@ -1794,7 +1806,6 @@ function filterMenu(resId, category, btn) {
                 priceElement.innerText = 'Вне зоны доставки';
                 priceElement.style.color = '#d32f2f'; 
                 priceElement.style.fontSize = '14px'; 
-                
                 submitButton.classList.add('disabled');
                 submitButton.style.pointerEvents = 'none';
                 submitButton.innerText = 'Слишком далеко';
@@ -1803,10 +1814,9 @@ function filterMenu(resId, category, btn) {
                 priceElement.innerText = currentDeliveryFee + ' сом';
                 priceElement.style.color = '#E65100';
                 priceElement.style.fontSize = '20px';
-                
                 submitButton.classList.remove('disabled');
                 submitButton.style.pointerEvents = 'auto';
-                submitButton.innerText = 'Готово'; // МЕНЯЕМ ТЕКСТ ОБРАТНО
+                submitButton.innerText = 'Готово'; 
             }
             updateReceipt();
         }
@@ -1945,17 +1955,24 @@ function filterMenu(resId, category, btn) {
         }
 
         function initCheckoutMap(resLat, resLon) {
+            // ВАЖНО: Используем локальные переменные для отображения карты по умолчанию, 
+            // НЕ перезаписывая глобальные clientLat/clientLon, чтобы не было фейковых цен!
+            let mapCenterLat = clientLat || 42.6482; // Центр Чолпон-Аты
+            let mapCenterLon = clientLon || 77.0855;
+            
+            let targetResLat = resLat || 42.6482;
+            let targetResLon = resLon || 77.0855;
+
             if (!checkoutMap) {
-                checkoutMap = L.map('fullscreen-map', {zoomControl: false}).setView([clientLat, clientLon], 16);
+                checkoutMap = L.map('fullscreen-map', {zoomControl: false}).setView([mapCenterLat, mapCenterLon], 16);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(checkoutMap);
                 
                 const resIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180209.png', iconSize: [32, 32] });
-                checkoutResMarker = L.marker([resLat, resLon], {icon: resIcon}).addTo(checkoutMap).bindPopup("Ресторан");
+                checkoutResMarker = L.marker([targetResLat, targetResLon], {icon: resIcon}).addTo(checkoutMap).bindPopup("Ресторан");
                 
                 const centerMarkerEl = document.querySelector('.center-marker-container');
                 const bottomPanel = document.querySelector('.map-floating-controls');
 
-                // Срабатывает исключительно тогда, когда пользователь двигает карту пальцем
                 checkoutMap.on('dragstart', function() {
                     mapWasDragged = true; 
                     if (centerMarkerEl) centerMarkerEl.classList.add('is-dragging');
@@ -1963,15 +1980,13 @@ function filterMenu(resId, category, btn) {
                     document.getElementById('map-street').value = 'Определение адреса...'; 
                 });
 
-                // Вызывается только по окончании ручного перемещения карты
                 checkoutMap.on('moveend', function() {
-                    if (!mapWasDragged) return; // Полный игнор программных перемещений от автокомплита
+                    if (!mapWasDragged) return; 
                     
                     mapWasDragged = false; 
                     if (centerMarkerEl) centerMarkerEl.classList.remove('is-dragging');
                     if (bottomPanel) bottomPanel.classList.remove('hidden-panel'); 
                     
-                    // Извлекаем координаты из-под маркера (теперь точно на высоте 25% видимой области)
                     const mapSize = checkoutMap.getSize();
                     const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.25);
                     const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
@@ -1981,12 +1996,14 @@ function filterMenu(resId, category, btn) {
                     reverseGeocode(clientLat, clientLon);
                 });
                 
-                setMapCenterToMarker(clientLat, clientLon);
+                setMapCenterToMarker(mapCenterLat, mapCenterLon);
             } else {
-                setMapCenterToMarker(clientLat, clientLon);
-                checkoutResMarker.setLatLng([resLat, resLon]);
+                setMapCenterToMarker(mapCenterLat, mapCenterLon);
+                checkoutResMarker.setLatLng([targetResLat, targetResLon]);
             }
-            recalcCheckoutDelivery(resLat, resLon);
+            
+            // Запускаем проверку цены (если GPS нет, она выдаст 0)
+            recalcCheckoutDelivery(targetResLat, targetResLon);
         }
 
         // УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы GPS-точка оказалась ровно под маркером на 25% экрана
@@ -2327,13 +2344,38 @@ function filterMenu(resId, category, btn) {
             if(event.target.classList.contains('pm-overlay')) closeProductModal();
         }
         // ==========================================
-        // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (КАК У CLICK FOOD)
+        // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (МГНОВЕННОЕ ОБНОВЛЕНИЕ БЕЗ ПЕРЕЗАГРУЗКИ)
         // ==========================================
         const geoOverlay = document.getElementById('geo-modal-overlay');
         const btnConfirmGeo = document.getElementById('btn-geo-confirm');
         const btnSkipGeo = document.getElementById('btn-geo-skip');
         
         const tgApp = window.Telegram?.WebApp;
+
+        // Единый контроллер: срабатывает, как только телефон дал координаты
+        function processFoundLocation(lat, lon) {
+            clientLat = lat;
+            clientLon = lon;
+            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+            if (geoOverlay) geoOverlay.style.display = 'none';
+            
+            // 1. Моментально даем визуальный отклик клиенту в шапке
+            document.getElementById('current-city-display').innerText = "📍 Загрузка адреса...";
+            
+            // 2. МОМЕНТАЛЬНО обновляем цены и дистанцию в карточках ресторанов (Без перезагрузки!)
+            renderRestaurants(); 
+            
+            // 3. Если карта открыта, моментально центрируем её на юзере и пересчитываем доставку
+            if (checkoutMap) {
+                setMapCenterToMarker(clientLat, clientLon);
+                if (cartActiveTabResId && database[cartActiveTabResId]) {
+                    recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
+                }
+            }
+            
+            // 4. Запускаем фоновый поиск названия улицы (когда загрузится, просто заменит текст в шапке)
+            reverseGeocode(clientLat, clientLon);
+        }
 
         if (tgApp && tgApp.LocationManager) {
             tgApp.LocationManager.init(() => {
@@ -2342,12 +2384,7 @@ function filterMenu(resId, category, btn) {
                 } else {
                     tgApp.LocationManager.getLocation((data) => {
                         if (data && data.latitude) {
-                            clientLat = data.latitude;
-                            clientLon = data.longitude;
-                            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                            
-                            renderRestaurants(); // МГНОВЕННО ОБНОВЛЯЕМ ЦЕНЫ И ДИСТАНЦИИ
-                            reverseGeocode(clientLat, clientLon);
+                            processFoundLocation(data.latitude, data.longitude);
                         }
                     });
                 }
@@ -2357,11 +2394,7 @@ function filterMenu(resId, category, btn) {
                 geoOverlay.style.display = 'flex';
             } else {
                 let sg = JSON.parse(localStorage.getItem('user_geo'));
-                clientLat = sg.lat;
-                clientLon = sg.lon;
-                
-                renderRestaurants(); // МГНОВЕННО ОБНОВЛЯЕМ ЦЕНЫ И ДИСТАНЦИИ
-                reverseGeocode(clientLat, clientLon);
+                processFoundLocation(sg.lat, sg.lon);
             }
         }
 
@@ -2377,16 +2410,11 @@ function filterMenu(resId, category, btn) {
                     
                     tgApp.LocationManager.getLocation((data) => {
                         if (data && data.latitude) {
-                            clientLat = data.latitude;
-                            clientLon = data.longitude;
-                            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                            geoOverlay.style.display = 'none';
                             if(tgApp.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('success');
-                            
-                            renderRestaurants(); // МГНОВЕННО ОБНОВЛЯЕМ ЦЕНЫ И ДИСТАНЦИИ
-                            reverseGeocode(clientLat, clientLon);
+                            // Сразу запускаем мгновенное обновление
+                            processFoundLocation(data.latitude, data.longitude);
                         } else {
-                            btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Открыть настройки';
+                            btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Включите GPS в телефоне';
                         }
                     });
                 }
@@ -2394,14 +2422,9 @@ function filterMenu(resId, category, btn) {
             else {
                 btnConfirmGeo.innerText = "Определяем...";
                 navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                        clientLat = pos.coords.latitude;
-                        clientLon = pos.coords.longitude;
-                        localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                        geoOverlay.style.display = 'none';
-                        
-                        renderRestaurants(); // МГНОВЕННО ОБНОВЛЯЕМ ЦЕНЫ И ДИСТАНЦИИ
-                        reverseGeocode(clientLat, clientLon);
+                    (pos) => { 
+                        // Сразу запускаем мгновенное обновление
+                        processFoundLocation(pos.coords.latitude, pos.coords.longitude); 
                     },
                     (err) => {
                         alert("Включите GPS в шторке телефона!");
