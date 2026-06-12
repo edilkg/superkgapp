@@ -630,10 +630,10 @@
     <div id="screen-main">
         <div class="header-nav">
             <img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=100" class="logo-img">
-            <div class="header-address">
-    <span>Доставка в городе</span>
-    <span id="current-city-display">Чолпон-Ата</span>
-</div>
+            <div class="header-address" onclick="openMapModal()" style="cursor: pointer; overflow: hidden; padding-right: 10px;">
+                <span style="color: var(--text-gray); font-size: 11px; display: flex; align-items: center; gap: 4px;">ДОСТАВИТЬ ПО АДРЕСУ <span style="font-size: 14px; font-weight: bold;">›</span></span>
+                <span id="current-city-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; width: 100%; font-size: 15px; font-weight: 700;">Чолпон-Ата</span>
+            </div>
         </div>
 
         <div class="search-container">
@@ -1069,6 +1069,9 @@
             document.getElementById('screen-'+screenId).classList.remove('hidden');
             document.getElementById('cart-float-btn').style.display = (totalSum > 0 && ['main', 'menu'].includes(screenId)) ? 'flex' : 'none';
 
+            // МГНОВЕННО ВОЗВРАЩАЕМ СТРАНИЦУ В САМЫЙ ВЕРХ ПРИ СМЕНЕ ЭКРАНА
+            window.scrollTo(0, 0);
+
             // Обязательно закрываем все открытые модалки при смене экрана, чтобы ничего не зависло
             document.getElementById('modal-product').classList.add('hidden');
             document.getElementById('modal-address').classList.add('hidden');
@@ -1193,12 +1196,46 @@ function renderRestaurants(searchQuery = '') {
                 <div class="res-info">
                     <div class="res-name">
                         <span>${res.title}</span>
+                        <div class="res-meta">
+                        ${checkOpenStatus(res.hours)}
+                    </div>
+                    </div>
+                    <div>
+                        <span class="res-desc">${res.address}</span></div>
+                </div>
+            `;
+            div.innerHTML = `
+                <img src="${res.img}" class="res-img" alt="${res.title}">
+                <div class="res-info">
+                    <div class="res-name">
+                        <span>${res.title}</span>
+                        <div class="res-meta">
+                        ${checkOpenStatus(res.hours)}
+                    </div>
                     </div>
                     <div class="res-desc">${res.address}</div>
-                    <div class="res-meta">
+                </div>
+            `;div.innerHTML = `
+                <img src="${res.img}" class="res-img" alt="${res.title}">
+                <div class="res-info">
+                    <div class="res-name">
+                        <span>${res.title}</span>
+                        <div class="res-meta">
                         ${checkOpenStatus(res.hours)}
-                        <span style="color: #666;">• 🛵 От 100 сом</span>
                     </div>
+                    </div>
+                    <div class="res-desc">${res.address}</div>
+                </div>
+            `;div.innerHTML = `
+                <img src="${res.img}" class="res-img" alt="${res.title}">
+                <div class="res-info">
+                    <div class="res-name">
+                        <span>${res.title}</span>
+                        <div class="res-meta">
+                        ${checkOpenStatus(res.hours)}
+                    </div>
+                    </div>
+                    <div class="res-desc">${res.address}</div>
                 </div>
             `;
             list.appendChild(div);
@@ -1571,16 +1608,63 @@ function filterMenu(resId, category, btn) {
             
             const activeRes = database[cartActiveTabResId];
             
-            // ИСПРАВЛЕНИЕ: Заставляем карту пересчитать свои размеры после снятия 'hidden', 
-            // иначе при повторном открытии она ломается (серый экран).
+            // Защита: если корзина пустая и открыли с главной, берем GPS юзера или дефолтные координаты
+            const resLat = activeRes ? activeRes.lat : (clientLat || 42.6482);
+            const resLon = activeRes ? activeRes.lon : (clientLon || 77.0855);
+            
             setTimeout(() => { 
                 if (checkoutMap) checkoutMap.invalidateSize(); 
-                initCheckoutMap(activeRes.lat, activeRes.lon); 
+                initCheckoutMap(resLat, resLon); 
             }, 50);
             
             document.getElementById('map-street').value = orderAddressData.street || '';
             document.getElementById('map-kv').value = orderAddressData.kv || '';
             document.getElementById('map-comment').value = orderAddressData.comment || '';
+        }
+
+        function recalcCheckoutDelivery(resLat, resLon) {
+            const priceElement = document.getElementById('modal-map-price');
+            const submitButton = document.querySelector('#modal-map .btn-yellow');
+
+            // Защита: Если ресторан еще не выбран (открыли с главной)
+            if (!cartActiveTabResId || !database[cartActiveTabResId]) {
+                currentDeliveryFee = 0;
+                priceElement.innerText = 'Выберите блюда';
+                priceElement.style.color = '#888';
+                priceElement.style.fontSize = '14px';
+                submitButton.classList.remove('disabled');
+                submitButton.style.pointerEvents = 'auto';
+                submitButton.innerText = 'Сохранить адрес';
+                return;
+            }
+
+            const straightDist = getDistance(resLat, resLon, clientLat, clientLon);
+            const MAX_DISTANCE_KM = 15; 
+
+            if (straightDist > MAX_DISTANCE_KM) {
+                currentDeliveryFee = 0; 
+                priceElement.innerText = 'Вне зоны доставки';
+                priceElement.style.color = '#d32f2f'; 
+                priceElement.style.fontSize = '14px'; 
+                
+                submitButton.classList.add('disabled');
+                submitButton.style.pointerEvents = 'none';
+                submitButton.innerText = 'Слишком далеко';
+                
+                if(tg) tg.HapticFeedback.notificationOccurred('error');
+            } else {
+                currentDeliveryFee = calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon);
+                
+                priceElement.innerText = currentDeliveryFee + ' сом';
+                priceElement.style.color = '#E65100';
+                priceElement.style.fontSize = '20px';
+                
+                submitButton.classList.remove('disabled');
+                submitButton.style.pointerEvents = 'auto';
+                submitButton.innerText = 'Готово';
+            }
+            
+            updateReceipt();
         }
 
         function confirmMapAddress() {
@@ -1667,28 +1751,30 @@ function filterMenu(resId, category, btn) {
                         fullAddress = house;
                     }
 
-                    // Определяем элемент один раз (как советовал VS Code)
                     const inputStreet = document.getElementById('map-street');
 
                     if (fullAddress) {
-                        // Если нашли точный адрес (улица/дом)
                         if (inputStreet) inputStreet.value = fullAddress;
                         orderAddressData.street = fullAddress;
                     } else {
-                        // FALLBACK: Если улицу не нашли, берем город, село или пишем "Адрес не определен"
                         const fallback = data.address.city || data.address.town || data.address.village || "Адрес не определён";
                         if (inputStreet) inputStreet.value = fallback;
                         orderAddressData.street = fallback;
+                        fullAddress = fallback; // Сохраняем для шапки
                     }
                     
-                    // Обновляем текст на мини-карте
+                    // --- ОБНОВЛЯЕМ АДРЕС В ШАПКЕ ГЛАВНОЙ СТРАНИЦЫ ---
+                    const cityDisplay = document.getElementById('current-city-display');
+                    if (cityDisplay) {
+                        cityDisplay.innerText = fullAddress;
+                    }
+                    
                     updateCheckoutSummaryUI(); 
                 }
             } catch(e) {
                 console.error("Ошибка определения адреса:", e);
             }
             
-            // Пересчитываем цену доставки
             if (cartActiveTabResId && database[cartActiveTabResId]) {
                 recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
             }
