@@ -1933,20 +1933,27 @@ function filterMenu(resId, category, btn) {
                         const fallback = data.address.city || data.address.town || data.address.village || "Адрес не определён";
                         if (inputStreet) inputStreet.value = fallback;
                         orderAddressData.street = fallback;
-                        fullAddress = fallback; // Сохраняем для шапки
+                        fullAddress = fallback; 
                     }
                     
-                    // --- ОБНОВЛЯЕМ АДРЕС В ШАПКЕ ГЛАВНОЙ СТРАНИЦЫ ---
                     const cityDisplay = document.getElementById('current-city-display');
-                    if (cityDisplay) {
-                        cityDisplay.innerText = fullAddress;
-                    }
+                    if (cityDisplay) cityDisplay.innerText = fullAddress;
                     
                     updateCheckoutSummaryUI();
                     renderRestaurants();
                 }
             } catch(e) {
                 console.error("Ошибка определения адреса:", e);
+                // АНТИКРАШ: Если сервер адресов упал, ставим заглушку, чтобы интерфейс не завис
+                const inputStreet = document.getElementById('map-street');
+                if (inputStreet) inputStreet.value = "📍 Местоположение найдено";
+                orderAddressData.street = "Текущая геопозиция";
+                
+                const cityDisplay = document.getElementById('current-city-display');
+                if (cityDisplay) cityDisplay.innerText = "📍 Точка на карте";
+                
+                updateCheckoutSummaryUI();
+                renderRestaurants(); // Цены пересчитаются в любом случае!
             }
             
             if (cartActiveTabResId && database[cartActiveTabResId]) {
