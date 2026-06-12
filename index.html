@@ -657,7 +657,7 @@
         </div>
 
         <div class="search-container">
-            <input type="text" id="search-input" class="search-bar" placeholder="🔍 Найти ресторан или блюдо..." oninput="handleSearch()">
+            <input type="text" id="search-input" class="search-bar" placeholder="🔍 Найти ресторан" oninput="handleSearch()">
         </div>
         
         <div class="main-categories">
@@ -818,7 +818,7 @@
                 </div>
                 <div style="height: 12px;"></div>
 
-                <input type="text" id="map-kv" placeholder="🏠 (гостевой дом, номер кв или комментарий курьеру)" class="full-width-input" style="background: #f0f0f0; margin-bottom: 12px;">
+                <input type="text" id="map-kv" placeholder="🏠 (номер дома, кв. ёазвание дома и т.д)" class="full-width-input" style="background: #f0f0f0; margin-bottom: 12px;">
                 
                 <input type="text" id="map-comment" placeholder="💬 курьеру (ориентир, красные ворота)" class="full-width-input" style="background: #f0f0f0;">
 
@@ -1210,24 +1210,22 @@ function renderRestaurants(searchQuery = '') {
             // --- НОВАЯ ЛОГИКА РАСЧЕТА ДОСТАВКИ ДЛЯ КАРТОЧКИ ---
             let deliveryText = `<div class="res-desc">${res.address}</div>`; // По умолчанию показываем адрес
             
-            // Если мы уже узнали координаты юзера, считаем цену
-            if (clientLat && clientLon) {
+           if (clientLat && clientLon) {
                 const straightDist = getDistance(res.lat, res.lon, clientLat, clientLon);
-                const MAX_DISTANCE_KM = 15; // Твой лимит из кода
+                const MAX_DISTANCE_KM = 15; 
                 
                 if (straightDist > MAX_DISTANCE_KM) {
-                    // Показываем, насколько именно далеко
                     deliveryText = `<div class="res-desc" style="color: #d32f2f; font-weight: 600;">🚫 Слишком далеко (${straightDist.toFixed(1)} км)</div>`;
                 } else {
                     const fee = calculateDynamicDeliveryFee(res.lat, res.lon, clientLat, clientLon);
                     
-                    // Динамический расчет времени: 20 мин (готовка/ожидание) + 4 мин на каждый 1 км расстояния
-                    const minTime = 20 + Math.floor(straightDist * 4);
-                    const maxTime = minTime + 15; // Добавляем "вилку" в 15 минут (например, 30-45 мин)
+                    // --- НОВОЕ: Округление времени до ближайших 5 минут ---
+                    const rawMinTime = 20 + Math.floor(straightDist * 4);
+                    const minTime = Math.round(rawMinTime / 5) * 5; // Магия округления
+                    const maxTime = minTime + 15; // Добавляем вилку в 15 минут
                     
-                    // Выводим красивую строку (toFixed(1) оставляет только 1 цифру после точки, например 1.5 км)
                     deliveryText = `<div class="res-desc" style="color: #E65100; font-weight: 700; font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px;">
-                        <span>📍 ${straightDist.toFixed(1)} км от вас</span> | 
+                        <span>📍 ${straightDist.toFixed(1)} км</span> | 
                         <span>🛵 ${fee} сом</span> | 
                         <span>🕓 ${minTime}-${maxTime} мин</span>
                     </div>`;
@@ -2328,10 +2326,8 @@ function filterMenu(resId, category, btn) {
         const btnConfirmGeo = document.getElementById('btn-geo-confirm');
         const btnSkipGeo = document.getElementById('btn-geo-skip');
         
-        // Подключаем API Телеграма
         const tgApp = window.Telegram?.WebApp;
 
-        // 1. Проверяем при входе, есть ли уже доступ к геолокации
         if (tgApp && tgApp.LocationManager) {
             tgApp.LocationManager.init(() => {
                 if (!tgApp.LocationManager.isAccessGranted) {
@@ -2342,25 +2338,26 @@ function filterMenu(resId, category, btn) {
                             clientLat = data.latitude;
                             clientLon = data.longitude;
                             localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                            // --- НОВОЕ: Сразу определяем улицу в фоне ---
+                            
+                            renderRestaurants(); // МГНОВЕННО ОБНОВЛЯЕМ ЦЕНЫ И ДИСТАНЦИИ
                             reverseGeocode(clientLat, clientLon);
                         }
                     });
                 }
             });
         } else {
-            // Резервный вариант для браузера
             if (!localStorage.getItem('user_geo')) {
                 geoOverlay.style.display = 'flex';
             } else {
                 let sg = JSON.parse(localStorage.getItem('user_geo'));
                 clientLat = sg.lat;
                 clientLon = sg.lon;
+                
+                renderRestaurants(); // МГНОВЕННО ОБНОВЛЯЕМ ЦЕНЫ И ДИСТАНЦИИ
                 reverseGeocode(clientLat, clientLon);
             }
         }
 
-        // 2. Обработка клика по желтой кнопке (когда юзер разрешает GPS первый раз)
         btnConfirmGeo.addEventListener('click', () => {
             if(tgApp && tgApp.HapticFeedback) tgApp.HapticFeedback.impactOccurred('medium');
             
@@ -2378,7 +2375,8 @@ function filterMenu(resId, category, btn) {
                             localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                             geoOverlay.style.display = 'none';
                             if(tgApp.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('success');
-                            // --- НОВОЕ: Сразу переводим точку в название улицы ---
+                            
+                            renderRestaurants(); // МГНОВЕННО ОБНОВЛЯЕМ ЦЕНЫ И ДИСТАНЦИИ
                             reverseGeocode(clientLat, clientLon);
                         } else {
                             btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Открыть настройки';
@@ -2394,7 +2392,8 @@ function filterMenu(resId, category, btn) {
                         clientLon = pos.coords.longitude;
                         localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                         geoOverlay.style.display = 'none';
-                        // --- НОВОЕ: Сразу переводим точку в название улицы ---
+                        
+                        renderRestaurants(); // МГНОВЕННО ОБНОВЛЯЕМ ЦЕНЫ И ДИСТАНЦИИ
                         reverseGeocode(clientLat, clientLon);
                     },
                     (err) => {
@@ -2406,9 +2405,9 @@ function filterMenu(resId, category, btn) {
             }
         });
 
-        // 3. Обработка кнопки "Ввести вручную"
         btnSkipGeo.addEventListener('click', () => {
             geoOverlay.style.display = 'none'; 
+            openMapModal(); 
         });
 
        window.isAddressSelectedFromList = false; // Глобальный флаг защиты от двойного поиска
