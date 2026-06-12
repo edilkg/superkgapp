@@ -627,10 +627,30 @@
         </div>
     </div>
 
+    <div id="modal-my-addresses" class="modal-overlay hidden" style="justify-content: center; align-items: flex-end; z-index: 10002;" onclick="closeMyAddressesIfOverlay(event)">
+        <div class="modal-window" style="background: white; width: 100%; border-radius: 24px 24px 0 0; padding: 24px 20px 32px; text-align: left; box-shadow: 0 -4px 20px rgba(0,0,0,0.1); max-height: 85vh; display: flex; flex-direction: column;">
+            
+            <div style="width: 40px; height: 4px; background: #e0e0e0; border-radius: 2px; margin: 0 auto 20px;"></div>
+            
+            <h2 style="font-size: 20px; font-weight: 800; color: #111; margin: 0 0 16px 0;">Мои адреса</h2>
+            
+            <div id="my-addresses-list" style="overflow-y: auto; flex-grow: 1; margin-bottom: 16px; max-height: 400px;">
+                </div>
+
+            <button onclick="addNewAddressFromModal()" style="width: 100%; background: transparent; color: #333; border: 1px dashed #ccc; border-radius: 12px; font-size: 15px; font-weight: 700; padding: 14px; cursor: pointer; margin-bottom: 12px; transition: 0.2s;">
+                + Добавить новый адрес
+            </button>
+
+            <button onclick="confirmAddressFromModal()" style="width: 100%; background: var(--main-yellow); color: #111; border: none; border-radius: 16px; padding: 16px; font-size: 16px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 15px rgba(252, 224, 0, 0.4);">
+                Доставить сюда
+            </button>
+        </div>
+    </div>
+
     <div id="screen-main">
         <div class="header-nav">
             <img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=100" class="logo-img">
-            <div class="header-address" onclick="openMapModal()" style="cursor: pointer; overflow: hidden; padding-right: 10px;">
+            <div class="header-address" onclick="onHeaderAddressClick()" style="cursor: pointer; overflow: hidden; padding-right: 10px;">
                 <span style="color: var(--text-gray); font-size: 11px; display: flex; align-items: center; gap: 4px;">ДОСТАВИТЬ ПО АДРЕСУ <span style="font-size: 14px; font-weight: bold;">›</span></span>
                 <span id="current-city-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; width: 100%; font-size: 15px; font-weight: 700;">Чолпон-Ата</span>
             </div>
@@ -798,7 +818,7 @@
                 </div>
                 <div style="height: 12px;"></div>
 
-                <input type="text" id="map-kv" placeholder="🏠 (название дома, № кв или комментарий курьеру)" class="full-width-input" style="background: #f0f0f0; margin-bottom: 12px;">
+                <input type="text" id="map-kv" placeholder="🏠 (гостевой дом, номер кв или комментарий курьеру)" class="full-width-input" style="background: #f0f0f0; margin-bottom: 12px;">
                 
                 <input type="text" id="map-comment" placeholder="💬 курьеру (ориентир, красные ворота)" class="full-width-input" style="background: #f0f0f0;">
 
@@ -1187,9 +1207,26 @@ function renderRestaurants(searchQuery = '') {
         if (matchesCity && matchesSearch && matchesTags) {
             hasResults = true;
             
+            // --- НОВАЯ ЛОГИКА РАСЧЕТА ДОСТАВКИ ДЛЯ КАРТОЧКИ ---
+            let deliveryText = `<div class="res-desc">${res.address}</div>`; // По умолчанию показываем адрес
+            
+            // Если мы уже узнали координаты юзера, считаем цену
+            if (clientLat && clientLon) {
+                const straightDist = getDistance(res.lat, res.lon, clientLat, clientLon);
+                const MAX_DISTANCE_KM = 15; // Твой лимит из кода
+                
+                if (straightDist > MAX_DISTANCE_KM) {
+                    deliveryText = `<div class="res-desc" style="color: #d32f2f; font-weight: 600;">🚫 Слишком далеко</div>`;
+                } else {
+                    const fee = calculateDynamicDeliveryFee(res.lat, res.lon, clientLat, clientLon);
+                    deliveryText = `<div class="res-desc" style="color: #E65100; font-weight: 700;">🛵 до вас ≈ ${fee} сом</div>`;
+                }
+            }
+            // ----------------------------------------------------
+
             const div = document.createElement('div');
             div.className = 'res-card';
-            div.onclick = () => openMenu(id); // Твоя функция открытия меню
+            div.onclick = () => openMenu(id); 
             
             div.innerHTML = `
                 <img src="${res.img}" class="res-img" alt="${res.title}">
@@ -1197,45 +1234,10 @@ function renderRestaurants(searchQuery = '') {
                     <div class="res-name">
                         <span>${res.title}</span>
                         <div class="res-meta">
-                        ${checkOpenStatus(res.hours)}
+                            ${checkOpenStatus(res.hours)}
+                        </div>
                     </div>
-                    </div>
-                    <div>
-                        <span class="res-desc">${res.address}</span></div>
-                </div>
-            `;
-            div.innerHTML = `
-                <img src="${res.img}" class="res-img" alt="${res.title}">
-                <div class="res-info">
-                    <div class="res-name">
-                        <span>${res.title}</span>
-                        <div class="res-meta">
-                        ${checkOpenStatus(res.hours)}
-                    </div>
-                    </div>
-                    <div class="res-desc">${res.address}</div>
-                </div>
-            `;div.innerHTML = `
-                <img src="${res.img}" class="res-img" alt="${res.title}">
-                <div class="res-info">
-                    <div class="res-name">
-                        <span>${res.title}</span>
-                        <div class="res-meta">
-                        ${checkOpenStatus(res.hours)}
-                    </div>
-                    </div>
-                    <div class="res-desc">${res.address}</div>
-                </div>
-            `;div.innerHTML = `
-                <img src="${res.img}" class="res-img" alt="${res.title}">
-                <div class="res-info">
-                    <div class="res-name">
-                        <span>${res.title}</span>
-                        <div class="res-meta">
-                        ${checkOpenStatus(res.hours)}
-                    </div>
-                    </div>
-                    <div class="res-desc">${res.address}</div>
+                    ${deliveryText}
                 </div>
             `;
             list.appendChild(div);
@@ -1622,22 +1624,158 @@ function filterMenu(resId, category, btn) {
             document.getElementById('map-comment').value = orderAddressData.comment || '';
         }
 
-        function recalcCheckoutDelivery(resLat, resLon) {
-            const priceElement = document.getElementById('modal-map-price');
-            const submitButton = document.querySelector('#modal-map .btn-yellow');
+        // ==========================================
+        // ЛОГИКА ОКНА "МОИ АДРЕСА"
+        // ==========================================
+        let tempSelectedAddressIndex = 0;
 
-            // Защита: Если ресторан еще не выбран (открыли с главной)
-            if (!cartActiveTabResId || !database[cartActiveTabResId]) {
-                currentDeliveryFee = 0;
-                priceElement.innerText = 'Выберите блюда';
-                priceElement.style.color = '#888';
-                priceElement.style.fontSize = '14px';
-                submitButton.classList.remove('disabled');
-                submitButton.style.pointerEvents = 'auto';
-                submitButton.innerText = 'Сохранить адрес';
+        function onHeaderAddressClick() {
+            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+            
+            // Если есть хотя бы один сохраненный адрес, открываем список
+            if (saved.length > 0) {
+                tempSelectedAddressIndex = 0; 
+                // Пытаемся найти текущий выбранный адрес по координатам
+                const currentSavedIndex = saved.findIndex(a => a.lat === clientLat && a.lon === clientLon);
+                if (currentSavedIndex !== -1) tempSelectedAddressIndex = currentSavedIndex;
+                
+                renderMyAddressesModal();
+                document.getElementById('modal-my-addresses').classList.remove('hidden');
+            } else {
+                // Если адресов нет, сразу кидаем на карту
+                openMapModal();
+            }
+        }
+
+        function closeMyAddressesIfOverlay(event) {
+            if(event.target.id === 'modal-my-addresses') {
+                document.getElementById('modal-my-addresses').classList.add('hidden');
+            }
+        }
+
+        function renderMyAddressesModal() {
+            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+            const container = document.getElementById('my-addresses-list');
+            
+            if (saved.length === 0) {
+                document.getElementById('modal-my-addresses').classList.add('hidden');
+                openMapModal();
                 return;
             }
 
+            container.innerHTML = saved.map((a, i) => {
+                const isActive = (tempSelectedAddressIndex === i);
+                return `
+                <div style="display: flex; align-items: center; background: ${isActive ? '#fffcf0' : '#f5f5f5'}; border: 1px solid ${isActive ? '#FCE000' : 'transparent'}; padding: 14px 16px; border-radius: 16px; margin-bottom: 10px; cursor: pointer; transition: 0.2s;" onclick="selectAddressFromModal(${i})">
+                    <div style="width: 20px; height: 20px; border-radius: 50%; border: 2px solid ${isActive ? '#E65100' : '#ccc'}; display: flex; align-items: center; justify-content: center; margin-right: 12px; flex-shrink: 0;">
+                        ${isActive ? '<div style="width: 10px; height: 10px; background: #E65100; border-radius: 50%;"></div>' : ''}
+                    </div>
+                    
+                    <div style="flex-grow: 1; font-size: 15px; font-weight: 600; color: #111;">
+                        ${a.text}
+                    </div>
+                    
+                    <div onclick="event.stopPropagation(); editAddressFromModal(${i})" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: #1ea1f2; background: #eef7ff; border-radius: 8px; margin-left: 8px;" title="Редактировать">
+                        ✏️
+                    </div>
+                    
+                    <div onclick="event.stopPropagation(); deleteAddressFromModal(${i})" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: #d32f2f; background: #ffebee; border-radius: 8px; margin-left: 8px;" title="Удалить">
+                        🗑️
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        function selectAddressFromModal(index) {
+            tempSelectedAddressIndex = index;
+            renderMyAddressesModal();
+            if(tg && tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+        }
+
+        function deleteAddressFromModal(index) {
+            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+            saved.splice(index, 1);
+            localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+            
+            if (tempSelectedAddressIndex >= saved.length) {
+                tempSelectedAddressIndex = Math.max(0, saved.length - 1);
+            }
+            
+            renderMyAddressesModal();
+            renderSavedAddressesUI(); // Обновляем и в корзине
+        }
+
+        function editAddressFromModal(index) {
+            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+            let data = saved[index];
+            
+            // Вставляем данные в глобальные переменные для карты
+            orderAddressData = { street: data.street, pod: data.pod || '', kv: data.kv || '', comment: data.comment || '' };
+            clientLat = data.lat;
+            clientLon = data.lon;
+            
+            // Удаляем старую запись, чтобы после редактирования сохранилась новая
+            deleteAddressFromModal(index); 
+            
+            document.getElementById('modal-my-addresses').classList.add('hidden');
+            openMapModal();
+        }
+
+        function addNewAddressFromModal() {
+            document.getElementById('modal-my-addresses').classList.add('hidden');
+            
+            // Очищаем текущие инпуты, чтобы открыть "чистую" карту
+            document.getElementById('map-street').value = '';
+            document.getElementById('map-kv').value = '';
+            document.getElementById('map-comment').value = '';
+            orderAddressData = { street: '', pod: '', kv: '', comment: '' };
+            
+            openMapModal();
+        }
+
+        function confirmAddressFromModal() {
+            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+            if (saved.length > 0 && saved[tempSelectedAddressIndex]) {
+                const data = saved[tempSelectedAddressIndex];
+                
+                // Применяем выбранные данные в систему
+                orderAddressData.street = data.street;
+                orderAddressData.pod = data.pod || '';
+                orderAddressData.kv = data.kv || '';
+                orderAddressData.comment = data.comment || '';
+                clientLat = data.lat;
+                clientLon = data.lon;
+                
+                // Обновляем текст в шапке главного меню
+                document.getElementById('current-city-display').innerText = data.text;
+                
+                // Если мы в корзине - пересчитываем доставку и карту
+                updateCheckoutSummaryUI();
+                updateReceipt();
+            }
+            
+            document.getElementById('modal-my-addresses').classList.add('hidden');
+            if(tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        }
+
+        function recalcCheckoutDelivery(resLat, resLon) {
+            const priceElement = document.getElementById('modal-map-price');
+            const submitButton = document.querySelector('#modal-map .btn-yellow');
+            
+            // ЕСЛИ МЫ НА ГЛАВНОЙ СТРАНИЦЕ (ресторан еще не выбран)
+            if (!cartActiveTabResId || !database[cartActiveTabResId]) {
+                currentDeliveryFee = 0;
+                priceElement.innerText = 'Укажите адрес';
+                priceElement.style.color = '#888';
+                priceElement.style.fontSize = '14px';
+                
+                submitButton.classList.remove('disabled');
+                submitButton.style.pointerEvents = 'auto';
+                submitButton.innerText = 'Сохранить адрес'; // МЕНЯЕМ ТЕКСТ КНОПКИ
+                return;
+            }
+
+            // ЕСЛИ МЫ В КОРЗИНЕ (считаем доставку)
             const straightDist = getDistance(resLat, resLon, clientLat, clientLon);
             const MAX_DISTANCE_KM = 15; 
 
@@ -1650,33 +1788,48 @@ function filterMenu(resId, category, btn) {
                 submitButton.classList.add('disabled');
                 submitButton.style.pointerEvents = 'none';
                 submitButton.innerText = 'Слишком далеко';
-                
-                if(tg) tg.HapticFeedback.notificationOccurred('error');
             } else {
                 currentDeliveryFee = calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon);
-                
                 priceElement.innerText = currentDeliveryFee + ' сом';
                 priceElement.style.color = '#E65100';
                 priceElement.style.fontSize = '20px';
                 
                 submitButton.classList.remove('disabled');
                 submitButton.style.pointerEvents = 'auto';
-                submitButton.innerText = 'Готово';
+                submitButton.innerText = 'Готово'; // МЕНЯЕМ ТЕКСТ ОБРАТНО
             }
-            
             updateReceipt();
         }
 
         function confirmMapAddress() {
             orderAddressData.street = document.getElementById('map-street').value;
-            orderAddressData.pod = ''; // Очистили, так как поля больше нет
+            orderAddressData.pod = '';
             orderAddressData.kv = document.getElementById('map-kv').value;
             orderAddressData.comment = document.getElementById('map-comment').value;
 
             if (!orderAddressData.street) return alert("Пожалуйста, укажите улицу!");
 
-            updateCheckoutSummaryUI();
-            updateReceipt();
+            // АВТО-СОХРАНЕНИЕ АДРЕСА 
+            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+            let text = orderAddressData.street;
+            if (orderAddressData.kv) text += `, кв.${orderAddressData.kv}`;
+            
+            // Если такого адреса еще нет в списке, добавляем его наверх
+            const existingIndex = saved.findIndex(a => a.street === orderAddressData.street && a.kv === orderAddressData.kv);
+            if (existingIndex === -1) {
+                saved.unshift({ text: text, ...orderAddressData, lat: clientLat, lon: clientLon });
+                localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+                renderSavedAddressesUI(); // Обновляем список в корзине
+            }
+
+            // Обновляем интерфейсы
+            if (!document.getElementById('screen-cart-list').classList.contains('hidden')) {
+                updateCheckoutSummaryUI();
+                updateReceipt();
+            } else {
+                // Если мы на главной странице
+                document.getElementById('current-city-display').innerText = text; 
+            }
             onBackClick();
         }
 
