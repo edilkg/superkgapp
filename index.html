@@ -1216,13 +1216,24 @@ function renderRestaurants(searchQuery = '') {
                 const MAX_DISTANCE_KM = 15; // Твой лимит из кода
                 
                 if (straightDist > MAX_DISTANCE_KM) {
-                    deliveryText = `<div class="res-desc" style="color: #d32f2f; font-weight: 600;">🚫 Слишком далеко</div>`;
+                    // Показываем, насколько именно далеко
+                    deliveryText = `<div class="res-desc" style="color: #d32f2f; font-weight: 600;">🚫 Слишком далеко (${straightDist.toFixed(1)} км)</div>`;
                 } else {
                     const fee = calculateDynamicDeliveryFee(res.lat, res.lon, clientLat, clientLon);
-                    deliveryText = `<div class="res-desc" style="color: #E65100; font-weight: 700;">🛵 до вас ≈ ${fee} сом</div>`;
+                    
+                    // Динамический расчет времени: 20 мин (готовка/ожидание) + 4 мин на каждый 1 км расстояния
+                    const minTime = 20 + Math.floor(straightDist * 4);
+                    const maxTime = minTime + 15; // Добавляем "вилку" в 15 минут (например, 30-45 мин)
+                    
+                    // Выводим красивую строку (toFixed(1) оставляет только 1 цифру после точки, например 1.5 км)
+                    deliveryText = `<div class="res-desc" style="color: #E65100; font-weight: 700; font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px;">
+                        <span>📍 ${straightDist.toFixed(1)} км</span> | 
+                        <span>🛵 ${fee} сом</span> | 
+                        <span>🕓 ${minTime}-${maxTime} мин</span>
+                    </div>`;
                 }
             }
-            // ----------------------------------------------------
+            // -----------------------------------------------------
 
             const div = document.createElement('div');
             div.className = 'res-card';
