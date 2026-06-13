@@ -603,64 +603,76 @@
             margin-top: 2px;
         }
 /* ==========================================
-   СТИЛИ ДЛЯ ЭКРАНА ОПЛАТЫ (АДАПТИВНЫЙ)
+   СТИЛИ ДЛЯ ЭКРАНА ОПЛАТЫ (ФИКСИРОВАННЫЙ, БЕЗ СКРОЛЛА)
    ========================================== */
 #screen-payment {
-    padding-bottom: 30px; /* Уменьшили отступ, чтобы кнопка была ниже */
+    position: fixed; /* Отрываем экран от общего body */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh; /* Идеальная высота для мобильных браузеров */
     background: var(--bg-color);
-    min-height: 100vh;
     display: flex;
     flex-direction: column;
+    z-index: 2000; /* Показываем поверх всего остального */
+    overflow: hidden; /* Строго блокируем любой скролл */
+    box-sizing: border-box;
 }
+
 .payment-container {
-    padding: 24px 16px;
+    padding: 20px 16px;
     background: #ffffff;
     border-radius: 24px;
-    margin: 16px;
+    margin: 12px 16px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.04);
     text-align: center;
-    flex-grow: 0.5; /* Позволяет контейнеру тянуться на больших экранах */
+    flex-grow: 1; /* Контейнер растягивается на всю доступную высоту */
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: space-between; /* Равномерно распределяет элементы внутри */
 }
+
 .payment-instructions {
     font-size: 14px;
     color: var(--text-dark);
-    margin-bottom: 20px;
+    margin-bottom: 12px;
     line-height: 1.4;
     font-weight: 500;
 }
-/* Адаптивная обертка для QR */
+
+/* Умная обертка для QR-кода */
 .qr-wrapper {
-    margin: 0 auto 20px;
+    margin: 0 auto;
     width: 100%;
-    max-width: 360px; /* На планшетах не будет гигантским */
+    flex-grow: 1; /* Отдаем QR-коду ВСЁ свободное пространство экрана */
     display: flex;
     justify-content: center;
     align-items: center;
+    min-height: 0; /* Обязательное свойство, чтобы QR не вылезал за границы на крошечных экранах */
 }
+
 .qr-image {
-    width: 100%; 
-    height: auto; 
-    max-height: 45vh; /* ВАЖНО: QR никогда не займет больше 45% высоты экрана! */
-    object-fit: contain;
-    border-radius: 16px;
-    /* Убрал жесткие 420px, теперь картинка сама масштабируется */
+    width: 100%;
+    height: 100%; /* Заставляет картинку расти вслед за контейнером */
+    max-width: 450px; 
+    max-height: 45vh; /* Увеличен лимит высоты с 45vh до 60vh */
+    object-fit: contain; /* Пропорции не искажаются */
 }
-/* Сетка кнопок */
+
 .payment-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px; /* Чуть уменьшил зазор для маленьких экранов */
-    margin-top: auto; /* Прижимает кнопки к низу контейнера */
+    gap: 8px;
+    margin-top: 16px;
 }
+
 .btn-pay-action {
     background: #f5f5f5;
     border: none;
     padding: 14px 8px;
     border-radius: 14px;
-    font-size: 13px; /* Оптимальный размер для узких экранов (320px) */
+    font-size: 13px;
     font-weight: 600;
     color: var(--text-dark);
     cursor: pointer;
@@ -670,10 +682,12 @@
     gap: 6px;
     transition: 0.1s;
 }
+
 .btn-pay-action:active {
     background: #e0e0e0;
     transform: scale(0.97);
 }
+
 .btn-pay-action.full-width {
     grid-column: span 2;
     padding: 14px;
@@ -2325,7 +2339,7 @@ function filterMenu(resId, category, btn) {
 // ==========================================
 
 // ТВОИ ДАННЫЕ (Вставь свою картинку QR и свой номер/реквизиты)
-const MY_QR_IMAGE_URL = "https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/mbankQR.jpg"; 
+const MY_QR_IMAGE_URL = "https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/MBNKQR.jpeg"; 
 const MY_PAYMENT_NUMBER = "500402002"; 
 
 function openPaymentScreen() {
