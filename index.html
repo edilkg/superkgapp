@@ -2351,33 +2351,6 @@ function openPaymentScreen() {
     showScreen('payment');
 }
 
-function downloadQR() {
-    if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-
-    // Вызываем нативное всплывающее окно Telegram с инструкцией
-    if (tg && tg.showPopup) {
-        tg.showPopup({
-            title: 'Как сохранить QR-код',
-            message: 'Сейчас картинка откроется на весь экран.\nЗажмите её пальцем на пару секунд и выберите «Сохранить изображение».',
-            buttons: [
-                { id: 'ok', type: 'default', text: 'Понятно, открыть' }
-            ]
-        }, function(btnId) {
-            // Когда юзер нажал "Понятно", открываем картинку
-            if (btnId === 'ok') {
-                if (tg.openLink) {
-                    tg.openLink(MY_QR_IMAGE_URL);
-                } else {
-                    window.open(MY_QR_IMAGE_URL, '_blank');
-                }
-            }
-        });
-    } else {
-        // Для старых устройств просто открываем ссылку
-        window.open(MY_QR_IMAGE_URL, '_blank');
-    }
-}
-
 function copyPaymentNumber() {
     if(tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
     
@@ -2400,74 +2373,6 @@ function copyPaymentNumber() {
         else alert("Реквизиты скопированы: " + MY_PAYMENT_NUMBER);
     }
 }
-
-async function sharePayment() {
-    if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-    
-    const btn = document.querySelector('button[onclick="sharePayment()"]');
-    const originalHTML = btn.innerHTML;
-    btn.innerHTML = '<span style="font-size: 16px;">⏳</span> Открытие...';
-    btn.style.pointerEvents = 'none';
-
-    // Специально ставим ссылку в самый конец, чтобы WhatsApp сделал красивое превью картинки
-    const shareText = 'Оплатите заказ ТамакKG по реквизитам:\nНомер: ' + MY_PAYMENT_NUMBER + '\n\nQR-код для оплаты:\n' + MY_QR_IMAGE_URL;
-
-    try {
-        // 1. Проверяем, вдруг системное меню доступно (если откроют не через бота, а через обычный браузер)
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: 'Оплата ТамакKG',
-                    text: shareText
-                });
-                return;
-            } catch (e) {
-                console.log("Системный шеринг недоступен", e);
-            }
-        }
-
-        // 2. ОБХОД ДЛЯ TELEGRAM MINI APP
-        // Вызываем нативное всплывающее окно iOS/Android внутри Telegram
-        if (tg && tg.showPopup) {
-            tg.showPopup({
-                title: 'Поделиться реквизитами',
-                message: 'Куда вы хотите отправить ссылку на оплату?',
-                buttons: [
-                    { id: 'whatsapp', type: 'default', text: 'Отправить в WhatsApp' },
-                    { id: 'telegram', type: 'default', text: 'Переслать в Telegram' },
-                    { id: 'copy', type: 'default', text: 'Просто скопировать' }
-                ]
-            }, function(buttonId) {
-                if (buttonId === 'whatsapp') {
-                    // Открываем WhatsApp с уже вставленным текстом
-                    tg.openLink('https://wa.me/?text=' + encodeURIComponent(shareText));
-                } else if (buttonId === 'telegram') {
-                    // Внутренняя пересылка Telegram
-                    tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(MY_QR_IMAGE_URL)}&text=${encodeURIComponent('Оплатить заказ ТамакKG: ' + MY_PAYMENT_NUMBER)}`);
-                } else if (buttonId === 'copy') {
-                    copyPaymentNumber();
-                }
-            });
-        } else {
-            // Запасной вариант для очень старых версий Telegram
-            copyPaymentNumber();
-        }
-
-    } catch (error) {
-        console.log("Ошибка шеринга:", error);
-    } finally {
-        // Возвращаем кнопку в исходное состояние
-        btn.innerHTML = originalHTML;
-        btn.style.pointerEvents = 'auto';
-    }
-}
-
-        // ==========================================
-        // ФУНКЦИИ ДЛЯ ГЕОЛОКАЦИИ
-        // ==========================================
-
-        // ==========================================
-        // ЛОГИКА МОДАЛЬНОГО ОКНА БЛЮДА (ЖЕЛЕЗОБЕТОННАЯ ВЕРСИЯ)
         // ==========================================
         var currentModalItem = null; // Используем var, чтобы избежать ошибки инициализации
 
@@ -2875,21 +2780,20 @@ function goToMainMenu() {
             <img src="" id="custom-qr-code" class="qr-image" alt="QR Code">
         </div>
 
+        <div style="font-size: 13px; color: #888; margin-bottom: 16px; line-height: 1.4;">
+            💡 Зажмите фото QR-кода, чтобы сохранить его в галерею,<br>или просто скопируйте номер
+        </div>
+
         <div class="payment-actions">
-            <button class="btn-pay-action" onclick="downloadQR()">
-                <span style="font-size: 16px;">⬇️</span> Сохранить QR
-            </button>
-            <button class="btn-pay-action" onclick="copyPaymentNumber()">
-                <span style="font-size: 16px;">📋</span> Скопировать номер
-            </button> <button class="btn-pay-action full-width" onclick="sharePayment()">
-                <span style="font-size: 16px;">🔗</span> Поделиться ссылкой
+            <button class="btn-pay-action full-width" onclick="copyPaymentNumber()" style="padding: 16px; font-size: 16px;">
+                <span style="font-size: 18px;">📋</span> Скопировать номер
             </button>
         </div>
     </div>
     
     <div style="padding: 0 16px 20px 16px;">
         <div style="text-align: center; color: #d32f2f; font-size: 13px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 6px;">
-            ⚠️Прошу нажимайте только ПОСЛЕ перевода денег!
+            ⚠️ Нажимайте только ПОСЛЕ перевода денег!
         </div>
         
         <button class="btn-yellow" onclick="createOrder()">Я оплатил заказ</button>
@@ -2898,6 +2802,7 @@ function goToMainMenu() {
             Мы проверим оплату и сразу же начнем готовить заказ!<br>Это занимает 1-2 минуты
         </div>
     </div>
+</div>
 </div>
 </body>
 </html>
