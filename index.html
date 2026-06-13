@@ -783,7 +783,7 @@
             </div>
             
             <h3 class="section-title" style="margin-top: 16px; padding: 0 0 12px 0;">Контакты получателя</h3>
-            <input type="tel" id="client-phone" class="full-width-input" placeholder="📞 Ваш номер телефона" style="background: #f5f5f5; font-weight: bold;">
+            <input type="tel" id="client-phone" class="full-width-input" placeholder="📞 Ваш номер телефона" style="background: #f5f5f5; font-weight: bold;" oninput="localStorage.setItem('tamak_client_phone', this.value)">
         </div>
 
         <div class="cart-section">
@@ -818,7 +818,7 @@
                 </div>
                 <div style="height: 12px;"></div>
 
-                <input type="text" id="map-kv" placeholder="🏠 (номер дома, кв. ёазвание дома и т.д)" class="full-width-input" style="background: #f0f0f0; margin-bottom: 12px;">
+                <input type="text" id="map-kv" placeholder="🏠 (номер дома, кв. нзвание дома и т.д)" class="full-width-input" style="background: #f0f0f0; margin-bottom: 12px;">
                 
                 <input type="text" id="map-comment" placeholder="💬 курьеру (ориентир, красные ворота)" class="full-width-input" style="background: #f0f0f0;">
 
@@ -2009,23 +2009,55 @@ function filterMenu(resId, category, btn) {
         }
 
         function locateUser() {
-            if (!navigator.geolocation) return alert("Браузер не поддерживает GPS");
-            if(tg) tg.HapticFeedback.impactOccurred('medium');
-            
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    clientLat = position.coords.latitude; 
-                    clientLon = position.coords.longitude;
-                    mapWasDragged = false; // Блокируем перезапись события moveend
-                    setMapCenterToMarker(clientLat, clientLon);
-                    reverseGeocode(clientLat, clientLon);
-                },
-                (error) => {
-                    if (error.code === 1) alert("Разрешите доступ к геолокации в настройках телефона");
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
-            );
+    // 1. СРАЗУ пускаем юзера в главное меню, не заставляя ждать!
+    showScreen('main'); 
+    
+    // 2. СРАЗУ меняем текст адреса в шапке на "Определяем..."
+    // (Убедись, что ID совпадает с твоим полем адреса в шапке)
+    const addressElement = document.querySelector('.header-address span:last-child');
+    if (addressElement) {
+        addressElement.innerText = "📍 Определяем ваш адрес...";
+    }
+
+    // 3. Запрашиваем GPS у телефона В ФОНОВОМ РЕЖИМЕ
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                // Когда GPS наконец-то нашел юзера (через 3-5 сек)
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                
+                // Сохраняем в память
+                localStorage.setItem('clientLat', lat);
+                localStorage.setItem('clientLon', lon);
+                
+                // Превращаем координаты в нормальный адрес (вызываем твою функцию)
+                reverseGeocode(lat, lon); 
+                
+                // Если нужно, пересчитываем цены/доставку с новыми координатами
+                if (typeof calculateDistanceAndPrice === 'function') {
+                    calculateDistanceAndPrice();
+                }
+            },
+            function(error) {
+                // Если юзер запретил GPS или произошла ошибка
+                if (addressElement) {
+                    addressElement.innerText = "Укажите адрес вручную ➔";
+                }
+                console.log("Ошибка геолокации: ", error.message);
+            },
+            {
+                enableHighAccuracy: false, // Отключили для скорости (Решение 1 тоже в деле!)
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
+    } else {
+        if (addressElement) {
+            addressElement.innerText = "GPS не поддерживается";
         }
+    }
+}
 
         function recalcCheckoutDelivery(resLat, resLon) {
             // Считаем расстояние по прямой
