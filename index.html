@@ -602,6 +602,113 @@
             color: #777777;
             margin-top: 2px;
         }
+        /* ==========================================
+   СТИЛИ ДЛЯ ЭКРАНА ОПЛАТЫ (NAMBA/ELQR СТИЛЬ)
+   ========================================== */
+#screen-payment {
+    padding-bottom: 120px;
+    background: var(--bg-color);
+    min-height: 100vh;
+}
+.payment-container {
+    padding: 24px 20px;
+    background: #ffffff;
+    border-radius: 24px;
+    margin: 16px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.04);
+    text-align: center;
+}
+.payment-tabs {
+    display: flex;
+    background: #f5f5f5;
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 24px;
+}
+.payment-tab {
+    flex: 1;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    color: var(--text-gray);
+    transition: 0.2s;
+}
+.payment-tab.active {
+    background: white;
+    color: var(--text-dark);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.payment-instructions {
+    font-size: 14px;
+    color: var(--text-dark);
+    margin-bottom: 24px;
+    line-height: 1.5;
+    font-weight: 500;
+}
+.qr-wrapper {
+    margin: 0 auto 20px;
+    padding: 12px;
+    background: #ffffff;
+    border-radius: 20px;
+    display: inline-block;
+}
+.qr-image {
+    width: 220px;
+    height: 220px;
+    object-fit: contain;
+    border-radius: 12px;
+}
+.elqr-logo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    font-weight: 900;
+    font-size: 20px;
+    color: #111;
+    margin-bottom: 24px;
+}
+.elqr-icon {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #a64dff 0%, #4d79ff 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 18px;
+}
+.payment-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 10px;
+}
+.btn-pay-action {
+    background: #f5f5f5;
+    border: none;
+    padding: 14px;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dark);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: 0.1s;
+}
+.btn-pay-action:active {
+    background: #e0e0e0;
+    transform: scale(0.97);
+}
+.btn-pay-action.full-width {
+    grid-column: span 2;
+}
 </style>
 </head>
 <body>
@@ -1085,26 +1192,23 @@
         }
 
         function showScreen(screenId) {
-            ['screen-main', 'screen-menu', 'screen-cart-list', 'screen-status', 'modal-map'].forEach(id => document.getElementById(id).classList.add('hidden'));
-            document.getElementById('screen-'+screenId).classList.remove('hidden');
-            document.getElementById('cart-float-btn').style.display = (totalSum > 0 && ['main', 'menu'].includes(screenId)) ? 'flex' : 'none';
+    ['screen-main', 'screen-menu', 'screen-cart-list', 'screen-status', 'screen-payment', 'modal-map'].forEach(id => document.getElementById(id).classList.add('hidden'));
+    document.getElementById('screen-'+screenId).classList.remove('hidden');
+    document.getElementById('cart-float-btn').style.display = (totalSum > 0 && ['main', 'menu'].includes(screenId)) ? 'flex' : 'none';
 
-            // МГНОВЕННО ВОЗВРАЩАЕМ СТРАНИЦУ В САМЫЙ ВЕРХ ПРИ СМЕНЕ ЭКРАНА
-            window.scrollTo(0, 0);
+    window.scrollTo(0, 0);
 
-            // Обязательно закрываем все открытые модалки при смене экрана, чтобы ничего не зависло
-            document.getElementById('modal-product').classList.add('hidden');
-            document.getElementById('modal-address').classList.add('hidden');
+    document.getElementById('modal-product').classList.add('hidden');
+    document.getElementById('modal-address').classList.add('hidden');
 
-            // --- МАГИЯ КНОПКИ "НАЗАД" ДЛЯ TELEGRAM ---
-            if (tg && tg.BackButton) {
-                if (screenId === 'main') {
-                    tg.BackButton.hide(); // На главной прячем стрелочку
-                } else {
-                    tg.BackButton.show(); // На странице ресторана или корзины - показываем
-                }
-            }
+    if (tg && tg.BackButton) {
+        if (screenId === 'main') {
+            tg.BackButton.hide();
+        } else {
+            tg.BackButton.show();
         }
+    }
+}
 
         function onNavClick(type) {
             if(tg) tg.HapticFeedback.impactOccurred('light');
@@ -2229,11 +2333,14 @@ function filterMenu(resId, category, btn) {
                 const result = await response.json(); // Читаем ответ сервера
 
                 if (response.ok) {
-                    showScreen('status');
-                    document.getElementById('st-res-name').innerText = database[cartActiveTabResId]?.title;
-                    document.getElementById('st-total').innerText = (totalSum + currentDeliveryFee) + " сом";
+                    // Данные для экрана статуса (заполняем заранее)
+                    document.getElementById('st-res-name').innerText = database[cartActiveTabResId]?.title || 'Ресторан';
+                    // Берем сумму заказа и перекидываем на оплату
                     for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
                     recalcTotal();
+                    
+                    // ОТКРЫВАЕМ ЭКРАН ОПЛАТЫ
+                    openPaymentScreen();
                 } else {
                     // ЕСЛИ СЕРВЕР ВЫДАЛ ОШИБКУ, ПОКАЗЫВАЕМ ЕЁ
                     alert("Ошибка при заказе: " + (result.error || "Неизвестная ошибка"));
@@ -2246,6 +2353,90 @@ function filterMenu(resId, category, btn) {
                 payBtn.style.opacity = '1';
             }
         }
+        
+        // ==========================================
+// ЛОГИКА ЭКРАНА ОПЛАТЫ
+// ==========================================
+
+// ТВОИ ДАННЫЕ (Вставь свою картинку QR и свой номер/реквизиты)
+const MY_QR_IMAGE_URL = "https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/dummy-qr.png"; 
+const MY_PAYMENT_NUMBER = "+996700000000"; 
+
+function openPaymentScreen() {
+    document.getElementById('custom-qr-code').src = MY_QR_IMAGE_URL;
+    history.pushState({screen: 'payment'}, '');
+    showScreen('payment');
+}
+
+function downloadQR() {
+    if(tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    
+    // Внутри Telegram Web App стандартный скачиватель работает нестабильно.
+    // Поэтому мы просим Telegram открыть картинку в браузере телефона, откуда юзер легко ее сохранит.
+    if (tg && tg.openLink) {
+        tg.openLink(MY_QR_IMAGE_URL);
+    } else {
+        // Запасной вариант для обычного браузера
+        const link = document.createElement('a');
+        link.href = MY_QR_IMAGE_URL;
+        link.download = 'QR_TamakKG.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
+function copyPaymentNumber() {
+    if(tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    
+    // Безопасное копирование с проверкой на null
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(MY_PAYMENT_NUMBER).then(() => {
+            if (tg && tg.showAlert) tg.showAlert("Реквизиты скопированы: " + MY_PAYMENT_NUMBER);
+            else alert("Реквизиты скопированы: " + MY_PAYMENT_NUMBER);
+        }).catch(err => console.error("Ошибка копирования:", err));
+    } else {
+        // Fallback для старых устройств
+        const tempInput = document.createElement("input");
+        tempInput.value = MY_PAYMENT_NUMBER;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand("copy");
+        document.body.removeChild(tempInput);
+        
+        if (tg && tg.showAlert) tg.showAlert("Реквизиты скопированы: " + MY_PAYMENT_NUMBER);
+        else alert("Реквизиты скопированы: " + MY_PAYMENT_NUMBER);
+    }
+}
+
+function sharePayment() {
+    if(tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    
+    // Нативный шеринг телефона (работает на iOS и Android)
+    if (navigator.share) {
+        navigator.share({
+            title: 'Оплата заказа ТамакKG',
+            text: 'Оплатите заказ по этим реквизитам: ' + MY_PAYMENT_NUMBER,
+            url: MY_QR_IMAGE_URL
+        }).catch(err => console.log("Отмена шеринга"));
+    } else if (tg && tg.openTelegramLink) {
+        // Если API телефона недоступно, открываем выбор чата в Telegram
+        const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(MY_QR_IMAGE_URL)}&text=${encodeURIComponent('Оплатить заказ ТамакKG: ' + MY_PAYMENT_NUMBER)}`;
+        tg.openTelegramLink(shareUrl);
+    } else {
+        // Если вообще ничего не сработало
+        copyPaymentNumber();
+    }
+}
+
+function completePaymentAndGoToStatus() {
+    if(tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    
+    // Перекидываем на финальный экран статуса (Заказ обрабатывается)
+    // Очищаем историю, чтобы юзер не мог по кнопке "Назад" снова попасть на экран оплаты
+    history.replaceState({screen: 'status'}, '');
+    showScreen('status');
+}
         // ==========================================
         // ФУНКЦИИ ДЛЯ ГЕОЛОКАЦИИ
         // ==========================================
@@ -2451,7 +2642,7 @@ function filterMenu(resId, category, btn) {
                                 reverseGeocode(clientLat, clientLon);
                             },
                             (err) => {
-                                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Текущее местоположение';
+                                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Определить0 местоположение';
                             },
                             { enableHighAccuracy: true, timeout: 5000 }
                         );
@@ -2644,5 +2835,49 @@ function goToMainMenu() {
             goToMainMenu();
         }
 </script>
+<div id="screen-payment" class="screen hidden">
+    <div class="header-nav">
+        <span class="back-btn" onclick="onBackClick()">←</span>
+        <h2 style="margin: 0; font-size: 18px; text-align: center; flex-grow: 1; padding-right: 24px;">Оплата</h2>
+    </div>
+
+    <div class="payment-container">
+        <div class="payment-tabs">
+            <div class="payment-tab">Быстрая оплата</div>
+            <div class="payment-tab active">QR-код</div>
+        </div>
+
+        <div class="payment-instructions">
+            Для оплаты отсканируйте QR-код с помощью<br>приложения банка или камерой телефона
+        </div>
+
+        <div class="qr-wrapper">
+            <img src="" id="custom-qr-code" class="qr-image" alt="QR Code">
+        </div>
+
+        <div class="elqr-logo">
+            <div class="elqr-icon">❇️</div> ELQR
+        </div>
+
+        <div class="payment-actions">
+            <button class="btn-pay-action" onclick="downloadQR()">
+                <span style="font-size: 18px;">⬇️</span> Скачать QR
+            </button>
+            <button class="btn-pay-action" onclick="copyPaymentNumber()">
+                <span style="font-size: 18px;">📋</span> Скопировать
+            </button>
+            <button class="btn-pay-action full-width" onclick="sharePayment()">
+                <span style="font-size: 18px;">🔗</span> Поделиться ссылкой
+            </button>
+        </div>
+    </div>
+    
+    <div style="padding: 0 16px;">
+        <button class="btn-yellow" onclick="completePaymentAndGoToStatus()">Я оплатил заказ</button>
+        <div style="text-align: center; margin-top: 16px; font-size: 12px; color: #999;">
+            Удобные платежи для бизнеса вместе с ТамакKG
+        </div>
+    </div>
+</div>
 </body>
 </html>
