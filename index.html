@@ -2351,52 +2351,30 @@ function openPaymentScreen() {
     showScreen('payment');
 }
 
-async function downloadQR() {
+function downloadQR() {
     if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-    
-    // Кнопка показывает процесс загрузки
-    const btn = document.querySelector('button[onclick="downloadQR()"]');
-    const originalHTML = btn.innerHTML;
-    btn.innerHTML = '<span style="font-size: 16px;">⏳</span> Сохранение...';
-    btn.style.pointerEvents = 'none';
 
-    try {
-        // Загружаем картинку как бинарные данные
-        const response = await fetch(MY_QR_IMAGE_URL);
-        const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-
-        // Инициируем скачивание
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = 'QR_TamakKG.jpg'; // Имя файла
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        // Очищаем память
-        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 100);
-        
-        // Уведомляем пользователя
-        if (tg && tg.showAlert) {
-            tg.showAlert("✅ QR-код сохранен на ваше устройство!");
-        } else {
-            alert("✅ QR-код сохранен!");
-        }
-
-    } catch (error) {
-        console.error("Скачивание заблокировано:", error);
-        
-        // РЕЗЕРВНЫЙ ВАРИАНТ ДЛЯ IPHONE И ЗАБЛОКИРОВАННЫХ БРАУЗЕРОВ
-        if (tg && tg.openLink) {
-            tg.openLink(MY_QR_IMAGE_URL);
-        } else {
-            window.open(MY_QR_IMAGE_URL, '_blank');
-        }
-    } finally {
-        // Возвращаем кнопку в нормальный вид
-        btn.innerHTML = originalHTML;
-        btn.style.pointerEvents = 'auto';
+    // Вызываем нативное всплывающее окно Telegram с инструкцией
+    if (tg && tg.showPopup) {
+        tg.showPopup({
+            title: 'Как сохранить QR-код',
+            message: 'Сейчас картинка откроется на весь экран.\nЗажмите её пальцем на пару секунд и выберите «Сохранить изображение».',
+            buttons: [
+                { id: 'ok', type: 'default', text: 'Понятно, открыть' }
+            ]
+        }, function(btnId) {
+            // Когда юзер нажал "Понятно", открываем картинку
+            if (btnId === 'ok') {
+                if (tg.openLink) {
+                    tg.openLink(MY_QR_IMAGE_URL);
+                } else {
+                    window.open(MY_QR_IMAGE_URL, '_blank');
+                }
+            }
+        });
+    } else {
+        // Для старых устройств просто открываем ссылку
+        window.open(MY_QR_IMAGE_URL, '_blank');
     }
 }
 
