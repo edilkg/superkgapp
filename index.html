@@ -2423,48 +2423,57 @@ function copyPaymentNumber() {
 async function sharePayment() {
     if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
     
-    // Меняем кнопку, пока картинка подготавливается к отправке
     const btn = document.querySelector('button[onclick="sharePayment()"]');
     const originalHTML = btn.innerHTML;
-    btn.innerHTML = '<span style="font-size: 16px;">⏳</span> Загрузка...';
+    btn.innerHTML = '<span style="font-size: 16px;">⏳</span> Открытие...';
     btn.style.pointerEvents = 'none';
 
+    // Специально ставим ссылку в самый конец, чтобы WhatsApp сделал красивое превью картинки
+    const shareText = 'Оплатите заказ ТамакKG по реквизитам:\nНомер: ' + MY_PAYMENT_NUMBER + '\n\nQR-код для оплаты:\n' + MY_QR_IMAGE_URL;
+
     try {
-        // 1. Скачиваем картинку в фоне
-        const response = await fetch(MY_QR_IMAGE_URL);
-        const blob = await response.blob();
-        
-        // 2. Превращаем её в полноценный файл
-        const file = new File([blob], 'QR_TamakKG.jpg', { type: blob.type });
+        // 1. Проверяем, вдруг системное меню доступно (если откроют не через бота, а через обычный браузер)
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: 'Оплата ТамакKG',
+                    text: shareText
+                });
+                return;
+            } catch (e) {
+                console.log("Системный шеринг недоступен", e);
+            }
+        }
 
-        // 3. Формируем данные для нативного меню (Файл + Текст)
-        const shareData = {
-            title: 'Оплата заказа ТамакKG',
-            text: 'Оплатите заказ по этим реквизитам: ' + MY_PAYMENT_NUMBER,
-            files: [file] // ПЕРЕДАЕМ ИМЕННО ФАЙЛ
-        };
-
-        // 4. Проверяем, поддерживает ли телефон шеринг файлов (как на видео)
-        if (navigator.canShare && navigator.canShare(shareData)) {
-            await navigator.share(shareData);
-        } 
-        // 5. Запасной вариант: если телефон старый и не умеет шерить файлы
-        else if (navigator.share) {
-            await navigator.share({
-                title: 'Оплата заказа ТамакKG',
-                text: 'Оплатите заказ по этим реквизитам: ' + MY_PAYMENT_NUMBER + '\n\nСсылка на QR: ' + MY_QR_IMAGE_URL
+        // 2. ОБХОД ДЛЯ TELEGRAM MINI APP
+        // Вызываем нативное всплывающее окно iOS/Android внутри Telegram
+        if (tg && tg.showPopup) {
+            tg.showPopup({
+                title: 'Поделиться реквизитами',
+                message: 'Куда вы хотите отправить ссылку на оплату?',
+                buttons: [
+                    { id: 'whatsapp', type: 'default', text: 'Отправить в WhatsApp' },
+                    { id: 'telegram', type: 'default', text: 'Переслать в Telegram' },
+                    { id: 'copy', type: 'default', text: 'Просто скопировать' }
+                ]
+            }, function(buttonId) {
+                if (buttonId === 'whatsapp') {
+                    // Открываем WhatsApp с уже вставленным текстом
+                    tg.openLink('https://wa.me/?text=' + encodeURIComponent(shareText));
+                } else if (buttonId === 'telegram') {
+                    // Внутренняя пересылка Telegram
+                    tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(MY_QR_IMAGE_URL)}&text=${encodeURIComponent('Оплатить заказ ТамакKG: ' + MY_PAYMENT_NUMBER)}`);
+                } else if (buttonId === 'copy') {
+                    copyPaymentNumber();
+                }
             });
-        } 
-        // 6. Совсем старые устройства или ограничения Telegram
-        else if (tg && tg.openTelegramLink) {
-            const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(MY_QR_IMAGE_URL)}&text=${encodeURIComponent('Оплатить заказ ТамакKG: ' + MY_PAYMENT_NUMBER)}`;
-            tg.openTelegramLink(shareUrl);
         } else {
+            // Запасной вариант для очень старых версий Telegram
             copyPaymentNumber();
         }
+
     } catch (error) {
-        // Ошибка выскочит, если юзер просто передумал и закрыл менюшку шеринга. Это нормально.
-        console.log("Шеринг отменен или произошла ошибка:", error);
+        console.log("Ошибка шеринга:", error);
     } finally {
         // Возвращаем кнопку в исходное состояние
         btn.innerHTML = originalHTML;
