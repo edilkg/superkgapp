@@ -2369,7 +2369,7 @@ function filterMenu(resId, category, btn) {
                     tgApp.LocationManager.openSettings(); 
                     btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">🔄</span> Я включил, повторить';
                 } else {
-                    btnConfirmGeo.innerText = "секундочку...";
+                    btnConfirmGeo.innerText = "Секундочку🙏";
                     
                     tgApp.LocationManager.getLocation((data) => {
                         if (data && data.latitude) {
@@ -2399,7 +2399,7 @@ function filterMenu(resId, category, btn) {
                     },
                     (err) => {
                         alert("Включите GPS в шторке телефона!");
-                        btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Текущее местоположение';
+                        btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Определить местоположение';
                     },
                     { enableHighAccuracy: true, timeout: 10000 }
                 );
