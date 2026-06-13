@@ -655,8 +655,8 @@
     display: inline-block;
 }
 .qr-image {
-    width: 220px;
-    height: 220px;
+    /* width: 420px; */
+    height: 420px;
     object-fit: contain;
     border-radius: 12px;
 }
@@ -902,7 +902,7 @@
 
         <div class="pay-bar">
             <div class="pay-sum"><span id="pay-btn-sum">0 сом</span><span>К оплате</span></div>
-            <div class="btn-pay" id="main-pay-btn" onclick="createOrder()" style="background: var(--main-yellow); padding: 14px 24px; border-radius: 14px; font-weight: 800; cursor: pointer; font-size: 16px;">Оформить</div>
+            <div class="btn-pay" id="main-pay-btn" onclick="openPaymentScreen()" style="background: var(--main-yellow); padding: 14px 24px; border-radius: 14px; font-weight: 800; cursor: pointer; font-size: 16px;">Оформить</div>
         </div>
     </div>
 
@@ -2333,16 +2333,12 @@ function filterMenu(resId, category, btn) {
                 const result = await response.json(); // Читаем ответ сервера
 
                 if (response.ok) {
-                    // Данные для экрана статуса (заполняем заранее)
+                    showScreen('status');
                     document.getElementById('st-res-name').innerText = database[cartActiveTabResId]?.title || 'Ресторан';
-                    // Берем сумму заказа и перекидываем на оплату
+                    document.getElementById('st-price').innerText = (totalSum + currentDeliveryFee + doorDeliveryFee) + " сом"; // Обновил ID для суммы
                     for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
                     recalcTotal();
-                    
-                    // ОТКРЫВАЕМ ЭКРАН ОПЛАТЫ
-                    openPaymentScreen();
                 } else {
-                    // ЕСЛИ СЕРВЕР ВЫДАЛ ОШИБКУ, ПОКАЗЫВАЕМ ЕЁ
                     alert("Ошибка при заказе: " + (result.error || "Неизвестная ошибка"));
                 }
             } catch (e) { 
@@ -2359,8 +2355,8 @@ function filterMenu(resId, category, btn) {
 // ==========================================
 
 // ТВОИ ДАННЫЕ (Вставь свою картинку QR и свой номер/реквизиты)
-const MY_QR_IMAGE_URL = "https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/dummy-qr.png"; 
-const MY_PAYMENT_NUMBER = "+996700000000"; 
+const MY_QR_IMAGE_URL = "https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/mbankQR.jpg"; 
+const MY_PAYMENT_NUMBER = "500402002"; 
 
 function openPaymentScreen() {
     document.getElementById('custom-qr-code').src = MY_QR_IMAGE_URL;
@@ -2429,14 +2425,6 @@ function sharePayment() {
     }
 }
 
-function completePaymentAndGoToStatus() {
-    if(tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-    
-    // Перекидываем на финальный экран статуса (Заказ обрабатывается)
-    // Очищаем историю, чтобы юзер не мог по кнопке "Назад" снова попасть на экран оплаты
-    history.replaceState({screen: 'status'}, '');
-    showScreen('status');
-}
         // ==========================================
         // ФУНКЦИИ ДЛЯ ГЕОЛОКАЦИИ
         // ==========================================
@@ -2842,21 +2830,12 @@ function goToMainMenu() {
     </div>
 
     <div class="payment-container">
-        <div class="payment-tabs">
-            <div class="payment-tab">Быстрая оплата</div>
-            <div class="payment-tab active">QR-код</div>
-        </div>
-
         <div class="payment-instructions">
-            Для оплаты отсканируйте QR-код с помощью<br>приложения банка или камерой телефона
+            Отсканируйте QR-код с помощью<br>приложения банка или камерой телефона
         </div>
 
         <div class="qr-wrapper">
             <img src="" id="custom-qr-code" class="qr-image" alt="QR Code">
-        </div>
-
-        <div class="elqr-logo">
-            <div class="elqr-icon">❇️</div> ELQR
         </div>
 
         <div class="payment-actions">
@@ -2864,8 +2843,7 @@ function goToMainMenu() {
                 <span style="font-size: 18px;">⬇️</span> Скачать QR
             </button>
             <button class="btn-pay-action" onclick="copyPaymentNumber()">
-                <span style="font-size: 18px;">📋</span> Скопировать
-            </button>
+                <span style="font-size: 18px;">📋</span> Скопировать номер
             <button class="btn-pay-action full-width" onclick="sharePayment()">
                 <span style="font-size: 18px;">🔗</span> Поделиться ссылкой
             </button>
@@ -2873,9 +2851,9 @@ function goToMainMenu() {
     </div>
     
     <div style="padding: 0 16px;">
-        <button class="btn-yellow" onclick="completePaymentAndGoToStatus()">Я оплатил заказ</button>
+        <button class="btn-yellow" onclick="createOrder()">Я оплатил заказ</button>
         <div style="text-align: center; margin-top: 16px; font-size: 12px; color: #999;">
-            Удобные платежи для бизнеса вместе с ТамакKG
+            Мы проверим оплату и сразу же начнем готовить заказ! Это занимает 1-2 минуты
         </div>
     </div>
 </div>
