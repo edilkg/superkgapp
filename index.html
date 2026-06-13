@@ -602,104 +602,72 @@
             color: #777777;
             margin-top: 2px;
         }
-        /* ==========================================
-   СТИЛИ ДЛЯ ЭКРАНА ОПЛАТЫ (NAMBA/ELQR СТИЛЬ)
+/* ==========================================
+   СТИЛИ ДЛЯ ЭКРАНА ОПЛАТЫ (АДАПТИВНЫЙ)
    ========================================== */
 #screen-payment {
-    padding-bottom: 120px;
+    padding-bottom: 30px; /* Уменьшили отступ, чтобы кнопка была ниже */
     background: var(--bg-color);
     min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 .payment-container {
-    padding: 24px 20px;
+    padding: 24px 16px;
     background: #ffffff;
     border-radius: 24px;
     margin: 16px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.04);
     text-align: center;
-}
-.payment-tabs {
+    flex-grow: 0.5; /* Позволяет контейнеру тянуться на больших экранах */
     display: flex;
-    background: #f5f5f5;
-    border-radius: 12px;
-    padding: 4px;
-    margin-bottom: 24px;
-}
-.payment-tab {
-    flex: 1;
-    padding: 12px;
-    font-size: 14px;
-    font-weight: 600;
-    border-radius: 10px;
-    cursor: pointer;
-    color: var(--text-gray);
-    transition: 0.2s;
-}
-.payment-tab.active {
-    background: white;
-    color: var(--text-dark);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    flex-direction: column;
+    justify-content: center;
 }
 .payment-instructions {
     font-size: 14px;
     color: var(--text-dark);
-    margin-bottom: 24px;
-    line-height: 1.5;
+    margin-bottom: 20px;
+    line-height: 1.4;
     font-weight: 500;
 }
+/* Адаптивная обертка для QR */
 .qr-wrapper {
     margin: 0 auto 20px;
-    padding: 12px;
-    background: #ffffff;
-    border-radius: 20px;
-    display: inline-block;
+    width: 100%;
+    max-width: 360px; /* На планшетах не будет гигантским */
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 .qr-image {
-    /* width: 420px; */
-    height: 420px;
+    width: 100%; 
+    height: auto; 
+    max-height: 45vh; /* ВАЖНО: QR никогда не займет больше 45% высоты экрана! */
     object-fit: contain;
-    border-radius: 12px;
+    border-radius: 16px;
+    /* Убрал жесткие 420px, теперь картинка сама масштабируется */
 }
-.elqr-logo {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-    font-weight: 900;
-    font-size: 20px;
-    color: #111;
-    margin-bottom: 24px;
-}
-.elqr-icon {
-    width: 32px;
-    height: 32px;
-    background: linear-gradient(135deg, #a64dff 0%, #4d79ff 100%);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 18px;
-}
+/* Сетка кнопок */
 .payment-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-top: 10px;
+    gap: 8px; /* Чуть уменьшил зазор для маленьких экранов */
+    margin-top: auto; /* Прижимает кнопки к низу контейнера */
 }
 .btn-pay-action {
     background: #f5f5f5;
     border: none;
-    padding: 14px;
+    padding: 14px 8px;
     border-radius: 14px;
-    font-size: 14px;
+    font-size: 13px; /* Оптимальный размер для узких экранов (320px) */
     font-weight: 600;
     color: var(--text-dark);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
     transition: 0.1s;
 }
 .btn-pay-action:active {
@@ -708,6 +676,8 @@
 }
 .btn-pay-action.full-width {
     grid-column: span 2;
+    padding: 14px;
+    font-size: 14px;
 }
 </style>
 </head>
@@ -2840,20 +2810,20 @@ function goToMainMenu() {
 
         <div class="payment-actions">
             <button class="btn-pay-action" onclick="downloadQR()">
-                <span style="font-size: 18px;">⬇️</span> Скачать QR
+                <span style="font-size: 16px;">⬇️</span> Скачать QR
             </button>
             <button class="btn-pay-action" onclick="copyPaymentNumber()">
-                <span style="font-size: 18px;">📋</span> Скопировать номер
-            <button class="btn-pay-action full-width" onclick="sharePayment()">
-                <span style="font-size: 18px;">🔗</span> Поделиться ссылкой
+                <span style="font-size: 16px;">📋</span> Скопировать номер
+            </button> <button class="btn-pay-action full-width" onclick="sharePayment()">
+                <span style="font-size: 16px;">🔗</span> Поделиться ссылкой
             </button>
         </div>
     </div>
     
-    <div style="padding: 0 16px;">
+    <div style="padding: 0 16px 20px 16px;">
         <button class="btn-yellow" onclick="createOrder()">Я оплатил заказ</button>
-        <div style="text-align: center; margin-top: 16px; font-size: 12px; color: #999;">
-            Мы проверим оплату и сразу же начнем готовить заказ! Это занимает 1-2 минуты
+        <div style="text-align: center; margin-top: 12px; font-size: 12px; color: #888; line-height: 1.4;">
+            Мы проверим оплату и сразу же начнем готовить заказ!<br>Это занимает 1-2 минуты
         </div>
     </div>
 </div>
