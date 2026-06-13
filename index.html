@@ -2009,55 +2009,23 @@ function filterMenu(resId, category, btn) {
         }
 
         function locateUser() {
-    // 1. СРАЗУ пускаем юзера в главное меню, не заставляя ждать!
-    showScreen('main'); 
-    
-    // 2. СРАЗУ меняем текст адреса в шапке на "Определяем..."
-    // (Убедись, что ID совпадает с твоим полем адреса в шапке)
-    const addressElement = document.querySelector('.header-address span:last-child');
-    if (addressElement) {
-        addressElement.innerText = "📍 Определяем ваш адрес...";
-    }
-
-    // 3. Запрашиваем GPS у телефона В ФОНОВОМ РЕЖИМЕ
-    if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                // Когда GPS наконец-то нашел юзера (через 3-5 сек)
-                const lat = position.coords.latitude;
-                const lon = position.coords.longitude;
-                
-                // Сохраняем в память
-                localStorage.setItem('clientLat', lat);
-                localStorage.setItem('clientLon', lon);
-                
-                // Превращаем координаты в нормальный адрес (вызываем твою функцию)
-                reverseGeocode(lat, lon); 
-                
-                // Если нужно, пересчитываем цены/доставку с новыми координатами
-                if (typeof calculateDistanceAndPrice === 'function') {
-                    calculateDistanceAndPrice();
-                }
-            },
-            function(error) {
-                // Если юзер запретил GPS или произошла ошибка
-                if (addressElement) {
-                    addressElement.innerText = "Укажите адрес вручную ➔";
-                }
-                console.log("Ошибка геолокации: ", error.message);
-            },
-            {
-                enableHighAccuracy: false, // Отключили для скорости (Решение 1 тоже в деле!)
-                timeout: 10000,
-                maximumAge: 0
-            }
-        );
-    } else {
-        if (addressElement) {
-            addressElement.innerText = "GPS не поддерживается";
+            if (!navigator.geolocation) return alert("Браузер не поддерживает GPS");
+            if(tg) tg.HapticFeedback.impactOccurred('medium');
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    clientLat = position.coords.latitude; 
+                    clientLon = position.coords.longitude;
+                    mapWasDragged = false; // Блокируем перезапись события moveend
+                    setMapCenterToMarker(clientLat, clientLon);
+                    reverseGeocode(clientLat, clientLon);
+                },
+                (error) => {
+                    if (error.code === 1) alert("Разрешите доступ к геолокации в настройках телефона");
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
         }
-    }
-}
 
         function recalcCheckoutDelivery(resLat, resLon) {
             // Считаем расстояние по прямой
@@ -2401,7 +2369,7 @@ function filterMenu(resId, category, btn) {
                     tgApp.LocationManager.openSettings(); 
                     btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">🔄</span> Я включил, повторить';
                 } else {
-                    btnConfirmGeo.innerText = "Запрашиваем...";
+                    btnConfirmGeo.innerText = "секундочку...";
                     
                     tgApp.LocationManager.getLocation((data) => {
                         if (data && data.latitude) {
@@ -2452,7 +2420,7 @@ function filterMenu(resId, category, btn) {
                 if (geoOverlay.style.display !== 'none') {
                     
                     // Меняем текст, чтобы юзер видел, что приложение не зависло, а "думает"
-                    btnConfirmGeo.innerText = "Проверяем гео...";
+                    btnConfirmGeo.innerText = "Ищем ваше местоположение...";
 
                     if (tgApp && tgApp.LocationManager) {
                         tgApp.LocationManager.getLocation((data) => {
