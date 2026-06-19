@@ -1022,36 +1022,38 @@
             
             <div style="width: 40px; height: 4px; background: #e0e0e0; border-radius: 2px; margin: 0 auto 20px;"></div>
             <h2 style="font-size: 20px; font-weight: 800; color: #111; margin: 0 0 8px 0;">Выберите банк</h2>
-            <div style="font-size: 13px; color: #888; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                <span>⬅️</span> Свайпайте в стороны <span>➡️</span>
-            </div>
+            <div style="font-size: 13px; color: #888; margin-bottom: 20px;">Свайпайте в стороны или нажимайте на стрелки</div>
             
-            <div style="display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; padding-bottom: 16px; scrollbar-width: none;">
+            <div style="position: relative; width: 100%; max-width: 450px; margin: 0 auto;">
                 
-                <div style="flex: 0 0 100%; scroll-snap-align: center; display: flex; flex-direction: column; align-items: center; padding: 0 40px; box-sizing: border-box;">
-                    <div style="background: #f9f9f9; border-radius: 24px; padding: 20px; border: 1px solid #eee; width: 100%; max-width: 280px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
-                        <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/BAKAQR.jpeg" style="width: 100%; height: 220px; object-fit: contain; border-radius: 12px; margin-bottom: 16px;" alt="MBank">
-                        <div style="font-weight: 900; font-size: 20px; color: #111;">MBank</div>
-                    </div>
-                </div>
+                <div onclick="scrollOtherQRs(-1)" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; background: white; border-radius: 50%; box-shadow: 0 4px 15px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; font-size: 20px; color: #333; z-index: 10; cursor: pointer;">❮</div>
 
-                <div style="flex: 0 0 100%; scroll-snap-align: center; display: flex; flex-direction: column; align-items: center; padding: 0 40px; box-sizing: border-box;">
-                    <div style="background: #f9f9f9; border-radius: 24px; padding: 20px; border: 1px solid #eee; width: 100%; max-width: 280px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
-                        <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/ODENGI.jpg" style="width: 100%; height: 220px; object-fit: contain; border-radius: 12px; margin-bottom: 16px;" alt="О!Деньги">
-                        <div style="font-weight: 900; font-size: 20px; color: #111;">О!Деньги</div>
-                    </div>
-                </div>
+                <div onclick="scrollOtherQRs(1)" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; background: white; border-radius: 50%; box-shadow: 0 4px 15px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; font-size: 20px; color: #333; z-index: 10; cursor: pointer;">❯</div>
 
-                <div style="flex: 0 0 100%; scroll-snap-align: center; display: flex; flex-direction: column; align-items: center; padding: 0 40px; box-sizing: border-box;">
-                    <div style="background: #f9f9f9; border-radius: 24px; padding: 20px; border: 1px solid #eee; width: 100%; max-width: 280px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
-                        <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/OPTIMA%20QR.jpeg" style="width: 100%; height: 220px; object-fit: contain; border-radius: 12px; margin-bottom: 16px;" alt="Элсом">
-                        <div style="font-weight: 900; font-size: 20px; color: #111;">Элсом</div>
+                <div id="other-qrs-carousel" style="display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; padding-bottom: 16px; scrollbar-width: none;">
+                    
+                    <div style="flex: 0 0 100%; scroll-snap-align: center; display: flex; justify-content: center; padding: 0 24px; box-sizing: border-box;">
+                        <div style="background: #f9f9f9; border-radius: 24px; padding: 24px; border: 1px solid #eee; width: 100%; max-width: 280px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
+                            <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/ODENGI.jpg" style="width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 16px;" alt="MBank QR">
+                        </div>
                     </div>
-                </div>
 
+                    <div style="flex: 0 0 100%; scroll-snap-align: center; display: flex; justify-content: center; padding: 0 24px; box-sizing: border-box;">
+                        <div style="background: #f9f9f9; border-radius: 24px; padding: 24px; border: 1px solid #eee; width: 100%; max-width: 280px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
+                            <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/BAKAQR.jpeg" style="width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 16px;" alt="О!Деньги QR">
+                        </div>
+                    </div>
+
+                    <div style="flex: 0 0 100%; scroll-snap-align: center; display: flex; justify-content: center; padding: 0 24px; box-sizing: border-box;">
+                        <div style="background: #f9f9f9; border-radius: 24px; padding: 24px; border: 1px solid #eee; width: 100%; max-width: 280px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
+                            <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/OPTIMA%20QR.jpeg" style="width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 16px;" alt="Элсом QR">
+                        </div>
+                    </div>
+
+                </div>
             </div>
 
-            <div style="padding: 0 20px;">
+            <div style="padding: 0 24px;">
                 <button onclick="closeOtherQRs()" style="width: 100%; background: #f5f5f5; color: #333; border: none; border-radius: 16px; padding: 16px; font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 16px;">
                     Понятно
                 </button>
@@ -2412,10 +2414,58 @@ function openPaymentScreen() {
     showScreen('payment');
 }
 
-// Функции для модалки Других QR-кодов
+// ==========================================
+// ЛОГИКА ДРУГИХ QR-КОДОВ (БЕСКОНЕЧНЫЙ СВАЙП)
+// ==========================================
+
 function openOtherQRs() {
     if(tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
     document.getElementById('modal-other-qrs').classList.remove('hidden');
+    
+    const carousel = document.getElementById('other-qrs-carousel');
+    
+    // Инициализируем бесконечный цикл только ОДИН раз
+    if (!carousel.dataset.infinite) {
+        // 1. Утраиваем карточки, чтобы получилось 9 штук (3+3+3)
+        const html = carousel.innerHTML;
+        carousel.innerHTML = html + html + html;
+        carousel.dataset.infinite = "true";
+        
+        // 2. Обработчик свайпа (Невидимая телепортация)
+        carousel.addEventListener('scroll', () => {
+            const w = carousel.clientWidth;
+            
+            // Если долистали до клона слева (самое начало)
+            if (carousel.scrollLeft <= 5) {
+                carousel.style.scrollBehavior = 'auto'; // Временно отключаем плавность
+                carousel.scrollLeft += w * 3; // Мгновенно прыгаем на оригинальную копию в центре
+                setTimeout(() => carousel.style.scrollBehavior = 'smooth', 10);
+            } 
+            // Если долистали до клона справа (самый конец)
+            else if (carousel.scrollLeft >= (w * 8) - 5) {
+                carousel.style.scrollBehavior = 'auto'; 
+                carousel.scrollLeft -= w * 3; // Мгновенно прыгаем назад в центр
+                setTimeout(() => carousel.style.scrollBehavior = 'smooth', 10);
+            }
+        });
+    }
+    
+    // 3. При каждом открытии окна сразу ставим фокус ровно по центру на MBank
+    setTimeout(() => {
+        carousel.style.scrollBehavior = 'auto';
+        carousel.scrollLeft = carousel.clientWidth * 3;
+        setTimeout(() => carousel.style.scrollBehavior = 'smooth', 10);
+    }, 10);
+}
+
+function scrollOtherQRs(direction) {
+    const carousel = document.getElementById('other-qrs-carousel');
+    if (carousel) {
+        const slideWidth = carousel.clientWidth; 
+        // Плавная прокрутка на 1 слайд при клике по боковым стрелочкам
+        carousel.scrollBy({ left: slideWidth * direction, behavior: 'smooth' });
+        if(tg && tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+    }
 }
 
 function closeOtherQRs() {
