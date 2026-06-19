@@ -1017,6 +1017,47 @@
             </div>
         </div>
     </div>
+    <div id="modal-other-qrs" class="modal-overlay hidden" style="justify-content: center; align-items: flex-end; z-index: 10005;" onclick="closeOtherQRsIfOverlay(event)">
+        <div class="modal-window" style="background: white; width: 100%; border-radius: 24px 24px 0 0; padding: 24px 0 32px; text-align: center; box-shadow: 0 -4px 20px rgba(0,0,0,0.1);">
+            
+            <div style="width: 40px; height: 4px; background: #e0e0e0; border-radius: 2px; margin: 0 auto 20px;"></div>
+            <h2 style="font-size: 20px; font-weight: 800; color: #111; margin: 0 0 8px 0;">Выберите банк</h2>
+            <div style="font-size: 13px; color: #888; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <span>⬅️</span> Свайпайте в стороны <span>➡️</span>
+            </div>
+            
+            <div style="display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; padding-bottom: 16px; scrollbar-width: none;">
+                
+                <div style="flex: 0 0 100%; scroll-snap-align: center; display: flex; flex-direction: column; align-items: center; padding: 0 40px; box-sizing: border-box;">
+                    <div style="background: #f9f9f9; border-radius: 24px; padding: 20px; border: 1px solid #eee; width: 100%; max-width: 280px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
+                        <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/BAKAQR.jpeg" style="width: 100%; height: 220px; object-fit: contain; border-radius: 12px; margin-bottom: 16px;" alt="MBank">
+                        <div style="font-weight: 900; font-size: 20px; color: #111;">MBank</div>
+                    </div>
+                </div>
+
+                <div style="flex: 0 0 100%; scroll-snap-align: center; display: flex; flex-direction: column; align-items: center; padding: 0 40px; box-sizing: border-box;">
+                    <div style="background: #f9f9f9; border-radius: 24px; padding: 20px; border: 1px solid #eee; width: 100%; max-width: 280px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
+                        <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/ODENGI.jpg" style="width: 100%; height: 220px; object-fit: contain; border-radius: 12px; margin-bottom: 16px;" alt="О!Деньги">
+                        <div style="font-weight: 900; font-size: 20px; color: #111;">О!Деньги</div>
+                    </div>
+                </div>
+
+                <div style="flex: 0 0 100%; scroll-snap-align: center; display: flex; flex-direction: column; align-items: center; padding: 0 40px; box-sizing: border-box;">
+                    <div style="background: #f9f9f9; border-radius: 24px; padding: 20px; border: 1px solid #eee; width: 100%; max-width: 280px; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
+                        <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/OPTIMA%20QR.jpeg" style="width: 100%; height: 220px; object-fit: contain; border-radius: 12px; margin-bottom: 16px;" alt="Элсом">
+                        <div style="font-weight: 900; font-size: 20px; color: #111;">Элсом</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div style="padding: 0 20px;">
+                <button onclick="closeOtherQRs()" style="width: 100%; background: #f5f5f5; color: #333; border: none; border-radius: 16px; padding: 16px; font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 16px;">
+                    Понятно
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script>
         const supabaseUrl = 'https://dtxybpdjbdmqrvsdwvvk.supabase.co';
@@ -2346,9 +2387,45 @@ const MY_QR_IMAGE_URL = "https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/obj
 const MY_PAYMENT_NUMBER = "500402002"; 
 
 function openPaymentScreen() {
+    // 1. ЗАЩИТА: Проверяем данные ДО оплаты
+    if (!orderAddressData.street && currentDeliveryFee > 0) return alert("Пожалуйста, выберите адрес на карте!");
+    
+    const clientPhone = document.getElementById('client-phone').value;
+    if (!clientPhone) return alert("Пожалуйста, укажите ваш номер телефона для курьера!");
+
+    // 2. Считаем итоговую сумму (Товары + Доставка)
+    let tabTotalSum = 0; 
+    for(let k in cartItems) { 
+        if(cartItems[k].resId === cartActiveTabResId) {
+            tabTotalSum += (cartItems[k].pricePerUnit * cartItems[k].count); 
+        }
+    }
+    let finalDeliveryFee = currentDeliveryFee > 0 ? (currentDeliveryFee + doorDeliveryFee) : 0;
+    let finalTotal = tabTotalSum + finalDeliveryFee;
+
+    // 3. Выводим сумму на экран оплаты
+    document.getElementById('payment-total-amount').innerText = finalTotal + " сом";
+
+    // 4. Открываем экран
     document.getElementById('custom-qr-code').src = MY_QR_IMAGE_URL;
     history.pushState({screen: 'payment'}, '');
     showScreen('payment');
+}
+
+// Функции для модалки Других QR-кодов
+function openOtherQRs() {
+    if(tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    document.getElementById('modal-other-qrs').classList.remove('hidden');
+}
+
+function closeOtherQRs() {
+    document.getElementById('modal-other-qrs').classList.add('hidden');
+}
+
+function closeOtherQRsIfOverlay(event) {
+    if(event.target.id === 'modal-other-qrs') {
+        closeOtherQRs();
+    }
 }
 
 function copyPaymentNumber() {
@@ -2357,8 +2434,8 @@ function copyPaymentNumber() {
     // Безопасное копирование с проверкой на null
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(MY_PAYMENT_NUMBER).then(() => {
-            if (tg && tg.showAlert) tg.showAlert("Реквизиты скопированы: " + MY_PAYMENT_NUMBER);
-            else alert("Реквизиты скопированы: " + MY_PAYMENT_NUMBER);
+            if (tg && tg.showAlert) tg.showAlert("Готочо✅ " + MY_PAYMENT_NUMBER);
+            else alert("Готочо✅ " + MY_PAYMENT_NUMBER);
         }).catch(err => console.error("Ошибка копирования:", err));
     } else {
         // Fallback для старых устройств
@@ -2369,8 +2446,8 @@ function copyPaymentNumber() {
         document.execCommand("copy");
         document.body.removeChild(tempInput);
         
-        if (tg && tg.showAlert) tg.showAlert("Реквизиты скопированы: " + MY_PAYMENT_NUMBER);
-        else alert("Реквизиты скопированы: " + MY_PAYMENT_NUMBER);
+        if (tg && tg.showAlert) tg.showAlert("Готочо✅ " + MY_PAYMENT_NUMBER);
+        else alert("Готочо✅ " + MY_PAYMENT_NUMBER);
     }
 }
         // ==========================================
@@ -2760,7 +2837,6 @@ function goToMainMenu() {
                 showScreen('main');
             }, 50);
         }
-
         function startNewOrder() {
             goToMainMenu();
         }
@@ -2772,21 +2848,29 @@ function goToMainMenu() {
     </div>
 
     <div class="payment-container">
-        <div class="payment-instructions">
-            Отсканируйте QR-код с помощью<br>приложения банка или камерой телефона
+        <div style="margin-bottom: 12px; background: #f9f9f9; padding: 12px; border-radius: 16px; border: 1px solid #eee;">
+            <div style="font-size: 13px; color: #888; font-weight: 600; margin-bottom: 4px;">Итого к оплате:</div>
+            <div id="payment-total-amount" style="font-size: 28px; font-weight: 900; color: #111;">0 сом</div>
         </div>
 
         <div class="qr-wrapper">
             <img src="" id="custom-qr-code" class="qr-image" alt="QR Code">
         </div>
 
-        <div style="font-size: 13px; color: #888; margin-bottom: 16px; line-height: 1.4;">
-            💡 Зажмите фото QR-кода, чтобы сохранить его в галерею,<br>или просто скопируйте номер
+        <div style="margin-top: 12px; display: flex; flex-direction: column; align-items: center;">
+            <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/drugiologo.png" alt="Платежные системы" style="width: 100%; height: auto; object-fit: contain; margin-bottom: 8px;">
+            <div style="font-size: 15
+            px; color: #888; text-align: center; line-height: 1.4;">
+                По номеру телефона, вы также можете<br>перевести через эти сервисы.<br>
+            </div>
         </div>
 
-        <div class="payment-actions">
-            <button class="btn-pay-action full-width" onclick="copyPaymentNumber()" style="padding: 16px; font-size: 16px;">
+        <div class="payment-actions" style="margin-bottom: 20px; flex-shrink: 0; display: block;">
+            <button class="btn-pay-action" onclick="copyPaymentNumber()" style="width: 100%; padding: 16px; font-size: 16px; margin-bottom: 8px;">
                 <span style="font-size: 18px;">📋</span> Скопировать номер
+            </button>
+            <button class="btn-pay-action" onclick="openOtherQRs()" style="width: 100%; padding: 14px; font-size: 15px; background: transparent; border: 1px solid #ddd; color: #555;">
+                <span style="font-size: 18px;">📱</span> Другие QR-коды
             </button>
         </div>
     </div>
