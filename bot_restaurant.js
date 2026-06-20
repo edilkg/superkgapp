@@ -1,3 +1,4 @@
+// bot_restaurant.js
 const { Markup } = require('telegraf');
 
 module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, supabase, ADMIN_GROUP_ID) {
@@ -10,17 +11,13 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
 
             if (!rest) {
                 await supabase.from('restaurants').insert([{ id, step: 'ask_name', is_approved: false }]);
-                return ctx.reply("Привет! Добро пожаловать в панель партнера ТамакKG. 🍔\n\nВведите название вашего заведения (например, 'Дракон Суши'):");
+                return ctx.reply("Привет! Добро пожаловать в панель партнера ТамакKG. 🍔\n\nВведите название вашего заведения:");
             }
 
-            if (!rest.is_approved) {
-                return ctx.reply("⏳ Ваша заявка находится на проверке у администратора.");
-            }
+            if (!rest.is_approved) return ctx.reply("⏳ Ваша заявка находится на проверке у администратора.");
 
             ctx.reply(`✅ Кабинет ресторана "${rest.name}" активен!\nСюда будут приходить новые заказы.`);
-        } catch (err) {
-            ctx.reply("⚠️ Ошибка. Попробуйте позже.");
-        }
+        } catch (err) {}
     });
 
     // 2. ШАГИ РЕГИСТРАЦИИ
@@ -34,30 +31,22 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
 
         if (rest.step === 'ask_name') {
             await supabase.from('restaurants').update({ name: text, step: 'ask_phone' }).eq('id', id);
-            return ctx.reply(`Принято! Теперь напишите номер телефона для связи:`);
+            return ctx.reply(`Принято! Теперь напишите номер телефона:`);
         }
 
         if (rest.step === 'ask_phone') {
             await supabase.from('restaurants').update({ phone: text, step: 'waiting' }).eq('id', id);
             ctx.reply("Спасибо! Заявка отправлена администратору.");
 
-            // ПУШ АДМИНУ
-            return restBot.telegram.sendMessage(ADMIN_GROUP_ID, 
-                `🏢 НОВАЯ ЗАЯВКА (РЕСТОРАН)\n\nНазвание: ${rest.name}\nТелефон: ${text}\nID: ${id}`,
+            // ПУШ АДМИНУ (Отправляем через главного бота)
+            return clientBot.telegram.sendMessage(ADMIN_GROUP_ID, 
+                `🏢 НОВАЯ ЗАЯВКА (РЕСТОРАН)\nНазвание: ${rest.name}\nТелефон: ${text}\nID: ${id}`,
                 Markup.inlineKeyboard([[Markup.button.callback('✅ ОДОБРИТЬ РЕСТОРАН', `approve_rest_${id}`)]])
             );
         }
     });
 
-    // 3. ДЕЙСТВИЕ АДМИНА: ОДОБРЕНИЕ
-    restBot.action(/approve_rest_(.+)/, async (ctx) => {
-        const restId = ctx.match[1];
-        await supabase.from('restaurants').update({ is_approved: true }).eq('id', restId);
-        await ctx.editMessageText(`✅ Ресторан ${restId} одобрен!`);
-        restBot.telegram.sendMessage(restId, "🎉 Поздравляем! Ваш ресторан одобрен. Теперь вы можете принимать заказы.");
-    });
-
-    // 4. ЛОГИКА ЗАКАЗОВ (ОСТАВЛЯЕМ БЕЗ ИЗМЕНЕНИЙ)
+    // 3. ЛОГИКА ЗАКАЗОВ
     restBot.action(/rest_accept_(.+)/, async (ctx) => {
         const orderId = ctx.match[1];
         await supabase.from('orders').update({ status: 'cooking' }).eq('id', orderId);
@@ -76,5 +65,5 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
         ctx.editMessageText(`❌ Заказ отклонен.`);
     });
 
-    console.log('📦 Модуль Restaurant обновлен');
+    console.log('📦 Модуль Restaurant загружен');
 };

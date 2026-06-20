@@ -931,8 +931,9 @@
     </div>
     <div style="padding: 16px;">
         <div style="background: white; border-radius: 12px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-            <div style="font-size: 40px; margin-bottom: 12px;">⏳</div>
-            <h3 id="st-status-text" style="margin: 0 0 8px 0; color: #FF9800;">Обрабатывается...</h3>
+            <div style="font-size: 40px; margin-bottom: 12px;">💸</div>
+            <h3 id="st-status-text" style="margin: 0 0 8px 0; color: #FF9800;">Проверяем оплату...</h3>
+            <p style="color: #666; margin: 0 0 12px 0; font-size: 13px; line-height: 1.4;">Менеджер проверяет поступление средств. Как только оплата подтвердится, заказ уйдет на кухню!</p>
             <p style="color: var(--tg-theme-hint-color); margin: 0; font-size: 14px;">Ресторан: <b id="st-res-name">...</b></p>
             <p style="color: var(--tg-theme-hint-color); margin: 4px 0 0 0; font-size: 14px;">Сумма: <b id="st-price">...</b></p>
         </div>
@@ -1018,8 +1019,7 @@
         <div class="modal-window" style="background: white; width: 100%; border-radius: 24px 24px 0 0; padding: 24px 0 32px; text-align: center; box-shadow: 0 -4px 20px rgba(0,0,0,0.1);">
             
             <div style="width: 40px; height: 4px; background: #e0e0e0; border-radius: 2px; margin: 0 auto 20px;"></div>
-            <div style="font-size: 13px; color: #888; margin-bottom: 20px;">Свайпайте в стороны или нажимайте на стрелки</div>
-            
+            <div style="font-size: 13px; color: #888; margin-bottom: 20px;">Сделайте скриншот и сканируйте через любой банк КР или<br>переведите по номеру телефона</div>
             <div style="position: relative; width: 100%; max-width: 450px; margin: 0 auto;">
                 
                 <div onclick="scrollOtherQRs(-1)" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; background: white; border-radius: 50%; box-shadow: 0 4px 15px rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; font-size: 20px; color: #333; z-index: 10; cursor: pointer;">❮</div>
@@ -2481,7 +2481,7 @@ function copyPaymentNumber() {
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(MY_PAYMENT_NUMBER).then(() => {
             if (tg && tg.showAlert) tg.showAlert("Готочо✅ " + MY_PAYMENT_NUMBER);
-            else alert("Готочо✅ " + MY_PAYMENT_NUMBER);
+            else alert("Скопировано " + MY_PAYMENT_NUMBER);
         }).catch(err => console.error("Ошибка копирования:", err));
     } else {
         // Fallback для старых устройств
