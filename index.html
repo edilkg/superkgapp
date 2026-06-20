@@ -621,10 +621,8 @@
 }
 
 .payment-container {
-    padding: 20px 16px;
+    padding: 0px 16px;
     background: #ffffff;
-    border-radius: 24px;
-    margin: 12px 16px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.04);
     text-align: center;
     flex-grow: 1; /* Контейнер растягивается на всю доступную высоту */
@@ -643,9 +641,9 @@
 
 /* Умная обертка для QR-кода */
 .qr-wrapper {
-    margin: 0 auto;
+    margin: 20px auto;
     width: 100%;
-    flex-grow: 1; /* Отдаем QR-коду ВСЁ свободное пространство экрана */
+    flex-grow: 0.1; /* Отдаем QR-коду ВСЁ свободное пространство экрана */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -667,7 +665,6 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
-    margin-top: 16px;
 }
 
 .btn-pay-action {
@@ -889,7 +886,7 @@
 
         <div class="pay-bar">
             <div class="pay-sum"><span id="pay-btn-sum">0 сом</span><span>К оплате</span></div>
-            <div class="btn-pay" id="main-pay-btn" onclick="openPaymentScreen()" style="background: var(--main-yellow); padding: 14px 24px; border-radius: 14px; font-weight: 800; cursor: pointer; font-size: 16px;">Заказать❤️‍🔥</div>
+            <div class="btn-pay" id="main-pay-btn" onclick="openPaymentScreen()" style="background: var(--main-yellow); padding: 14px 24px; border-radius: 14px; font-weight: 800; cursor: pointer; font-size: 16px;">Оплатить</div>
         </div>
     </div>
 
@@ -1021,7 +1018,6 @@
         <div class="modal-window" style="background: white; width: 100%; border-radius: 24px 24px 0 0; padding: 24px 0 32px; text-align: center; box-shadow: 0 -4px 20px rgba(0,0,0,0.1);">
             
             <div style="width: 40px; height: 4px; background: #e0e0e0; border-radius: 2px; margin: 0 auto 20px;"></div>
-            <h2 style="font-size: 20px; font-weight: 800; color: #111; margin: 0 0 8px 0;">Выберите банк</h2>
             <div style="font-size: 13px; color: #888; margin-bottom: 20px;">Свайпайте в стороны или нажимайте на стрелки</div>
             
             <div style="position: relative; width: 100%; max-width: 450px; margin: 0 auto;">
@@ -1055,7 +1051,7 @@
 
             <div style="padding: 0 24px;">
                 <button onclick="closeOtherQRs()" style="width: 100%; background: #f5f5f5; color: #333; border: none; border-radius: 16px; padding: 16px; font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 16px;">
-                    Понятно
+                    Закрыть
                 </button>
             </div>
         </div>
@@ -2891,50 +2887,53 @@ function goToMainMenu() {
             goToMainMenu();
         }
 </script>
-<div id="screen-payment" class="screen hidden">
-    <div class="header-nav">
-        <span class="back-btn" onclick="onBackClick()">←</span>
-        <h2 style="margin: 0; font-size: 18px; text-align: center; flex-grow: 1; padding-right: 24px;">Оплата</h2>
-    </div>
-
-    <div class="payment-container">
-        <div style="margin-bottom: 12px; background: #f9f9f9; padding: 12px; border-radius: 16px; border: 1px solid #eee;">
-            <div style="font-size: 13px; color: #888; font-weight: 600; margin-bottom: 4px;">Итого к оплате:</div>
-            <div id="payment-total-amount" style="font-size: 28px; font-weight: 900; color: #111;">0 сом</div>
-        </div>
-
-        <div class="qr-wrapper">
-            <img src="" id="custom-qr-code" class="qr-image" alt="QR Code">
-        </div>
-
-        <div style="margin-top: 12px; display: flex; flex-direction: column; align-items: center;">
-            <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/drugiologo.png" alt="Платежные системы" style="width: 100%; height: auto; object-fit: contain; margin-bottom: 8px;">
-            <div style="font-size: 15
-            px; color: #888; text-align: center; line-height: 1.4;">
-                По номеру телефона, вы также можете<br>перевести через эти сервисы.<br>
+<div id="screen-payment" class="screen hidden" style="overflow-y: auto !important; display: block;">
+    
+    <div class="payment-container" style="padding-bottom: 15px;">
+        
+        <div style="display: flex; align-items: center; background: #f9f9f9; padding: 10px 16px; margin: 0px -16px 0px -16px; border-bottom: 1px solid #eee;">
+            <span class="back-btn" onclick="onBackClick()" style="margin: 0; font-size: 26px; padding: 4px 8px 4px 0;">←</span>
+            <div style="flex-grow: 1; text-align: center;"> <div style="font-size: 13px; color: #888; font-weight: 600; margin-bottom: 2px;">Итого к оплате:</div>
+                <div id="payment-total-amount" style="font-size: 28px; font-weight: 900; color: #111;">0 сом</div>
             </div>
         </div>
 
-        <div class="payment-actions" style="margin-bottom: 20px; flex-shrink: 0; display: block;">
-            <button class="btn-pay-action" onclick="copyPaymentNumber()" style="width: 100%; padding: 16px; font-size: 16px; margin-bottom: 8px;">
+        <div class="qr-wrapper">
+            <img src="" id="custom-qr-code" class="qr-image" alt="QR Code" style="max-height: 380px;">
+        </div>
+
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/drugiologo.png" alt="Платежные системы" style="width: 100%; height: auto; object-fit: contain; margin-bottom: 8px;">
+            <div style="font-size: 13px; color: #888; text-align: center; line-height: 1.4;">
+                Также можете перевести по номеру телефона<br>через эти сервисы.
+            </div>
+        </div>
+
+        <!-- КНОПКИ ДЕЙСТВИЙ -->
+        <div class="payment-actions" style="display: grid; grid-template-columns: 1fr 2fr; gap: 8px; margin: 20px auto;">
+            <!-- Левая кнопка (Занимает 1 часть ширины) -->
+            <button class="btn-pay-action" onclick="openOtherQRs()" style="width: 100%; padding: 14px 4px; font-size: 13px; background: transparent; border: 1px solid #ddd; color: #555; white-space: normal; line-height: 1.2;">
+                <span style="font-size: 18px; display: block; margin-bottom: 2px;">📱</span> Другие QR
+            </button>
+            
+            <!-- Правая кнопка (Занимает 2 части ширины) -->
+            <button class="btn-pay-action" onclick="copyPaymentNumber()" style="width: 100%; padding: 14px; font-size: 15px;">
                 <span style="font-size: 18px;">📋</span> Скопировать номер
             </button>
-            <button class="btn-pay-action" onclick="openOtherQRs()" style="width: 100%; padding: 14px; font-size: 15px; background: transparent; border: 1px solid #ddd; color: #555;">
-                <span style="font-size: 18px;">📱</span> Другие QR-коды
-            </button>
-        </div>
-    </div>
-    
-    <div style="padding: 0 16px 20px 16px;">
-        <div style="text-align: center; color: #d32f2f; font-size: 13px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 6px;">
-            ⚠️ Нажимайте только ПОСЛЕ перевода денег!
         </div>
         
-        <button class="btn-yellow" onclick="createOrder()">Я оплатил заказ</button>
-        
-        <div style="text-align: center; margin-top: 12px; font-size: 12px; color: #888; line-height: 1.4;">
-            Мы проверим оплату и сразу же начнем готовить заказ!<br>Это занимает 1-2 минуты
+        <div style="padding: 0 8px;">
+            <div style="text-align: center; color: #d32f2f; font-size: 13px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                ⚠️ Нажимайте только ПОСЛЕ перевода денег!
+            </div>
+            
+            <button class="btn-yellow" onclick="createOrder()">Я оплатил заказ</button>
+            
+            <div style="text-align: center; margin-top: 12px; font-size: 12px; color: #888; line-height: 1.4;">
+                Мы проверим оплату и сразу же начнем готовить заказ!<br>Это занимает 1-2 минуты
+            </div>
         </div>
+
     </div>
 </div>
 </div>
