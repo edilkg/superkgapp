@@ -93,16 +93,23 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
     console.log('🛡️ Модуль Admin загружен');
 
     // ВОЗВРАЩАЕМ ФУНКЦИЮ ДЛЯ ОТПРАВКИ ЗАКАЗА АДМИНУ ИЗ SERVER.JS
+    // ВОЗВРАЩАЕМ ФУНКЦИЮ ДЛЯ ОТПРАВКИ ЗАКАЗА АДМИНУ ИЗ SERVER.JS
     return {
         sendOrderToAdmin: async (orderData) => {
             const itemsText = orderData.items.map(i => `▫️ ${i.item.name} x${i.count}`).join('\n');
+            
+            // Формируем красивое и информативное сообщение для админа
             const message = `🚨 НОВЫЙ ЗАКАЗ НА ПРОВЕРКУ ОПЛАТЫ!
 ID: #${String(orderData.id).slice(0,5)}
-Сумма: ${orderData.total_price} сом
-Телефон: ${orderData.phone || 'Не указан'}
-Ресторан: ${orderData.restaurant}
+💰 Сумма: ${orderData.total_price} сом
 
-Блюда:
+📞 Телефон: ${orderData.phone || 'Не указан'}
+📍 Адрес: ${orderData.address || 'Не указан'}
+💬 Комментарий: ${orderData.comment || 'Нет'}
+
+🏢 Ресторан: ${orderData.restaurant}
+
+🛒 Блюда:
 ${itemsText}`;
 
             const keyboard = Markup.inlineKeyboard([
