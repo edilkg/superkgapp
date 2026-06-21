@@ -98,24 +98,30 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
         sendOrderToAdmin: async (orderData) => {
             const itemsText = orderData.items.map(i => `▫️ ${i.item.name} x${i.count}`).join('\n');
             
-            // Формируем красивое и информативное сообщение для админа
+            // Формируем сообщение, добавив Имя и TG ID клиента
             const message = `🚨 НОВЫЙ ЗАКАЗ НА ПРОВЕРКУ ОПЛАТЫ!
 ID: #${String(orderData.id).slice(0,5)}
 💰 Сумма: ${orderData.total_price} сом
-
+👤 Клиент: ${orderData.client_name || 'Гость'} (TG ID: ${orderData.client_id || 'Неизвестно'})
 📞 Телефон: ${orderData.phone || 'Не указан'}
 📍 Адрес: ${orderData.address || 'Не указан'}
 💬 Комментарий: ${orderData.comment || 'Нет'}
-
-🏢 Ресторан: ${orderData.restaurant}
-
+🏢 Откуда: ${orderData.restaurant}
 🛒 Блюда:
 ${itemsText}`;
 
-            const keyboard = Markup.inlineKeyboard([
+            // Базовые кнопки
+            const buttons = [
                 [Markup.button.callback("✅ Оплата получена", `approve_order_${orderData.id}`)],
                 [Markup.button.callback("❌ Оплаты нет", `reject_order_${orderData.id}`)]
-            ]);
+            ];
+
+            // Если у нас есть Telegram ID клиента, добавляем волшебную кнопку для быстрой связи
+            if (orderData.client_id) {
+                buttons.push([Markup.button.url("💬 Написать клиенту", `tg://user?id=${orderData.client_id}`)]);
+            }
+
+            const keyboard = Markup.inlineKeyboard(buttons);
 
             await adminBot.telegram.sendMessage(ADMIN_GROUP_ID, message, keyboard);
         }
