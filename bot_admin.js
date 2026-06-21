@@ -1,4 +1,3 @@
-// bot_admin.js
 const { Markup } = require('telegraf');
 
 module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase, ADMIN_GROUP_ID) {
@@ -9,14 +8,12 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
     adminBot.action(/approve_order_(.+)/, async (ctx) => {
         const orderId = ctx.match[1];
         
-        // Достаем заказ из базы
         const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
         if (!order) return ctx.answerCbQuery("❌ Заказ не найден");
 
-        // Меняем статус сообщения у админа
         await ctx.editMessageText(`✅ ЗАКАЗ #${String(orderId).slice(0,5)} ОДОБРЕН (Оплата получена)\nРесторан: ${order.restaurant}\nСумма: ${order.total_price} сом`);
 
-        // 1. ОТПРАВЛЯЕМ ЗАКАЗ РЕСТОРАНУ
+        // Отправляем в ресторан
         const { data: restData } = await supabase.from('restaurants').select('id').eq('name', order.restaurant).eq('is_approved', true).maybeSingle();
         if (restData) {
             const itemsText = order.items.map(i => `▫️ ${i.item.name} x${i.count}`).join('\n');
@@ -27,7 +24,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             ]));
         }
 
-        // 2. ОТПРАВЛЯЕМ ЗАКАЗ КУРЬЕРАМ
+        // Отправляем курьерам
         const { data: couriers } = await supabase.from('couriers').select('id').eq('status', 'active');
         if (couriers && couriers.length > 0) {
             let msgCourier = `🔥 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n🏢 Ресторан: ${order.restaurant}\n📍 Куда: ${order.address}\n💰 Оплата: ${order.total_price} сом\n\nКто заберет?`;
@@ -40,7 +37,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             }
         }
 
-        // 3. УВЕДОМЛЯЕМ КЛИЕНТА, ЧТО ОПЛАТА ПРОШЛА
+        // Уведомляем клиента
         if (order.client_id) {
             try { await adminBot.telegram.sendMessage(order.client_id, `✅ Ваша оплата подтверждена! Заказ #${String(orderId).slice(0,5)} передан на кухню.`); } catch(e){}
         }
@@ -61,7 +58,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
     });
 
     // ==========================================
-    // 3. ОДОБРЕНИЕ КУРЬЕРОВ И РЕСТОРАНОВ (Перенесли сюда)
+    // 3. ОДОБРЕНИЕ КУРЬЕРОВ И РЕСТОРАНОВ
     // ==========================================
     adminBot.action(/approve_courier_(.+)/, async (ctx) => {
         const id = ctx.match[1];
@@ -92,38 +89,37 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
 
     console.log('🛡️ Модуль Admin загружен');
 
-    // ВОЗВРАЩАЕМ ФУНКЦИЮ ДЛЯ ОТПРАВКИ ЗАКАЗА АДМИНУ ИЗ SERVER.JS
-    // ВОЗВРАЩАЕМ ФУНКЦИЮ ДЛЯ ОТПРАВКИ ЗАКАЗА АДМИНУ ИЗ SERVER.JS
+    // ВОЗВРАЩАЕМ ФУНКЦИЮ ДЛЯ ОТПРАВКИ ЗАКАЗА АДМИНУ
     return {
         sendOrderToAdmin: async (orderData) => {
-            const itemsText = orderData.items.map(i => `▫️ ${i.item.name} x${i.count}`).join('\n');
-            
-            // Формируем сообщение, добавив Имя и TG ID клиента
-            const message = `🚨 НОВЫЙ ЗАКАЗ НА ПРОВЕРКУ ОПЛАТЫ!
+            try {
+                const itemsText = orderData.items.map(i => `▫️ ${i.item.name} x${i.count}`).join('\n');
+                
+                const message = `🚨 НОВЫЙ ЗАКАЗ НА ПРОВЕРКУ ОПЛАТЫ!
 ID: #${String(orderData.id).slice(0,5)}
 💰 Сумма: ${orderData.total_price} сом
-👤 Клиент: ${orderData.client_name || 'Гость'} (TG ID: ${orderData.client_id || 'Неизвестно'})
+👤 Клиент: ${orderData.client_name || 'Гость'} (TG ID: ${orderData.client_id || 'Нет'})
 📞 Телефон: ${orderData.phone || 'Не указан'}
 📍 Адрес: ${orderData.address || 'Не указан'}
 💬 Комментарий: ${orderData.comment || 'Нет'}
-🏢 Откуда: ${orderData.restaurant}
+🏢 Ресторан: ${orderData.restaurant}
 🛒 Блюда:
 ${itemsText}`;
 
-            // Базовые кнопки
-            const buttons = [
-                [Markup.button.callback("✅ Оплата получена", `approve_order_${orderData.id}`)],
-                [Markup.button.callback("❌ Оплаты нет", `reject_order_${orderData.id}`)]
-            ];
+                const buttons = [
+                    [Markup.button.callback("✅ Оплата получена", `approve_order_${orderData.id}`)],
+                    [Markup.button.callback("❌ Оплаты нет", `reject_order_${orderData.id}`)]
+                ];
 
-            // Если у нас есть Telegram ID клиента, добавляем волшебную кнопку для быстрой связи
-            if (orderData.client_id) {
-                buttons.push([Markup.button.url("💬 Написать клиенту", `tg://user?id=${orderData.client_id}`)]);
+                if (orderData.client_id) {
+                    buttons.push([Markup.button.url("💬 Написать клиенту", `tg://user?id=${orderData.client_id}`)]);
+                }
+
+                await adminBot.telegram.sendMessage(ADMIN_GROUP_ID, message, Markup.inlineKeyboard(buttons));
+                console.log(`✅ Заказ #${orderData.id} успешно отправлен в группу админов!`);
+            } catch (err) {
+                console.error("❌ ОШИБКА ОТПРАВКИ В TG-ГРУППУ:", err.message);
             }
-
-            const keyboard = Markup.inlineKeyboard(buttons);
-
-            await adminBot.telegram.sendMessage(ADMIN_GROUP_ID, message, keyboard);
         }
     };
 };
