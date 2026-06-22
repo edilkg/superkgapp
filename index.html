@@ -2899,33 +2899,54 @@ function goToMainMenu() {
         // ==========================================
         let orderSubscription = null;
 
+        // ==========================================
+        // ЛОГИКА АКТИВНОГО ЗАКАЗА И REALTIME
+        // ==========================================
+        let orderSubscription = null;
+
         async function checkActiveOrder() {
             const orderId = localStorage.getItem('tamak_active_order_id');
             if (!orderId) {
-                document.getElementById('active-order-banner').classList.add('hidden');
+                const banner = document.getElementById('active-order-banner');
+                if(banner) banner.classList.add('hidden');
                 return;
             }
 
-            // Загружаем текущий статус из базы
+            // 1. Загружаем текущий статус принудительно (чтобы точно показать свежее)
             const { data: order, error } = await supabaseClient.from('orders').select('*').eq('id', orderId).maybeSingle();
             
             if (order && !['completed', 'canceled'].includes(order.status)) {
-                updateOrderUI(order); // Обновляем экран сразу
+                updateOrderUI(order); // Рисуем текущий статус на экране
                 
-                // СЛУШАЕМ ИЗМЕНЕНИЯ В РЕАЛЬНОМ ВРЕМЕНИ (Supabase WebSockets)
+                // 2. СЛУШАЕМ ИЗМЕНЕНИЯ (Создаем уникальный канал для этого заказа)
                 if (!orderSubscription) {
-                    orderSubscription = supabaseClient.channel('realtime-orders')
-                        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, (payload) => {
-                            updateOrderUI(payload.new);
+                    const channelName = 'order-watch-' + orderId; // Уникальное имя!
+                    
+                    orderSubscription = supabaseClient.channel(channelName)
+                        .on('postgres_changes', { 
+                            event: 'UPDATE', 
+                            schema: 'public', 
+                            table: 'orders', 
+                            filter: `id=eq.${orderId}` 
+                        }, (payload) => {
+                            console.log("🔥 ПРИЛЕТЕЛО ИЗМЕНЕНИЕ ИЗ БАЗЫ:", payload.new);
+                            updateOrderUI(payload.new); // Мгновенно обновляем экран
                         })
-                        .subscribe();
+                        .subscribe((status) => {
+                            console.log("📡 Статус подключения к базе:", status);
+                        });
                 }
             } else {
-                // Если заказ завершен или отменен — убираем баннер
+                // Если заказ завершен или отменен — стираем его из памяти
                 localStorage.removeItem('tamak_active_order_id');
-                document.getElementById('active-order-banner').classList.add('hidden');
-                if (orderSubscription) supabaseClient.removeChannel(orderSubscription);
-                orderSubscription = null;
+                const banner = document.getElementById('active-order-banner');
+                if(banner) banner.classList.add('hidden');
+                
+                // Закрываем канал связи
+                if (orderSubscription) {
+                    supabaseClient.removeChannel(orderSubscription);
+                    orderSubscription = null;
+                }
             }
         }
 
