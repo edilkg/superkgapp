@@ -115,3 +115,5 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             console.error("Ошибка при статусе 'доставлен':", err);
         }
     });
+
+};
