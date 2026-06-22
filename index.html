@@ -2933,7 +2933,6 @@ function goToMainMenu() {
             const banner = document.getElementById('active-order-banner');
             if(banner) banner.classList.remove('hidden');
 
-            // Обновляем данные везде
             document.getElementById('banner-res-name').innerText = order.restaurant;
             document.getElementById('st-res-name').innerText = order.restaurant;
             document.getElementById('st-price').innerText = order.total_price + ' сом';
@@ -2944,11 +2943,18 @@ function goToMainMenu() {
             let detailDesc = "Менеджер проверяет поступление средств.";
             let statusColor = "#FF9800"; // Оранжевый
 
-            if (order.status === 'cooking') {
+            if (order.status === 'paid') {
+                statusText = "Оплата получена!";
+                icon = "💳";
+                bannerDesc = "Передаем на кухню...";
+                detailDesc = "Оплата подтверждена. Ждем, когда повара примут заказ.";
+                statusColor = "#8BC34A"; // Светло-зеленый
+            } else if (order.status === 'cooking') {
                 statusText = "Заказ на кухне!";
                 icon = "👨‍🍳";
                 bannerDesc = "Уже готовим...";
                 detailDesc = "Ресторан принял заказ и начал готовить.";
+                statusColor = "#FF9800"; 
             } else if (order.status === 'delivery') {
                 statusText = "Курьер в пути!";
                 icon = "🛵";
@@ -2961,32 +2967,24 @@ function goToMainMenu() {
                 bannerDesc = "Приятного аппетита!";
                 detailDesc = "Спасибо, что выбрали нас!";
                 statusColor = "#4CAF50"; // Зеленый
-                // Убираем баннер через 5 секунд после доставки
                 setTimeout(() => checkActiveOrder(), 5000);
             } else if (order.status === 'canceled') {
                 statusText = "Заказ отменен";
                 icon = "❌";
                 bannerDesc = "Отменен";
-                detailDesc = "Заказ был отменен администратором.";
+                detailDesc = "Заказ был отменен.";
                 statusColor = "#d32f2f"; // Красный
                 setTimeout(() => checkActiveOrder(), 5000);
             }
 
-            // Применяем цвета и тексты
             if(document.getElementById('st-status-icon')) document.getElementById('st-status-icon').innerText = icon;
             if(document.getElementById('st-status-desc')) document.getElementById('st-status-desc').innerText = detailDesc;
             
             const stText = document.getElementById('st-status-text');
-            if(stText) {
-                stText.innerText = statusText;
-                stText.style.color = statusColor;
-            }
+            if(stText) { stText.innerText = statusText; stText.style.color = statusColor; }
             
             const bText = document.getElementById('banner-status-text');
-            if(bText) {
-                bText.innerText = bannerDesc;
-                bText.style.color = statusColor; // Баннер тоже меняет цвет текста
-            }
+            if(bText) { bText.innerText = bannerDesc; bText.style.color = statusColor; }
         }
 
         // Вызываем проверку при загрузке сайта (если юзер закрыл приложение и зашел снова)
