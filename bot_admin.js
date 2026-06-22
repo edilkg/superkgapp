@@ -37,7 +37,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 for (const courier of couriers) {
                     try {
                         await courierBot.telegram.sendMessage(courier.id, msgCourier, Markup.inlineKeyboard([
-                            [Markup.button.callback('🏃‍♂️ Я ЗАБЕРУ!', `courier_take_${orderId}`)]
+                            [Markup.button.callback('🙋‍♂️ Я возьму', `courier_take_${orderId}`)]
                         ]));
                     } catch (e) {}
                 }

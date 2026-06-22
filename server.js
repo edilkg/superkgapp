@@ -22,7 +22,7 @@ const restBot = new Telegraf(process.env.REST_BOT_TOKEN);
 const ADMIN_GROUP_ID = process.env.ADMIN_CHAT_ID; 
 
 setupClientBot(bot, supabase, ADMIN_GROUP_ID);
-setupCourierBot(courierBot, bot, supabase, ADMIN_GROUP_ID);
+setupCourierBot(courierBot, bot, supabase,restBot, ADMIN_GROUP_ID);
 setupRestaurantBot(restBot, courierBot, bot, supabase, ADMIN_GROUP_ID);
 
 // Инициализируем админку, чтобы бот начал слушать кнопки!
