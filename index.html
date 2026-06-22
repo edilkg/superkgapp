@@ -2899,11 +2899,6 @@ function goToMainMenu() {
         // ==========================================
         let orderSubscription = null;
 
-        // ==========================================
-        // ЛОГИКА АКТИВНОГО ЗАКАЗА И REALTIME
-        // ==========================================
-        let orderSubscription = null;
-
         async function checkActiveOrder() {
             const orderId = localStorage.getItem('tamak_active_order_id');
             if (!orderId) {
