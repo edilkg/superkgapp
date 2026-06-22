@@ -2963,19 +2963,19 @@ function goToMainMenu() {
                 statusText = "Оплата получена!";
                 icon = "💳";
                 bannerDesc = "Передаем на кухню...";
-                detailDesc = "Оплата подтверждена. Ждем, когда повара примут заказ.";
+                detailDesc = "Оплата подтверждена. Заказ передан в ресторан и курьеру.";
                 statusColor = "#8BC34A"; // Светло-зеленый
             } else if (order.status === 'cooking') {
                 statusText = "Заказ на кухне!";
                 icon = "👨‍🍳";
                 bannerDesc = "Уже готовим...";
-                detailDesc = "Ресторан принял заказ и начал готовить.";
+                detailDesc = "Ресторан готовит ваш заказ. Курьер скоро заберет его и поедет к вам!";
                 statusColor = "#FF9800"; 
             } else if (order.status === 'delivery') {
                 statusText = "Курьер в пути!";
                 icon = "🛵";
                 bannerDesc = "Везем к вам!";
-                detailDesc = "Курьер забрал заказ и спешит по вашему адресу!";
+                detailDesc = "Курьер забрал заказ и едет к вам!";
                 statusColor = "#2196F3"; // Синий
             } else if (order.status === 'completed') {
                 statusText = "Заказ доставлен!";
