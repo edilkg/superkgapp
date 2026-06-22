@@ -30,33 +30,45 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
     // ==========================================
     // 1. КУРЬЕР БЕРЕТ ЗАКАЗ (ЕДЕТ В РЕСТОРАН)
     // ==========================================
+    // ==========================================
+    // 1. КУРЬЕР БЕРЕТ ЗАКАЗ (ЕДЕТ В РЕСТОРАН)
+    // ==========================================
     courierBot.action(/courier_take_(.+)/, async (ctx) => {
         const orderId = ctx.match[1];
         const courierId = ctx.from.id;
 
         try {
             // 1. Проверяем, не забрал ли уже заказ другой курьер
-            const { data: orderCheck } = await supabase.from('orders').select('courier_id, restaurant').eq('id', orderId).single();
+            const { data: orderCheck, error: checkErr } = await supabase.from('orders').select('courier_id, restaurant').eq('id', orderId).maybeSingle();
+            
+            if (checkErr || !orderCheck) {
+                return ctx.answerCbQuery("❌ Заказ не найден", { show_alert: true });
+            }
+            
             if (orderCheck.courier_id && orderCheck.courier_id !== courierId) {
                 return ctx.answerCbQuery("❌ Этот заказ уже взял другой курьер", { show_alert: true });
             }
 
-            // 2. Бронируем заказ за курьером, но СТАТУС ОСТАВЛЯЕМ СТАРЫМ (клиент ничего не видит)
-            await supabase.from('orders').update({ courier_id: courierId }).eq('id', orderId);
+            // 2. Бронируем заказ за курьером
+            const { error: updateErr } = await supabase.from('orders').update({ courier_id: courierId }).eq('id', orderId);
+            if (updateErr) throw updateErr;
 
-            // 3. Достаем данные курьера для уведомлений
-            const { data: courierData } = await supabase.from('couriers').select('name, phone').eq('id', courierId).single();
-            const cName = courierData?.name || 'Без имени';
-            const cPhone = courierData?.phone || 'Без номера';
+            // 3. Данные курьера берем прямо из его профиля Телеграм (Без нагрузки на БД!)
+            const cName = ctx.from.first_name || 'Курьер';
+            const cUsername = ctx.from.username ? '@' + ctx.from.username : `(Без юзернейма, ID: ${courierId})`;
 
             // 4. Уведомляем админа
-            await bot.telegram.sendMessage(ADMIN_GROUP_ID, `🛵 Курьер выехал в ресторан за заказом #${String(orderId).slice(0,5)}:\n👤 ${cName}\n📞 ${cPhone}`);
+            try {
+                await bot.telegram.sendMessage(ADMIN_GROUP_ID, `🛵 Курьер выехал в ресторан за заказом #${String(orderId).slice(0,5)}:\n👤 ${cName}\n💬 Связь: ${cUsername}`);
+            } catch(e) {}
 
             // 5. Уведомляем ресторан
             if (orderCheck.restaurant) {
                 const { data: restData } = await supabase.from('restaurants').select('id').eq('name', orderCheck.restaurant).maybeSingle();
                 if (restData) {
-                    await restBot.telegram.sendMessage(restData.id, `🛵 К вам за заказом #${String(orderId).slice(0,5)} выехал курьер:\n👤 ${cName}\n📞 ${cPhone}`);
+                    try {
+                        await restBot.telegram.sendMessage(restData.id, `🛵 К вам за заказом #${String(orderId).slice(0,5)} выехал курьер:\n👤 ${cName}\n💬 Связь: ${cUsername}`);
+                    } catch(e) {}
                 }
             }
 
@@ -70,7 +82,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             
             await ctx.answerCbQuery("✅ Вы назначены на заказ!");
         } catch (err) {
-            console.error("Ошибка при взятии заказа курьером:", err);
+            console.error("Ошибка при взятии заказа курьером:", err.message);
             ctx.answerCbQuery("❌ Ошибка базы данных");
         }
     });
