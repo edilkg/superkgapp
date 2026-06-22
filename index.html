@@ -787,7 +787,13 @@
             </div> -->
             
         </div>
-        
+        <div id="active-order-banner" class="hidden" onclick="showScreen('status')">
+            <div class="banner-info">
+                <span class="banner-title" id="banner-res-name">Ресторан</span>
+                <span class="banner-status" id="banner-status-text">Ожидает оплаты...</span>
+            </div>
+            <div style="font-size: 24px;">🛵</div>
+        </div>
         <div class="restaurant-list" id="restaurant-list"></div>
     </div>
 
@@ -931,9 +937,9 @@
     </div>
     <div style="padding: 16px;">
         <div style="background: white; border-radius: 12px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-            <div style="font-size: 40px; margin-bottom: 12px;">💸</div>
+            <div id="st-status-icon" style="font-size: 40px; margin-bottom: 12px;">💸</div>
             <h3 id="st-status-text" style="margin: 0 0 8px 0; color: #FF9800;">Проверяем оплату...</h3>
-            <p style="color: #666; margin: 0 0 12px 0; font-size: 13px; line-height: 1.4;">Менеджер проверяет поступление средств. Как только оплата подтвердится, заказ уйдет на кухню!</p>
+            <p id="st-status-desc" style="color: #666; margin: 0 0 12px 0; font-size: 13px; line-height: 1.4;">Менеджер проверяет поступление средств.</p>
             <p style="color: var(--tg-theme-hint-color); margin: 0; font-size: 14px;">Ресторан: <b id="st-res-name">...</b></p>
             <p style="color: var(--tg-theme-hint-color); margin: 4px 0 0 0; font-size: 14px;">Сумма: <b id="st-price">...</b></p>
         </div>
@@ -2359,9 +2365,11 @@ function filterMenu(resId, category, btn) {
                 const result = await response.json(); // Читаем ответ сервера
 
                 if (response.ok) {
+                    // --- НОВОЕ: Сохраняем ID заказа и запускаем слежку ---
+                    localStorage.setItem('tamak_active_order_id', result.orderId);
+                    checkActiveOrder(); // Запускаем магию реального времени
+
                     showScreen('status');
-                    document.getElementById('st-res-name').innerText = database[cartActiveTabResId]?.title || 'Ресторан';
-                    document.getElementById('st-price').innerText = (totalSum + currentDeliveryFee + doorDeliveryFee) + " сом"; // Обновил ID для суммы
                     for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
                     recalcTotal();
                 } else {
@@ -2886,6 +2894,103 @@ function goToMainMenu() {
         function startNewOrder() {
             goToMainMenu();
         }
+        // ==========================================
+        // ЛОГИКА АКТИВНОГО ЗАКАЗА И REALTIME
+        // ==========================================
+        let orderSubscription = null;
+
+        async function checkActiveOrder() {
+            const orderId = localStorage.getItem('tamak_active_order_id');
+            if (!orderId) {
+                document.getElementById('active-order-banner').classList.add('hidden');
+                return;
+            }
+
+            // Загружаем текущий статус из базы
+            const { data: order, error } = await supabaseClient.from('orders').select('*').eq('id', orderId).maybeSingle();
+            
+            if (order && !['completed', 'canceled'].includes(order.status)) {
+                updateOrderUI(order); // Обновляем экран сразу
+                
+                // СЛУШАЕМ ИЗМЕНЕНИЯ В РЕАЛЬНОМ ВРЕМЕНИ (Supabase WebSockets)
+                if (!orderSubscription) {
+                    orderSubscription = supabaseClient.channel('realtime-orders')
+                        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${orderId}` }, (payload) => {
+                            updateOrderUI(payload.new);
+                        })
+                        .subscribe();
+                }
+            } else {
+                // Если заказ завершен или отменен — убираем баннер
+                localStorage.removeItem('tamak_active_order_id');
+                document.getElementById('active-order-banner').classList.add('hidden');
+                if (orderSubscription) supabaseClient.removeChannel(orderSubscription);
+                orderSubscription = null;
+            }
+        }
+
+        function updateOrderUI(order) {
+            const banner = document.getElementById('active-order-banner');
+            if(banner) banner.classList.remove('hidden');
+
+            // Обновляем данные везде
+            document.getElementById('banner-res-name').innerText = order.restaurant;
+            document.getElementById('st-res-name').innerText = order.restaurant;
+            document.getElementById('st-price').innerText = order.total_price + ' сом';
+
+            let statusText = "Проверяем оплату...";
+            let icon = "💸";
+            let bannerDesc = "Ожидаем подтверждения...";
+            let detailDesc = "Менеджер проверяет поступление средств.";
+            let statusColor = "#FF9800"; // Оранжевый
+
+            if (order.status === 'cooking') {
+                statusText = "Заказ на кухне!";
+                icon = "👨‍🍳";
+                bannerDesc = "Уже готовим...";
+                detailDesc = "Ресторан принял заказ и начал готовить.";
+            } else if (order.status === 'delivery') {
+                statusText = "Курьер в пути!";
+                icon = "🛵";
+                bannerDesc = "Везем к вам!";
+                detailDesc = "Курьер забрал заказ и спешит по вашему адресу!";
+                statusColor = "#2196F3"; // Синий
+            } else if (order.status === 'completed') {
+                statusText = "Заказ доставлен!";
+                icon = "✅";
+                bannerDesc = "Приятного аппетита!";
+                detailDesc = "Спасибо, что выбрали нас!";
+                statusColor = "#4CAF50"; // Зеленый
+                // Убираем баннер через 5 секунд после доставки
+                setTimeout(() => checkActiveOrder(), 5000);
+            } else if (order.status === 'canceled') {
+                statusText = "Заказ отменен";
+                icon = "❌";
+                bannerDesc = "Отменен";
+                detailDesc = "Заказ был отменен администратором.";
+                statusColor = "#d32f2f"; // Красный
+                setTimeout(() => checkActiveOrder(), 5000);
+            }
+
+            // Применяем цвета и тексты
+            if(document.getElementById('st-status-icon')) document.getElementById('st-status-icon').innerText = icon;
+            if(document.getElementById('st-status-desc')) document.getElementById('st-status-desc').innerText = detailDesc;
+            
+            const stText = document.getElementById('st-status-text');
+            if(stText) {
+                stText.innerText = statusText;
+                stText.style.color = statusColor;
+            }
+            
+            const bText = document.getElementById('banner-status-text');
+            if(bText) {
+                bText.innerText = bannerDesc;
+                bText.style.color = statusColor; // Баннер тоже меняет цвет текста
+            }
+        }
+
+        // Вызываем проверку при загрузке сайта (если юзер закрыл приложение и зашел снова)
+        checkActiveOrder();
 </script>
 <div id="screen-payment" class="screen hidden" style="overflow-y: auto !important; display: block;">
     
