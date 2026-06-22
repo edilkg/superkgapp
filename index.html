@@ -2907,115 +2907,43 @@ function goToMainMenu() {
                 return;
             }
 
-            try {
-                // 1. Загружаем текущий статус
-                const { data: order, error } = await supabaseClient.from('orders').select('*').eq('id', orderId).maybeSingle();
-
-                if (order && !['completed', 'canceled'].includes(order.status)) {
-                    updateOrderUI(order);
-
-                    // 2. СЛУШАЕМ ИЗМЕНЕНИЯ (Уникальный канал)
-                    if (!orderSubscription) {
-                        const channelName = 'order-watch-' + orderId;
-
-                        orderSubscription = supabaseClient.channel(channelName)
-                            .on('postgres_changes', {
-                                event: 'UPDATE',
-                                schema: 'public',
-                                table: 'orders',
-                                filter: `id=eq.${orderId}`
-                            }, (payload) => {
-                                console.log("🔥 ПРИЛЕТЕЛО ИЗМЕНЕНИЕ ИЗ БАЗЫ:", payload.new);
-                                updateOrderUI(payload.new);
-                            })
-                            .subscribe((status) => {
-                                console.log("📡 Статус подключения к базе:", status);
-                            });
-                    }
-                } else {
-                    localStorage.removeItem('tamak_active_order_id');
-                    const banner = document.getElementById('active-order-banner');
-                    if(banner) banner.classList.add('hidden');
-
-                    if (orderSubscription) {
-                        supabaseClient.removeChannel(orderSubscription);
-                        orderSubscription = null;
-                    }
+            // 1. Загружаем текущий статус принудительно (чтобы точно показать свежее)
+            const { data: order, error } = await supabaseClient.from('orders').select('*').eq('id', orderId).maybeSingle();
+            
+            if (order && !['completed', 'canceled'].includes(order.status)) {
+                updateOrderUI(order); // Рисуем текущий статус на экране
+                
+                // 2. СЛУШАЕМ ИЗМЕНЕНИЯ (Создаем уникальный канал для этого заказа)
+                if (!orderSubscription) {
+                    const channelName = 'order-watch-' + orderId; // Уникальное имя!
+                    
+                    orderSubscription = supabaseClient.channel(channelName)
+                        .on('postgres_changes', { 
+                            event: 'UPDATE', 
+                            schema: 'public', 
+                            table: 'orders', 
+                            filter: `id=eq.${orderId}` 
+                        }, (payload) => {
+                            console.log("🔥 ПРИЛЕТЕЛО ИЗМЕНЕНИЕ ИЗ БАЗЫ:", payload.new);
+                            updateOrderUI(payload.new); // Мгновенно обновляем экран
+                        })
+                        .subscribe((status) => {
+                            console.log("📡 Статус подключения к базе:", status);
+                        });
                 }
-            } catch(e) {
-                console.error("Ошибка при проверке заказа:", e);
+            } else {
+                // Если заказ завершен или отменен — стираем его из памяти
+                localStorage.removeItem('tamak_active_order_id');
+                const banner = document.getElementById('active-order-banner');
+                if(banner) banner.classList.add('hidden');
+                
+                // Закрываем канал связи
+                if (orderSubscription) {
+                    supabaseClient.removeChannel(orderSubscription);
+                    orderSubscription = null;
+                }
             }
         }
-
-        function updateOrderUI(order) {
-            const banner = document.getElementById('active-order-banner');
-            if(banner) banner.classList.remove('hidden');
-
-            const bResName = document.getElementById('banner-res-name');
-            if(bResName) bResName.innerText = order.restaurant;
-            
-            const stResName = document.getElementById('st-res-name');
-            if(stResName) stResName.innerText = order.restaurant;
-            
-            const stPrice = document.getElementById('st-price');
-            if(stPrice) stPrice.innerText = order.total_price + ' сом';
-
-            let statusText = "Проверяем оплату...";
-            let icon = "💸";
-            let bannerDesc = "Ожидаем подтверждения...";
-            let detailDesc = "Менеджер проверяет поступление средств.";
-            let statusColor = "#FF9800";
-
-            if (order.status === 'paid') {
-                statusText = "Оплата получена!";
-                icon = "💳";
-                bannerDesc = "Передаем на кухню...";
-                detailDesc = "Оплата подтверждена. Ждем, когда повара примут заказ.";
-                statusColor = "#8BC34A";
-            } else if (order.status === 'cooking') {
-                statusText = "Заказ на кухне!";
-                icon = "👨‍🍳";
-                bannerDesc = "Уже готовим...";
-                detailDesc = "Ресторан принял заказ и начал готовить.";
-                statusColor = "#FF9800";
-            } else if (order.status === 'delivery') {
-                statusText = "Курьер в пути!";
-                icon = "🛵";
-                bannerDesc = "Везем к вам!";
-                detailDesc = "Курьер забрал заказ и спешит по вашему адресу!";
-                statusColor = "#2196F3";
-            } else if (order.status === 'completed') {
-                statusText = "Заказ доставлен!";
-                icon = "✅";
-                bannerDesc = "Приятного аппетита!";
-                detailDesc = "Спасибо, что выбрали нас!";
-                statusColor = "#4CAF50";
-                setTimeout(() => checkActiveOrder(), 5000);
-            } else if (order.status === 'canceled') {
-                statusText = "Заказ отменен";
-                icon = "❌";
-                bannerDesc = "Отменен";
-                detailDesc = "Заказ был отменен.";
-                statusColor = "#d32f2f";
-                setTimeout(() => checkActiveOrder(), 5000);
-            }
-
-            const stIcon = document.getElementById('st-status-icon');
-            if(stIcon) stIcon.innerText = icon;
-            
-            const stDesc = document.getElementById('st-status-desc');
-            if(stDesc) stDesc.innerText = detailDesc;
-
-            const stText = document.getElementById('st-status-text');
-            if(stText) { stText.innerText = statusText; stText.style.color = statusColor; }
-
-            const bText = document.getElementById('banner-status-text');
-            if(bText) { bText.innerText = bannerDesc; bText.style.color = statusColor; }
-        }
-
-        // Вызываем проверку при загрузке сайта
-        checkActiveOrder();
-    </script>
 
         function updateOrderUI(order) {
             const banner = document.getElementById('active-order-banner');
