@@ -1,9 +1,10 @@
-// bot_courier.js
 const { Markup } = require('telegraf');
 
 module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, ADMIN_GROUP_ID) {
     
-    // 1. СТАРТ И ПРОФИЛЬ
+    // ==========================================
+    // 0. СТАРТ И ПРОФИЛЬ
+    // ==========================================
     courierBot.start(async (ctx) => {
         try {
             const id = ctx.from.id;
@@ -13,8 +14,8 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 await supabase.from('couriers').insert([{ id, name: ctx.from.first_name, status: 'waiting_approval', balance: 0 }]);
                 ctx.reply("Привет! Заявка отправлена админу. Жди одобрения.");
                 
-                // ПРОСТО ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ АДМИНУ ЧЕРЕЗ ГЛАВНОГО БОТА (clientBot)
-                return clientBot.telegram.sendMessage(ADMIN_GROUP_ID, 
+                // ИСПРАВЛЕНИЕ: Используем 'bot' вместо 'clientBot'
+                return bot.telegram.sendMessage(ADMIN_GROUP_ID, 
                     `🛵 НОВАЯ ЗАЯВКА (КУРЬЕР)\nИмя: ${ctx.from.first_name}\nID: ${id}`,
                     Markup.inlineKeyboard([[Markup.button.callback('✅ ОДОБРИТЬ КУРЬЕРА', `approve_courier_${id}`)]])
                 );
@@ -26,10 +27,6 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
         } catch (e) { console.error(e); }
     });
 
-    // 2. ПРИНЯТИЕ И ЗАВЕРШЕНИЕ ЗАКАЗА
-    // ==========================================
-    // 1. КУРЬЕР БЕРЕТ ЗАКАЗ (ЕДЕТ В РЕСТОРАН)
-    // ==========================================
     // ==========================================
     // 1. КУРЬЕР БЕРЕТ ЗАКАЗ (ЕДЕТ В РЕСТОРАН)
     // ==========================================
@@ -50,10 +47,9 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             }
 
             // 2. Бронируем заказ за курьером
-            const { error: updateErr } = await supabase.from('orders').update({ courier_id: courierId }).eq('id', orderId);
-            if (updateErr) throw updateErr;
+            await supabase.from('orders').update({ courier_id: courierId }).eq('id', orderId);
 
-            // 3. Данные курьера берем прямо из его профиля Телеграм (Без нагрузки на БД!)
+            // 3. Данные курьера берем прямо из его профиля Телеграм
             const cName = ctx.from.first_name || 'Курьер';
             const cUsername = ctx.from.username ? '@' + ctx.from.username : `(Без юзернейма, ID: ${courierId})`;
 
@@ -83,7 +79,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             await ctx.answerCbQuery("✅ Вы назначены на заказ!");
         } catch (err) {
             console.error("Ошибка при взятии заказа курьером:", err.message);
-            ctx.answerCbQuery("❌ Ошибка базы данных");
+            try { await ctx.answerCbQuery("❌ Ошибка базы данных", {show_alert: true}); } catch(e){}
         }
     });
 
@@ -94,10 +90,8 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
         const orderId = ctx.match[1];
 
         try {
-            // 👉 МЕНЯЕМ СТАТУС В БАЗЕ (Клиент увидит: "Курьер забрал заказ и едет к вам!")
             await supabase.from('orders').update({ status: 'delivery' }).eq('id', orderId);
 
-            // Обновляем кнопку у курьера
             await ctx.editMessageText(
                 ctx.callbackQuery.message.text + `\n\n🛵 ВЫ В ПУТИ К КЛИЕНТУ!\nКак только отдадите еду, нажмите кнопку:`,
                 Markup.inlineKeyboard([
@@ -107,6 +101,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             await ctx.answerCbQuery("Выехали к клиенту!");
         } catch (err) {
             console.error("Ошибка при статусе 'в пути':", err);
+            try { await ctx.answerCbQuery("❌ Ошибка", {show_alert: true}); } catch(e){}
         }
     });
 
@@ -117,14 +112,13 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
         const orderId = ctx.match[1];
 
         try {
-            // 👉 МЕНЯЕМ СТАТУС В БАЗЕ (Клиент увидит: "Заказ доставлен! Спасибо, что выбрали нас!")
             await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId);
 
-            // Убираем кнопки у курьера, оставляем только текст
             await ctx.editMessageText(ctx.callbackQuery.message.text + `\n\n🎉 ЗАКАЗ УСПЕШНО ДОСТАВЛЕН!`);
             await ctx.answerCbQuery("Отличная работа!");
         } catch (err) {
             console.error("Ошибка при статусе 'доставлен':", err);
+            try { await ctx.answerCbQuery("❌ Ошибка", {show_alert: true}); } catch(e){}
         }
     });
 
