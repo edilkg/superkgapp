@@ -60,7 +60,8 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             
             await ctx.answerCbQuery("✅ Вы назначены на заказ!");
         } catch (err) {
-            try { await ctx.answerCbQuery("❌ Ошибка", {show_alert: true}); } catch(e){}
+            console.error("Ошибка при взятии заказа курьером:", err.message);
+            try { await ctx.answerCbQuery("❌ Ошибка базы данных", {show_alert: true}); } catch(e){}
         }
     });
 
@@ -74,18 +75,15 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
         try {
             await supabase.from('orders').update({ status: 'delivery' }).eq('id', orderId);
 
-            // 👉 Достаем данные клиента и курьера
             const { data: order } = await supabase.from('orders').select('client_id').eq('id', orderId).maybeSingle();
             const { data: courierData } = await supabase.from('couriers').select('name, phone').eq('id', courierId).maybeSingle();
             
-            // Собираем Имя и Телефон
             const cName = courierData?.name || ctx.from.first_name || 'Курьер';
             const cPhone = courierData?.phone || 'Номер не указан';
 
-            // 👉 2. НОВОЕ СООБЩЕНИЕ ДЛЯ КЛИЕНТА (КУРЬЕР В ПУТИ)
+            // 👉 ОБНОВЛЕНО: Короткое сообщение с кликабельным номером
             if (order && order.client_id && order.client_id != 111) {
                 const clientMessage = `🚀 Курьер взял заказ и летит к вам!\n\n👤 Курьер: <b>${cName}</b>\n📞 Телефон: ${cPhone}`;
-                
                 try { await bot.telegram.sendMessage(order.client_id, clientMessage, { parse_mode: 'HTML' }); } catch(e){}
             }
 
@@ -95,6 +93,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             );
             await ctx.answerCbQuery("Выехали к клиенту!");
         } catch (err) {
+            console.error("Ошибка при статусе 'в пути':", err);
             try { await ctx.answerCbQuery("❌ Ошибка", {show_alert: true}); } catch(e){}
         }
     });
@@ -108,7 +107,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
         try {
             await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId);
 
-            // 👉 3. НОВОЕ СООБЩЕНИЕ ДЛЯ КЛИЕНТА (ЗАКАЗ ДОСТАВЛЕН)
+            // 👉 ОБНОВЛЕНО: Короткое сообщение о доставке
             const { data: order } = await supabase.from('orders').select('client_id').eq('id', orderId).maybeSingle();
             if (order && order.client_id && order.client_id != 111) {
                 try { await bot.telegram.sendMessage(order.client_id, `🎉 Заказ успешно доставлен!\nПриятного аппетита 🍔😋`); } catch(e){}
@@ -117,6 +116,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             await ctx.editMessageText(ctx.callbackQuery.message.text + `\n\n🎉 ЗАКАЗ УСПЕШНО ДОСТАВЛЕН!`);
             await ctx.answerCbQuery("Отличная работа!");
         } catch (err) {
+            console.error("Ошибка при статусе 'доставлен':", err);
             try { await ctx.answerCbQuery("❌ Ошибка", {show_alert: true}); } catch(e){}
         }
     });

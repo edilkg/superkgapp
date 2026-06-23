@@ -7,9 +7,11 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
     // ==========================================
     adminBot.action(/approve_order_(.+)/, async (ctx) => {
         const orderId = ctx.match[1].trim(); 
+        console.log(`[АДМИН] Нажата кнопка Оплата получена для заказа: #${orderId}`);
         
         try {
-            await supabase.from('orders').update({ status: 'paid' }).eq('id', orderId);
+            const { error: updateErr } = await supabase.from('orders').update({ status: 'paid' }).eq('id', orderId);
+            if (updateErr) throw updateErr;
             
             const { data: order, error: fetchErr } = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
             if (fetchErr || !order) return ctx.answerCbQuery("❌ Заказ не найден в базе", { show_alert: true });
@@ -55,15 +57,17 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 }
             }
 
-            // 👉 1. НОВОЕ УВЕДОМЛЕНИЕ ОБ ОПЛАТЕ ДЛЯ КЛИЕНТА
+            // 👉 ОБНОВЛЕНО: Короткое сообщение клиенту об оплате
             if (order.client_id && order.client_id != 111) {
                 try { await adminBot.telegram.sendMessage(order.client_id, `✅ Ваша оплата поступила!\nЗаказ передан ресторану и курьеру 👨‍🍳🛵`); } catch(e){}
             }
 
             await ctx.answerCbQuery("✅ Оплата подтверждена!");
+            console.log(`[АДМИН] Заказ #${orderId} успешно передан дальше.`);
 
         } catch (err) {
-            try { await ctx.answerCbQuery("❌ Ошибка", { show_alert: true }); } catch(e){}
+            console.error("❌ ОШИБКА ПРИ ОДОБРЕНИИ ЗАКАЗА:", err);
+            try { await ctx.answerCbQuery("❌ Системная ошибка", { show_alert: true }); } catch(e){}
         }
     });
 
@@ -79,13 +83,16 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             const buttons = [];
             if (order && order.client_id && order.client_id != 111) {
                 buttons.push([Markup.button.url("💬 Написать клиенту", `tg://user?id=${order.client_id}`)]);
+                
+                // 👉 ОБНОВЛЕНО: Короткое сообщение об отмене
                 try { await adminBot.telegram.sendMessage(order.client_id, `❌ Ваш заказ отменен. Оплата не поступила.`); } catch(e){}
             }
 
             await ctx.editMessageText(`❌ Заказ #${String(orderId).slice(0,5)} ОТКЛОНЕН (Денег нет)`, Markup.inlineKeyboard(buttons));
             await ctx.answerCbQuery("❌ Заказ отменен!");
         } catch (err) {
-            try { await ctx.answerCbQuery("❌ Ошибка", { show_alert: true }); } catch(e){}
+            console.error("❌ Ошибка при отклонении:", err);
+            try { await ctx.answerCbQuery("❌ Системная ошибка", { show_alert: true }); } catch(e){}
         }
     });
 
@@ -140,7 +147,9 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 }
 
                 await adminBot.telegram.sendMessage(ADMIN_GROUP_ID, message, Markup.inlineKeyboard(buttons));
-            } catch (err) {}
+            } catch (err) {
+                console.error("❌ ОШИБКА ОТПРАВКИ В АДМИНКУ:", err.message);
+            }
         }
     };
 };
