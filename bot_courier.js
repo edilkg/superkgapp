@@ -70,14 +70,23 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
     // ==========================================
     courierBot.action(/courier_picked_up_(.+)/, async (ctx) => {
         const orderId = ctx.match[1];
+        const courierId = ctx.from.id; // Достаем ID курьера
 
         try {
             await supabase.from('orders').update({ status: 'delivery' }).eq('id', orderId);
 
-            // 👉 НОВОЕ: Отправляем уведомление клиенту в личку
+            // 👉 НОВОЕ: Достаем данные клиента и курьера
             const { data: order } = await supabase.from('orders').select('client_id').eq('id', orderId).maybeSingle();
+            const { data: courierData } = await supabase.from('couriers').select('name, phone').eq('id', courierId).maybeSingle();
+            
+            // Если в базе вдруг нет телефона, ставим заглушку
+            const cName = courierData?.name || ctx.from.first_name || 'Курьер';
+            const cPhone = courierData?.phone || 'Номер не указан';
+
+            // Отправляем сообщение клиенту в личку
             if (order && order.client_id && order.client_id != 111) {
-                try { await bot.telegram.sendMessage(order.client_id, `🛵 Ваш заказ #${String(orderId).slice(0,5)} передан курьеру и уже едет к вам!`); } catch(e){}
+                const clientMessage = `🛵 Ваш заказ #${String(orderId).slice(0,5)} передан курьеру и уже едет к вам!\n\n👤 Курьер: ${cName}\n📞 Телефон: ${cPhone}`;
+                try { await bot.telegram.sendMessage(order.client_id, clientMessage); } catch(e){}
             }
 
             await ctx.editMessageText(
@@ -100,7 +109,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
         try {
             await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId);
 
-            // 👉 НОВОЕ: Отправляем уведомление клиенту в личку
+            // 👉 Отправляем уведомление клиенту в личку
             const { data: order } = await supabase.from('orders').select('client_id').eq('id', orderId).maybeSingle();
             if (order && order.client_id && order.client_id != 111) {
                 try { await bot.telegram.sendMessage(order.client_id, `🎉 Ваш заказ #${String(orderId).slice(0,5)} успешно доставлен!\n\nСпасибо, что выбрали нас. Приятного аппетита! 🍔`); } catch(e){}
