@@ -70,22 +70,23 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
     // ==========================================
     courierBot.action(/courier_picked_up_(.+)/, async (ctx) => {
         const orderId = ctx.match[1];
-        const courierId = ctx.from.id; // Достаем ID курьера
+        const courierId = ctx.from.id; 
 
         try {
             await supabase.from('orders').update({ status: 'delivery' }).eq('id', orderId);
 
-            // 👉 НОВОЕ: Достаем данные клиента и курьера
+            // 👉 Достаем данные клиента и курьера
             const { data: order } = await supabase.from('orders').select('client_id').eq('id', orderId).maybeSingle();
             const { data: courierData } = await supabase.from('couriers').select('name, phone').eq('id', courierId).maybeSingle();
             
-            // Если в базе вдруг нет телефона, ставим заглушку
+            // Собираем Имя, Телефон и Телеграм-аккаунт
             const cName = courierData?.name || ctx.from.first_name || 'Курьер';
             const cPhone = courierData?.phone || 'Номер не указан';
+            const cUsername = ctx.from.username ? '@' + ctx.from.username : 'Скрыт настройками приватности';
 
             // Отправляем сообщение клиенту в личку
             if (order && order.client_id && order.client_id != 111) {
-                const clientMessage = `🛵 Ваш заказ #${String(orderId).slice(0,5)} передан курьеру и уже едет к вам!\n\n👤 Курьер: ${cName}\n📞 Телефон: ${cPhone}`;
+                const clientMessage = `🛵 Ваш заказ #${String(orderId).slice(0,5)} передан курьеру и уже едет к вам!\n\n👤 Курьер: ${cName}\n📞 Телефон: ${cPhone}\n💬 Telegram: ${cUsername}`;
                 try { await bot.telegram.sendMessage(order.client_id, clientMessage); } catch(e){}
             }
 
