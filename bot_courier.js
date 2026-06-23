@@ -79,14 +79,13 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             const { data: order } = await supabase.from('orders').select('client_id').eq('id', orderId).maybeSingle();
             const { data: courierData } = await supabase.from('couriers').select('name, phone').eq('id', courierId).maybeSingle();
             
-            // Собираем Имя, Телефон и Телеграм-аккаунт
+            // Собираем Имя и Телефон
             const cName = courierData?.name || ctx.from.first_name || 'Курьер';
             const cPhone = courierData?.phone || 'Номер не указан';
-            const cUsername = ctx.from.username ? '@' + ctx.from.username : 'Скрыт настройками приватности';
 
-            // Отправляем сообщение клиенту в личку (Убрали <code>, чтобы номер можно было набрать)
+            // Отправляем сообщение клиенту в личку (Убрали дублирование Telegram)
             if (order && order.client_id && order.client_id != 111) {
-                const clientMessage = `🛵 Ваш заказ <b>#${String(orderId).slice(0,5)}</b> передан курьеру и уже едет к вам!\n\n👤 Курьер: <b>${cName}</b>\n📞 Телефон: ${cPhone}\n💬 Telegram: ${cUsername}`;
+                const clientMessage = `🛵 Ваш заказ <b>#${String(orderId).slice(0,5)}</b> передан курьеру и уже едет к вам!\n\n👤 Курьер: <b>${cName}</b>\n📞 Телефон: ${cPhone}`;
                 
                 try { await bot.telegram.sendMessage(order.client_id, clientMessage, { parse_mode: 'HTML' }); } catch(e){}
             }
