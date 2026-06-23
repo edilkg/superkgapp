@@ -60,8 +60,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             
             await ctx.answerCbQuery("✅ Вы назначены на заказ!");
         } catch (err) {
-            console.error("Ошибка при взятии заказа курьером:", err.message);
-            try { await ctx.answerCbQuery("❌ Ошибка базы данных", {show_alert: true}); } catch(e){}
+            try { await ctx.answerCbQuery("❌ Ошибка", {show_alert: true}); } catch(e){}
         }
     });
 
@@ -83,9 +82,9 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             const cName = courierData?.name || ctx.from.first_name || 'Курьер';
             const cPhone = courierData?.phone || 'Номер не указан';
 
-            // Отправляем сообщение клиенту в личку (Убрали дублирование Telegram)
+            // 👉 2. НОВОЕ СООБЩЕНИЕ ДЛЯ КЛИЕНТА (КУРЬЕР В ПУТИ)
             if (order && order.client_id && order.client_id != 111) {
-                const clientMessage = `🛵 Ваш заказ <b>#${String(orderId).slice(0,5)}</b> передан курьеру и уже едет к вам!\n\n👤 Курьер: <b>${cName}</b>\n📞 Телефон: ${cPhone}`;
+                const clientMessage = `🚀 Курьер взял заказ и летит к вам!\n\n👤 Курьер: <b>${cName}</b>\n📞 Телефон: ${cPhone}`;
                 
                 try { await bot.telegram.sendMessage(order.client_id, clientMessage, { parse_mode: 'HTML' }); } catch(e){}
             }
@@ -96,7 +95,6 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             );
             await ctx.answerCbQuery("Выехали к клиенту!");
         } catch (err) {
-            console.error("Ошибка при статусе 'в пути':", err);
             try { await ctx.answerCbQuery("❌ Ошибка", {show_alert: true}); } catch(e){}
         }
     });
@@ -110,16 +108,15 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
         try {
             await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId);
 
-            // 👉 Отправляем уведомление клиенту в личку
+            // 👉 3. НОВОЕ СООБЩЕНИЕ ДЛЯ КЛИЕНТА (ЗАКАЗ ДОСТАВЛЕН)
             const { data: order } = await supabase.from('orders').select('client_id').eq('id', orderId).maybeSingle();
             if (order && order.client_id && order.client_id != 111) {
-                try { await bot.telegram.sendMessage(order.client_id, `🎉 Ваш заказ #${String(orderId).slice(0,5)} успешно доставлен!\n\nСпасибо, что выбрали нас. Приятного аппетита! 🍔`); } catch(e){}
+                try { await bot.telegram.sendMessage(order.client_id, `🎉 Заказ успешно доставлен!\nПриятного аппетита 🍔😋`); } catch(e){}
             }
 
             await ctx.editMessageText(ctx.callbackQuery.message.text + `\n\n🎉 ЗАКАЗ УСПЕШНО ДОСТАВЛЕН!`);
             await ctx.answerCbQuery("Отличная работа!");
         } catch (err) {
-            console.error("Ошибка при статусе 'доставлен':", err);
             try { await ctx.answerCbQuery("❌ Ошибка", {show_alert: true}); } catch(e){}
         }
     });
