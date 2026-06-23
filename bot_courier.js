@@ -41,15 +41,30 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
 
             await supabase.from('orders').update({ courier_id: courierId }).eq('id', orderId);
 
-            const cName = ctx.from.first_name || 'Курьер';
-            const cUsername = ctx.from.username ? '@' + ctx.from.username : `(Без юзернейма, ID: ${courierId})`;
+            // 👉 ОБНОВЛЕНО: Достаем телефон курьера из базы
+            const { data: courierData } = await supabase.from('couriers').select('name, phone').eq('id', courierId).maybeSingle();
+            
+            const cName = courierData?.name || ctx.from.first_name || 'Курьер';
+            const cPhone = courierData?.phone || 'Номер не указан';
+            
+            // Если есть юзернейм - пишем его, если нет - даем прямую ссылку на профиль
+            const cProfile = ctx.from.username ? `@${ctx.from.username}` : `<a href="tg://user?id=${courierId}">Профиль</a>`;
 
-            try { await bot.telegram.sendMessage(ADMIN_GROUP_ID, `🛵 Курьер выехал в ресторан за заказом #${String(orderId).slice(0,5)}:\n👤 ${cName}\n💬 Связь: ${cUsername}`); } catch(e) {}
+            // Собираем красивое сообщение для админа и ресторана
+            const notifyMessage = `🛵 Курьер выехал в ресторан за заказом <b>#${String(orderId).slice(0,5)}</b>\n\n👤 Курьер: <b>${cName}</b>\n📞 Телефон: ${cPhone}\n💬 Telegram: ${cProfile}`;
 
+            // Уведомляем админа (с поддержкой HTML)
+            try { 
+                await bot.telegram.sendMessage(ADMIN_GROUP_ID, notifyMessage, { parse_mode: 'HTML' }); 
+            } catch(e) {}
+
+            // Уведомляем ресторан (с поддержкой HTML)
             if (orderCheck.restaurant) {
                 const { data: restData } = await supabase.from('restaurants').select('id').eq('name', orderCheck.restaurant).maybeSingle();
                 if (restData) {
-                    try { await restBot.telegram.sendMessage(restData.id, `🛵 К вам за заказом #${String(orderId).slice(0,5)} выехал курьер:\n👤 ${cName}\n💬 Связь: ${cUsername}`); } catch(e) {}
+                    try { 
+                        await restBot.telegram.sendMessage(restData.id, notifyMessage, { parse_mode: 'HTML' }); 
+                    } catch(e) {}
                 }
             }
 
@@ -81,7 +96,6 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             const cName = courierData?.name || ctx.from.first_name || 'Курьер';
             const cPhone = courierData?.phone || 'Номер не указан';
 
-            // 👉 ОБНОВЛЕНО: Короткое сообщение с кликабельным номером
             if (order && order.client_id && order.client_id != 111) {
                 const clientMessage = `🚀 Курьер взял заказ и летит к вам!\n\n👤 Курьер: <b>${cName}</b>\n📞 Телефон: ${cPhone}`;
                 try { await bot.telegram.sendMessage(order.client_id, clientMessage, { parse_mode: 'HTML' }); } catch(e){}
@@ -107,7 +121,6 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
         try {
             await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId);
 
-            // 👉 ОБНОВЛЕНО: Короткое сообщение о доставке
             const { data: order } = await supabase.from('orders').select('client_id').eq('id', orderId).maybeSingle();
             if (order && order.client_id && order.client_id != 111) {
                 try { await bot.telegram.sendMessage(order.client_id, `🎉 Заказ успешно доставлен!\nПриятного аппетита 🍔😋`); } catch(e){}
