@@ -7,7 +7,7 @@ const { createClient } = require('@supabase/supabase-js');
 const setupClientBot = require('./bot_client');
 const setupCourierBot = require('./bot_courier');
 const setupRestaurantBot = require('./bot_restaurant');
-const setupAdminBot = require('./bot_admin'); // <--- ВЕРНУЛИ ПОДКЛЮЧЕНИЕ АДМИНКИ
+const setupAdminBot = require('./bot_admin');
 
 const app = express();
 app.use(cors());
@@ -21,26 +21,34 @@ const restBot = new Telegraf(process.env.REST_BOT_TOKEN);
 
 const ADMIN_GROUP_ID = process.env.ADMIN_CHAT_ID; 
 
+// ==========================================
+// ИНИЦИАЛИЗАЦИЯ БОТОВ (ИСПРАВЛЕННЫЙ ПОРЯДОК)
+// ==========================================
 setupClientBot(bot, supabase, ADMIN_GROUP_ID);
-setupCourierBot(courierBot, bot, supabase,restBot, ADMIN_GROUP_ID);
+
+// ВАЖНО: Теперь мы правильно передаем restBot в курьерского бота!
+setupCourierBot(courierBot, bot, restBot, supabase, ADMIN_GROUP_ID);
+
 setupRestaurantBot(restBot, courierBot, bot, supabase, ADMIN_GROUP_ID);
 
-// Инициализируем админку, чтобы бот начал слушать кнопки!
 const adminActions = setupAdminBot(bot, restBot, courierBot, supabase, ADMIN_GROUP_ID);
 
+// ==========================================
+// ПРИЕМ ЗАКАЗОВ С САЙТА
+// ==========================================
 app.post('/web-data', async (req, res) => {
     try {
         const { type, user, phone, address, restaurantName, totalPrice, comment, resComment, isDoorDelivery, cutlery, items } = req.body;
         if (type !== 'food') return res.status(400).json({ error: 'Тип не еда' });
 
-        // Собираем все новые настройки заказа в красивую строку
+        // Собираем все комментарии и опции
         let extraDetails = [];
         if (isDoorDelivery) extraDetails.push('🚪 До двери: Да');
         if (cutlery > 0) extraDetails.push(`🍴 Приборы: ${cutlery} шт`);
         if (comment) extraDetails.push(`📍 Ориентир: ${comment}`);
         if (resComment) extraDetails.push(`💬 Заведению: ${resComment}`);
 
-        // 1. Сохраняем в базу со статусом ожидания оплаты
+        // Сохраняем в базу
         const { data: orderData, error: dbError } = await supabase.from('orders').insert([{
             client_id: user?.id || null,
             client_name: user?.first_name || 'Гость',
@@ -48,7 +56,7 @@ app.post('/web-data', async (req, res) => {
             address: address,
             restaurant: restaurantName,
             total_price: totalPrice,
-            comment: extraDetails.join(' | '), // Сохраняем все комментарии вместе
+            comment: extraDetails.join(' | '),
             items: items,
             status: 'waiting_payment'
         }]).select();
@@ -56,10 +64,10 @@ app.post('/web-data', async (req, res) => {
         if (dbError) throw dbError;
         const newOrder = orderData[0];
 
-        // 2. Моментально отвечаем браузеру
+        // Моментально отвечаем браузеру
         res.status(200).json({ success: true, orderId: newOrder.id });
 
-        // 3. Отправляем заказ АДМИНУ на проверку (а не сразу ресторану!)
+        // Отправляем админу
         adminActions.sendOrderToAdmin(newOrder);
 
     } catch (err) {
