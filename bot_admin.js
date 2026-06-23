@@ -6,45 +6,54 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
     // 1. КНОПКА: ОДОБРИТЬ ОПЛАТУ ЗАКАЗА
     // ==========================================
     adminBot.action(/approve_order_(.+)/, async (ctx) => {
-        const orderId = ctx.match[1];
+        const orderId = ctx.match[1].trim(); // Убираем случайные пробелы
+        console.log(`[АДМИН] Нажата кнопка Оплата получена для заказа: #${orderId}`);
         
         try {
-            // 1. Меняем статус на 'paid'
-            await supabase.from('orders').update({ status: 'paid' }).eq('id', orderId);
+            // 1. Обновляем статус в базе
+            const { error: updateErr } = await supabase.from('orders').update({ status: 'paid' }).eq('id', orderId);
+            if (updateErr) throw updateErr;
             
-            // 2. Достаем обновленный заказ
-            const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
-            if (!order) return ctx.answerCbQuery("❌ Заказ не найден", { show_alert: true });
+            // 2. Получаем заказ
+            const { data: order, error: fetchErr } = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
+            if (fetchErr || !order) return ctx.answerCbQuery("❌ Заказ не найден в базе", { show_alert: true });
 
-            // 3. Сохраняем кнопку связи
+            // 3. Сохраняем кнопку "Написать клиенту"
             const buttons = [];
             if (order.client_id && order.client_id != 111) {
                 buttons.push([Markup.button.url("💬 Написать клиенту", `tg://user?id=${order.client_id}`)]);
             }
 
-            // 4. Меняем текст в самой админке и ПРИКРЕПЛЯЕМ кнопку обратно
-            await ctx.editMessageText(`✅ ЗАКАЗ #${String(orderId).slice(0,5)} ОДОБРЕН (Оплата получена)\nРесторан: ${order.restaurant}\nСумма: ${order.total_price} сом`, Markup.inlineKeyboard(buttons));
+            // 4. Обновляем текст в админке
+            await ctx.editMessageText(
+                `✅ ЗАКАЗ #${String(orderId).slice(0,5)} ОДОБРЕН (Оплата получена)\nРесторан: ${order.restaurant || 'Не указан'}\nСумма: ${order.total_price} сом`, 
+                Markup.inlineKeyboard(buttons)
+            );
 
-            // 5. Отправляем в ресторан (с защитой от ошибок)
-            const { data: restData } = await supabase.from('restaurants').select('id').eq('name', order.restaurant).eq('is_approved', true).maybeSingle();
-            if (restData) {
-                const itemsArr = Array.isArray(order.items) ? order.items : (JSON.parse(order.items || '[]'));
-                const itemsText = itemsArr.map(i => {
-                    const name = i.item ? i.item.name : i.name;
-                    return `▫️ ${name} x${i.count}`;
-                }).join('\n');
-                
-                let msgRest = `🍔 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}\n\n${itemsText}\n\nСумма: ${order.total_price} сом`;
-                await restBot.telegram.sendMessage(restData.id, msgRest, Markup.inlineKeyboard([
-                    [Markup.button.callback('✅ Принять', `rest_accept_${orderId}`)],
-                    [Markup.button.callback('❌ Отклонить', `rest_decline_${orderId}`)]
-                ]));
+            // 5. БЕЗОПАСНАЯ отправка в ресторан
+            if (order.restaurant) {
+                const { data: restData } = await supabase.from('restaurants').select('id').eq('name', order.restaurant).eq('is_approved', true).maybeSingle();
+                if (restData) {
+                    let itemsArr = [];
+                    try { itemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]'); } catch(e) {}
+                    
+                    const itemsText = itemsArr.map(i => {
+                        const name = i.item ? i.item.name : i.name;
+                        return `▫️ ${name} x${i.count}`;
+                    }).join('\n');
+                    
+                    let msgRest = `🍔 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}\n\n${itemsText}\n\nСумма: ${order.total_price} сом`;
+                    await restBot.telegram.sendMessage(restData.id, msgRest, Markup.inlineKeyboard([
+                        [Markup.button.callback('✅ Принять', `rest_accept_${orderId}`)],
+                        [Markup.button.callback('❌ Отклонить', `rest_decline_${orderId}`)]
+                    ])).catch(e => console.error("Ошибка отправки в ресторан:", e.message));
+                }
             }
 
-            // 6. Отправляем активным курьерам
+            // 6. Уведомляем курьеров
             const { data: couriers } = await supabase.from('couriers').select('id').eq('status', 'active');
             if (couriers && couriers.length > 0) {
-                let msgCourier = `🔥 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n🏢 Ресторан: ${order.restaurant}\n📍 Куда: ${order.address}\n💰 Оплата: ${order.total_price} сом\n\nКто заберет?`;
+                let msgCourier = `🔥 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n🏢 Ресторан: ${order.restaurant || 'Не указан'}\n📍 Куда: ${order.address}\n💰 Оплата: ${order.total_price} сом\n\nКто заберет?`;
                 for (const courier of couriers) {
                     try {
                         await courierBot.telegram.sendMessage(courier.id, msgCourier, Markup.inlineKeyboard([
@@ -59,11 +68,12 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 try { await adminBot.telegram.sendMessage(order.client_id, `✅ Ваша оплата подтверждена! Заказ #${String(orderId).slice(0,5)} передан на кухню.`); } catch(e){}
             }
 
-            // ОБЯЗАТЕЛЬНО: Даем сигнал Телеграму, что кнопка сработала
             await ctx.answerCbQuery("✅ Оплата подтверждена!");
+            console.log(`[АДМИН] Заказ #${orderId} успешно передан дальше.`);
+
         } catch (err) {
-            console.error("Ошибка при одобрении заказа:", err);
-            try { await ctx.answerCbQuery("❌ Ошибка", { show_alert: true }); } catch(e){}
+            console.error("❌ ОШИБКА ПРИ ОДОБРЕНИИ ЗАКАЗА:", err);
+            try { await ctx.answerCbQuery("❌ Системная ошибка", { show_alert: true }); } catch(e){}
         }
     });
 
@@ -71,7 +81,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
     // 2. КНОПКА: ОТКЛОНИТЬ ОПЛАТУ
     // ==========================================
     adminBot.action(/reject_order_(.+)/, async (ctx) => {
-        const orderId = ctx.match[1];
+        const orderId = ctx.match[1].trim();
         try {
             await supabase.from('orders').update({ status: 'canceled' }).eq('id', orderId);
             const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
@@ -85,8 +95,8 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             await ctx.editMessageText(`❌ Заказ #${String(orderId).slice(0,5)} ОТКЛОНЕН (Денег нет)`, Markup.inlineKeyboard(buttons));
             await ctx.answerCbQuery("❌ Заказ отменен!");
         } catch (err) {
-            console.error("Ошибка при отклонении:", err);
-            try { await ctx.answerCbQuery("❌ Ошибка", { show_alert: true }); } catch(e){}
+            console.error("❌ Ошибка при отклонении:", err);
+            try { await ctx.answerCbQuery("❌ Системная ошибка", { show_alert: true }); } catch(e){}
         }
     });
 
@@ -130,7 +140,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                     return `▫️ ${name} x${i.count}`;
                 }).join('\n');
                 
-                const message = `🚨 НОВЫЙ ЗАКАЗ НА ПРОВЕРКУ ОПЛАТЫ!\nID: #${String(orderData.id).slice(0,5)}\n💰 Сумма: ${orderData.total_price} сом\n\n👤 Клиент: ${orderData.client_name || 'Гость'} (TG ID: ${orderData.client_id || 'Нет'})\n📞 Телефон: ${orderData.phone || 'Не указан'}\n📍 Адрес: ${orderData.address || 'Не указан'}\n💬 Комментарий: ${orderData.comment || 'Нет'}\n\n🏢 Ресторан: ${orderData.restaurant}\n\n🛒 Блюда:\n${itemsText}`;
+                const message = `🚨 НОВЫЙ ЗАКАЗ НА ПРОВЕРКУ ОПЛАТЫ!\nID: #${String(orderData.id).slice(0,5)}\n💰 Сумма: ${orderData.total_price} сом\n\n👤 Клиент: ${orderData.client_name || 'Гость'} (TG ID: ${orderData.client_id || 'Нет'})\n📞 Телефон: ${orderData.phone || 'Не указан'}\n📍 Адрес: ${orderData.address || 'Не указан'}\n💬 Комментарий: ${orderData.comment || 'Нет'}\n\n🏢 Ресторан: ${orderData.restaurant || 'Не указан'}\n\n🛒 Блюда:\n${itemsText}`;
 
                 const buttons = [
                     [Markup.button.callback("✅ Оплата получена", `approve_order_${orderData.id}`)],
@@ -143,7 +153,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
 
                 await adminBot.telegram.sendMessage(ADMIN_GROUP_ID, message, Markup.inlineKeyboard(buttons));
             } catch (err) {
-                console.error("❌ ОШИБКА ОТПРАВКИ:", err.message);
+                console.error("❌ ОШИБКА ОТПРАВКИ В АДМИНКУ:", err.message);
             }
         }
     };
