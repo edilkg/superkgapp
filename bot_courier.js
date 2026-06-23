@@ -84,10 +84,12 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             const cPhone = courierData?.phone || 'Номер не указан';
             const cUsername = ctx.from.username ? '@' + ctx.from.username : 'Скрыт настройками приватности';
 
-            // Отправляем сообщение клиенту в личку
+            // Отправляем сообщение клиенту в личку (ВКЛЮЧАЕМ HTML-РАЗМЕТКУ)
             if (order && order.client_id && order.client_id != 111) {
-                const clientMessage = `🛵 Ваш заказ #${String(orderId).slice(0,5)} передан курьеру и уже едет к вам!\n\n👤 Курьер: ${cName}\n📞 Телефон: ${cPhone}\n💬 Telegram: ${cUsername}`;
-                try { await bot.telegram.sendMessage(order.client_id, clientMessage); } catch(e){}
+                const clientMessage = `🛵 Ваш заказ <b>#${String(orderId).slice(0,5)}</b> передан курьеру и уже едет к вам!\n\n👤 Курьер: <b>${cName}</b>\n📞 Телефон: <code>${cPhone}</code> <i>(нажми, чтобы скопировать)</i>\n💬 Telegram: ${cUsername}`;
+                
+                // Добавили { parse_mode: 'HTML' } чтобы Telegram понял теги
+                try { await bot.telegram.sendMessage(order.client_id, clientMessage, { parse_mode: 'HTML' }); } catch(e){}
             }
 
             await ctx.editMessageText(
