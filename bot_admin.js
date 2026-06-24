@@ -18,7 +18,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
 
             const buttons = [];
             const cid = order.client_id;
-            // ЗАЩИТА: Проверяем, что ID настоящий, а не пустота из браузера
+            // ЗАЩИТА: Проверяем, что ID настоящий
             if (cid && cid != 111 && cid !== 'null' && cid !== 'undefined') {
                 buttons.push([Markup.button.url("💬 Написать клиенту", `tg://user?id=${cid}`)]);
             }
@@ -28,6 +28,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 Markup.inlineKeyboard(buttons)
             );
 
+            // 👉 ОТПРАВКА В РЕСТОРАН (Теперь с данными клиента)
             if (order.restaurant) {
                 const { data: restData } = await supabase.from('restaurants').select('id').eq('name', order.restaurant).eq('is_approved', true).maybeSingle();
                 if (restData) {
@@ -39,11 +40,20 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                         return `▫️ ${name} x${i.count}`;
                     }).join('\n');
                     
-                    let msgRest = `🍔 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}\n\n${itemsText}\n\nСумма: ${order.total_price} сом`;
-                    await restBot.telegram.sendMessage(restData.id, msgRest, Markup.inlineKeyboard([
-                        [Markup.button.callback('✅ Принять', `rest_accept_${orderId}`)],
-                        [Markup.button.callback('❌ Отклонить', `rest_decline_${orderId}`)]
-                    ])).catch(e => console.error("Ошибка отправки в ресторан:", e.message));
+                    const clientName = order.client_name || 'Гость';
+                    const clientPhone = order.phone || 'Не указан';
+                    
+                    let msgRest = `🍔 НОВЫЙ ЗАКАЗ <b>#${String(orderId).slice(0,5)}</b>\n\n👤 Клиент: <b>${clientName}</b>\n📞 Телефон: ${clientPhone}\n\n🛒 Заказ:\n${itemsText}\n\n💰 Сумма: ${order.total_price} сом`;
+                    
+                    await restBot.telegram.sendMessage(restData.id, msgRest, {
+                        parse_mode: 'HTML',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [Markup.button.callback('✅ Принять', `rest_accept_${orderId}`)],
+                                [Markup.button.callback('❌ Отклонить', `rest_decline_${orderId}`)]
+                            ]
+                        }
+                    }).catch(e => console.error("Ошибка отправки в ресторан:", e.message));
                 }
             }
 
@@ -59,7 +69,6 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 }
             }
 
-            // Уведомление клиенту
             if (cid && cid != 111 && cid !== 'null' && cid !== 'undefined') {
                 try { await adminBot.telegram.sendMessage(cid, `✅ Ваша оплата поступила!\nЗаказ передан ресторану и курьеру 👨‍🍳🛵`); } catch(e){}
             }
@@ -142,7 +151,6 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 ];
 
                 const cid = orderData.client_id;
-                // ЗАЩИТА: Только для живых аккаунтов Телеграм
                 if (cid && cid != 111 && cid !== 'null' && cid !== 'undefined') {
                     buttons.push([Markup.button.url("💬 Написать клиенту", `tg://user?id=${cid}`)]);
                 }
