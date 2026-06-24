@@ -2305,8 +2305,8 @@ function filterMenu(resId, category, btn) {
         async function createOrder() {
             // 👉 ЗАЩИТА: Финальная проверка перед отправкой на сервер
             let activeOrders = JSON.parse(localStorage.getItem('tamak_active_order_ids') || '[]');
-            if (activeOrders.length >= 3) {
-                return alert("⚠️ Лимит: максимум 3 заказа одновременно!");
+            if (activeOrders.length >= 2) {
+                return alert("⚠️ Лимит: максимум 2 заказа одновременно!");
             }
 
             if (!orderAddressData.street && currentDeliveryFee > 0) return alert("Пожалуйста, выберите адрес на карте!");
@@ -2394,10 +2394,10 @@ function filterMenu(resId, category, btn) {
         const MY_PAYMENT_NUMBER = "500402002"; 
 
         function openPaymentScreen() {
-            // 👉 ЗАЩИТА: Ограничение на 3 активных заказа
+            // 👉 ЗАЩИТА: Ограничение на 2 активных заказа
             let activeOrders = JSON.parse(localStorage.getItem('tamak_active_order_ids') || '[]');
-            if (activeOrders.length >= 3) {
-                return alert("⚠️ У вас уже есть 3 активных заказа!\nПожалуйста, дождитесь их доставки, прежде чем делать новый.");
+            if (activeOrders.length >= 2) {
+                return alert("⚠️ У вас уже есть 2 активных заказа!\nПожалуйста, дождитесь их доставки, прежде чем делать новый.");
             }
 
             // 1. ЗАЩИТА: Проверяем данные ДО оплаты
