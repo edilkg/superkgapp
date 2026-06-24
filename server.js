@@ -41,6 +41,19 @@ app.post('/web-data', async (req, res) => {
         const { type, user, phone, address, restaurantName, totalPrice, comment, resComment, isDoorDelivery, cutlery, items } = req.body;
         if (type !== 'food') return res.status(400).json({ error: 'Тип не еда' });
 
+        // 👉 БРОНЕЖИЛЕТ ОТ СПАМА (МАКСИМУМ 3 ЗАКАЗА НА СЕРВЕРЕ)
+        if (user && user.id && user.id != 111) {
+            const { data: activeUserOrders } = await supabase
+                .from('orders')
+                .select('id')
+                .eq('client_id', user.id)
+                .in('status', ['waiting_payment', 'paid', 'cooking', 'delivery']);
+            
+            if (activeUserOrders && activeUserOrders.length >= 3) {
+                return res.status(400).json({ error: 'У вас уже есть 3 активных заказа! Дождитесь их завершения.' });
+            }
+        }
+
         // Собираем все комментарии и опции
         let extraDetails = [];
         if (isDoorDelivery) extraDetails.push('🚪 До двери: Да');

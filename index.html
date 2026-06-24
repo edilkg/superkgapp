@@ -2303,22 +2303,26 @@ function filterMenu(resId, category, btn) {
         }
 
         async function createOrder() {
+            // 👉 ЗАЩИТА: Финальная проверка перед отправкой на сервер
+            let activeOrders = JSON.parse(localStorage.getItem('tamak_active_order_ids') || '[]');
+            if (activeOrders.length >= 3) {
+                return alert("⚠️ Лимит: максимум 3 заказа одновременно!");
+            }
+
             if (!orderAddressData.street && currentDeliveryFee > 0) return alert("Пожалуйста, выберите адрес на карте!");
             
             const clientPhone = document.getElementById('client-phone').value;
             if (!clientPhone) return alert("Пожалуйста, укажите ваш номер телефона для курьера!");
 
-            // Сохраняем номер телефона в память телефона для следующих заказов
             localStorage.setItem('tamak_client_phone', clientPhone);
 
-            // --- НОВОЕ: Автоматически сохраняем координаты и улицу текущего заказа ---
             if (clientLat && clientLon) {
                 localStorage.setItem('tamak_last_lat', clientLat);
                 localStorage.setItem('tamak_last_lon', clientLon);
                 localStorage.setItem('tamak_last_street', orderAddressData.street || '');
             }
 
-            const resComment = document.getElementById('res-comment').value; // Забираем коммент
+            const resComment = document.getElementById('res-comment').value; 
 
             const payBtn = document.getElementById('main-pay-btn');
             const originalBtnText = payBtn.innerText;
@@ -2343,7 +2347,7 @@ function filterMenu(resId, category, btn) {
                 comment: orderAddressData.comment, 
                 resComment: resComment, 
                 isDoorDelivery: doorDeliveryFee > 0 ? true : false, 
-                cutlery: cutleryCount, // НОВОЕ ПОЛЕ: передаем количество приборов
+                cutlery: cutleryCount,
                 items: Object.values(cartItems).filter(item => item.resId === cartActiveTabResId)
             };
 
@@ -2356,23 +2360,20 @@ function filterMenu(resId, category, btn) {
                     body: JSON.stringify(orderData)
                 });
                 
-                const result = await response.json(); // Читаем ответ сервера
+                const result = await response.json(); 
 
                 if (response.ok) {
-                    // 👉 НОВОЕ: Сохраняем заказы в массив (список), чтобы поддерживать сразу несколько!
                     let activeOrders = JSON.parse(localStorage.getItem('tamak_active_order_ids') || '[]');
                     if (!activeOrders.includes(result.orderId)) {
                         activeOrders.push(result.orderId);
                     }
                     localStorage.setItem('tamak_active_order_ids', JSON.stringify(activeOrders));
                     
-                    checkActiveOrder(); // Запускаем слежку за всеми заказами
+                    checkActiveOrder();
 
-                    // Очищаем корзину
                     for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
                     recalcTotal();
 
-                    // Открываем экран статуса ИМЕННО ЭТОГО заказа
                     openOrderStatus(result.orderId);
                 } else {
                     alert("Ошибка при заказе: " + (result.error || "Неизвестная ошибка"));
@@ -2385,84 +2386,44 @@ function filterMenu(resId, category, btn) {
                 payBtn.style.opacity = '1';
             }
         }
-        
+// ==========================================
+        // ЛОГИКА ЭКРАНА ОПЛАТЫ
         // ==========================================
-// ЛОГИКА ЭКРАНА ОПЛАТЫ
-// ==========================================
 
-// ТВОИ ДАННЫЕ (Вставь свою картинку QR и свой номер/реквизиты)
-const MY_QR_IMAGE_URL = "https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/MBNKQR.jpeg"; 
-const MY_PAYMENT_NUMBER = "500402002"; 
+        const MY_QR_IMAGE_URL = "https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/MBNKQR.jpeg"; 
+        const MY_PAYMENT_NUMBER = "500402002"; 
 
-function openPaymentScreen() {
-    // 1. ЗАЩИТА: Проверяем данные ДО оплаты
-    if (!orderAddressData.street && currentDeliveryFee > 0) return alert("Пожалуйста, выберите адрес на карте!");
-    
-    const clientPhone = document.getElementById('client-phone').value;
-    if (!clientPhone) return alert("Пожалуйста, укажите ваш номер телефона для курьера!");
-
-    // 2. Считаем итоговую сумму (Товары + Доставка)
-    let tabTotalSum = 0; 
-    for(let k in cartItems) { 
-        if(cartItems[k].resId === cartActiveTabResId) {
-            tabTotalSum += (cartItems[k].pricePerUnit * cartItems[k].count); 
-        }
-    }
-    let finalDeliveryFee = currentDeliveryFee > 0 ? (currentDeliveryFee + doorDeliveryFee) : 0;
-    let finalTotal = tabTotalSum + finalDeliveryFee;
-
-    // 3. Выводим сумму на экран оплаты
-    document.getElementById('payment-total-amount').innerText = finalTotal + " сом";
-
-    // 4. Открываем экран
-    document.getElementById('custom-qr-code').src = MY_QR_IMAGE_URL;
-    history.pushState({screen: 'payment'}, '');
-    showScreen('payment');
-}
-
-// ==========================================
-// ЛОГИКА ДРУГИХ QR-КОДОВ (БЕСКОНЕЧНЫЙ СВАЙП)
-// ==========================================
-
-function openOtherQRs() {
-    if(tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
-    document.getElementById('modal-other-qrs').classList.remove('hidden');
-    
-    const carousel = document.getElementById('other-qrs-carousel');
-    
-    // Инициализируем бесконечный цикл только ОДИН раз
-    if (!carousel.dataset.infinite) {
-        // 1. Утраиваем карточки, чтобы получилось 9 штук (3+3+3)
-        const html = carousel.innerHTML;
-        carousel.innerHTML = html + html + html;
-        carousel.dataset.infinite = "true";
-        
-        // 2. Обработчик свайпа (Невидимая телепортация)
-        carousel.addEventListener('scroll', () => {
-            const w = carousel.clientWidth;
-            
-            // Если долистали до клона слева (самое начало)
-            if (carousel.scrollLeft <= 5) {
-                carousel.style.scrollBehavior = 'auto'; // Временно отключаем плавность
-                carousel.scrollLeft += w * 3; // Мгновенно прыгаем на оригинальную копию в центре
-                setTimeout(() => carousel.style.scrollBehavior = 'smooth', 10);
-            } 
-            // Если долистали до клона справа (самый конец)
-            else if (carousel.scrollLeft >= (w * 8) - 5) {
-                carousel.style.scrollBehavior = 'auto'; 
-                carousel.scrollLeft -= w * 3; // Мгновенно прыгаем назад в центр
-                setTimeout(() => carousel.style.scrollBehavior = 'smooth', 10);
+        function openPaymentScreen() {
+            // 👉 ЗАЩИТА: Ограничение на 3 активных заказа
+            let activeOrders = JSON.parse(localStorage.getItem('tamak_active_order_ids') || '[]');
+            if (activeOrders.length >= 3) {
+                return alert("⚠️ У вас уже есть 3 активных заказа!\nПожалуйста, дождитесь их доставки, прежде чем делать новый.");
             }
-        });
-    }
-    
-    // 3. При каждом открытии окна сразу ставим фокус ровно по центру на MBank
-    setTimeout(() => {
-        carousel.style.scrollBehavior = 'auto';
-        carousel.scrollLeft = carousel.clientWidth * 3;
-        setTimeout(() => carousel.style.scrollBehavior = 'smooth', 10);
-    }, 10);
-}
+
+            // 1. ЗАЩИТА: Проверяем данные ДО оплаты
+            if (!orderAddressData.street && currentDeliveryFee > 0) return alert("Пожалуйста, выберите адрес на карте!");
+            
+            const clientPhone = document.getElementById('client-phone').value;
+            if (!clientPhone) return alert("Пожалуйста, укажите ваш номер телефона для курьера!");
+
+            // 2. Считаем итоговую сумму (Товары + Доставка)
+            let tabTotalSum = 0; 
+            for(let k in cartItems) { 
+                if(cartItems[k].resId === cartActiveTabResId) {
+                    tabTotalSum += (cartItems[k].pricePerUnit * cartItems[k].count); 
+                }
+            }
+            let finalDeliveryFee = currentDeliveryFee > 0 ? (currentDeliveryFee + doorDeliveryFee) : 0;
+            let finalTotal = tabTotalSum + finalDeliveryFee;
+
+            // 3. Выводим сумму на экран оплаты
+            document.getElementById('payment-total-amount').innerText = finalTotal + " сом";
+
+            // 4. Открываем экран
+            document.getElementById('custom-qr-code').src = MY_QR_IMAGE_URL;
+            history.pushState({screen: 'payment'}, '');
+            showScreen('payment');
+        }
 
 function scrollOtherQRs(direction) {
     const carousel = document.getElementById('other-qrs-carousel');
