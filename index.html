@@ -2425,6 +2425,46 @@ function filterMenu(resId, category, btn) {
             showScreen('payment');
         }
 
+        function openOtherQRs() {
+    if(tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    document.getElementById('modal-other-qrs').classList.remove('hidden');
+    
+    const carousel = document.getElementById('other-qrs-carousel');
+    
+    // Инициализируем бесконечный цикл только ОДИН раз
+    if (!carousel.dataset.infinite) {
+        // 1. Утраиваем карточки, чтобы получилось 9 штук (3+3+3)
+        const html = carousel.innerHTML;
+        carousel.innerHTML = html + html + html;
+        carousel.dataset.infinite = "true";
+        
+        // 2. Обработчик свайпа (Невидимая телепортация)
+        carousel.addEventListener('scroll', () => {
+            const w = carousel.clientWidth;
+            
+            // Если долистали до клона слева (самое начало)
+            if (carousel.scrollLeft <= 5) {
+                carousel.style.scrollBehavior = 'auto'; // Временно отключаем плавность
+                carousel.scrollLeft += w * 3; // Мгновенно прыгаем на оригинальную копию в центре
+                setTimeout(() => carousel.style.scrollBehavior = 'smooth', 10);
+            } 
+            // Если долистали до клона справа (самый конец)
+            else if (carousel.scrollLeft >= (w * 8) - 5) {
+                carousel.style.scrollBehavior = 'auto'; 
+                carousel.scrollLeft -= w * 3; // Мгновенно прыгаем назад в центр
+                setTimeout(() => carousel.style.scrollBehavior = 'smooth', 10);
+            }
+        });
+    }
+    
+    // 3. При каждом открытии окна сразу ставим фокус ровно по центру на MBank
+    setTimeout(() => {
+        carousel.style.scrollBehavior = 'auto';
+        carousel.scrollLeft = carousel.clientWidth * 3;
+        setTimeout(() => carousel.style.scrollBehavior = 'smooth', 10);
+    }, 10);
+}
+
 function scrollOtherQRs(direction) {
     const carousel = document.getElementById('other-qrs-carousel');
     if (carousel) {
