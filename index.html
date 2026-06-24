@@ -787,13 +787,7 @@
             </div> -->
             
         </div>
-        <div id="active-order-banner" class="hidden" onclick="showScreen('status')">
-            <div class="banner-info">
-                <span class="banner-title" id="banner-res-name">Ресторан</span>
-                <span class="banner-status" id="banner-status-text">Ожидает оплаты...</span>
-            </div>
-            <div style="font-size: 24px;">🛵</div>
-        </div>
+        <div id="active-orders-container"></div>
         <div class="restaurant-list" id="restaurant-list"></div>
     </div>
 
@@ -2365,13 +2359,21 @@ function filterMenu(resId, category, btn) {
                 const result = await response.json(); // Читаем ответ сервера
 
                 if (response.ok) {
-                    // --- НОВОЕ: Сохраняем ID заказа и запускаем слежку ---
-                    localStorage.setItem('tamak_active_order_id', result.orderId);
-                    checkActiveOrder(); // Запускаем магию реального времени
+                    // 👉 НОВОЕ: Сохраняем заказы в массив (список), чтобы поддерживать сразу несколько!
+                    let activeOrders = JSON.parse(localStorage.getItem('tamak_active_order_ids') || '[]');
+                    if (!activeOrders.includes(result.orderId)) {
+                        activeOrders.push(result.orderId);
+                    }
+                    localStorage.setItem('tamak_active_order_ids', JSON.stringify(activeOrders));
+                    
+                    checkActiveOrder(); // Запускаем слежку за всеми заказами
 
-                    showScreen('status');
+                    // Очищаем корзину
                     for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
                     recalcTotal();
+
+                    // Открываем экран статуса ИМЕННО ЭТОГО заказа
+                    openOrderStatus(result.orderId);
                 } else {
                     alert("Ошибка при заказе: " + (result.error || "Неизвестная ошибка"));
                 }
@@ -2894,114 +2896,128 @@ function goToMainMenu() {
         function startNewOrder() {
             goToMainMenu();
         }
+
         // ==========================================
-        // ЛОГИКА АКТИВНОГО ЗАКАЗА И REALTIME
+        // ЛОГИКА АКТИВНЫХ ЗАКАЗОВ И REALTIME (МУЛЬТИ-ЗАКАЗЫ)
         // ==========================================
-        let orderSubscription = null;
+        let orderSubscriptions = {};
+        window.currentViewingOrderId = null; // Запоминаем, статус какого заказа сейчас открыт на весь экран
+
+        // Единая база статусов
+        function getStatusData(status) {
+            if (status === 'paid') return { text: "Оплата получена!", icon: "💳", banner: "Передаем на кухню...", desc: "Оплата подтверждена. Заказ передан в ресторан и курьеру.", color: "#8BC34A" };
+            if (status === 'cooking') return { text: "Заказ на кухне!", icon: "👨‍🍳", banner: "Уже готовим...", desc: "Ресторан готовит ваш заказ. Курьер скоро заберет его и поедет к вам!", color: "#FF9800" };
+            if (status === 'delivery') return { text: "Курьер в пути!", icon: "🛵", banner: "Везем к вам!", desc: "Курьер забрал заказ и едет к вам!", color: "#2196F3" };
+            if (status === 'completed') return { text: "Заказ доставлен!", icon: "✅", banner: "Приятного аппетита!", desc: "Спасибо, что выбрали нас!", color: "#4CAF50" };
+            if (status === 'canceled') return { text: "Заказ отменен", icon: "❌", banner: "Отменен", desc: "Скорее всего, деньги не поступили. Попробуйте оплатить снова или свяжитесь с поддержкой.", color: "#d32f2f" };
+            return { text: "Проверяем оплату...", icon: "💸", banner: "Ожидаем подтверждения...", desc: "Менеджер проверяет поступление средств.", color: "#FF9800" };
+        }
 
         async function checkActiveOrder() {
-            const orderId = localStorage.getItem('tamak_active_order_id');
-            if (!orderId) {
-                const banner = document.getElementById('active-order-banner');
-                if(banner) banner.classList.add('hidden');
+            // Переносим старый одиночный заказ в новый формат массива (чтобы у старых юзеров ничего не сломалось)
+            let oldId = localStorage.getItem('tamak_active_order_id');
+            let activeOrders = JSON.parse(localStorage.getItem('tamak_active_order_ids') || '[]');
+            if (oldId && !activeOrders.includes(parseInt(oldId))) {
+                activeOrders.push(parseInt(oldId));
+                localStorage.removeItem('tamak_active_order_id');
+                localStorage.setItem('tamak_active_order_ids', JSON.stringify(activeOrders));
+            }
+
+            if (activeOrders.length === 0) {
+                document.getElementById('active-orders-container').innerHTML = '';
                 return;
             }
 
-            // 1. Загружаем текущий статус принудительно (чтобы точно показать свежее)
-            const { data: order, error } = await supabaseClient.from('orders').select('*').eq('id', orderId).maybeSingle();
+            // Загружаем данные по всем активным заказам разом
+            const { data: orders, error } = await supabaseClient.from('orders').select('*').in('id', activeOrders);
             
-            if (order && !['completed', 'canceled'].includes(order.status)) {
-                updateOrderUI(order); // Рисуем текущий статус на экране
+            if (orders) {
+                let currentActive = [];
                 
-                // 2. СЛУШАЕМ ИЗМЕНЕНИЯ (Создаем уникальный канал для этого заказа)
-                if (!orderSubscription) {
-                    const channelName = 'order-watch-' + orderId; // Уникальное имя!
-                    
-                    orderSubscription = supabaseClient.channel(channelName)
-                        .on('postgres_changes', { 
-                            event: 'UPDATE', 
-                            schema: 'public', 
-                            table: 'orders', 
-                            filter: `id=eq.${orderId}` 
-                        }, (payload) => {
-                            console.log("🔥 ПРИЛЕТЕЛО ИЗМЕНЕНИЕ ИЗ БАЗЫ:", payload.new);
-                            updateOrderUI(payload.new); // Мгновенно обновляем экран
-                        })
-                        .subscribe((status) => {
-                            console.log("📡 Статус подключения к базе:", status);
-                        });
-                }
-            } else {
-                // Если заказ завершен или отменен — стираем его из памяти
-                localStorage.removeItem('tamak_active_order_id');
-                const banner = document.getElementById('active-order-banner');
-                if(banner) banner.classList.add('hidden');
+                orders.forEach(order => {
+                    if (!['completed', 'canceled'].includes(order.status)) {
+                        currentActive.push(order.id);
+                        
+                        // Создаем отдельный канал прослушки для каждого заказа
+                        if (!orderSubscriptions[order.id]) {
+                            const channelName = 'order-watch-' + order.id;
+                            orderSubscriptions[order.id] = supabaseClient.channel(channelName)
+                                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${order.id}` }, (payload) => {
+                                    checkActiveOrder(); // Перерисовываем мини-баннеры на главной
+                                    // Если юзер прямо сейчас смотрит статус этого заказа на весь экран — обновляем и его
+                                    if (window.currentViewingOrderId == payload.new.id) {
+                                        updateFullStatusUI(payload.new);
+                                    }
+                                }).subscribe();
+                        }
+                    } else {
+                        // Если заказ завершен, закрываем его канал связи
+                        if (orderSubscriptions[order.id]) {
+                            supabaseClient.removeChannel(orderSubscriptions[order.id]);
+                            delete orderSubscriptions[order.id];
+                        }
+                    }
+                });
                 
-                // Закрываем канал связи
-                if (orderSubscription) {
-                    supabaseClient.removeChannel(orderSubscription);
-                    orderSubscription = null;
+                // Очищаем локальную память от старых (завершенных) заказов
+                if (currentActive.length !== activeOrders.length) {
+                    localStorage.setItem('tamak_active_order_ids', JSON.stringify(currentActive));
                 }
+                
+                renderActiveOrderBanners(orders);
             }
         }
 
-        function updateOrderUI(order) {
-            const banner = document.getElementById('active-order-banner');
-            if(banner) banner.classList.remove('hidden');
+        // Рисуем список баннеров на главной странице
+        function renderActiveOrderBanners(orders) {
+            const container = document.getElementById('active-orders-container');
+            if (!container) return;
+            
+            container.innerHTML = orders.map(order => {
+                const info = getStatusData(order.status);
+                
+                // Если заказ только что завершен/отменен, прячем баннер через 7 секунд
+                if (['completed', 'canceled'].includes(order.status)) {
+                    setTimeout(() => checkActiveOrder(), 7000);
+                }
 
-            document.getElementById('banner-res-name').innerText = order.restaurant;
+                return `
+                <div onclick="openOrderStatus(${order.id})" style="background: #E8F5E9; border: 1px solid ${info.color}; padding: 12px 16px; margin: 12px 16px 0; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: 0.2s;">
+                    <div style="display: flex; flex-direction: column;">
+                        <span style="font-weight: 800; color: #111; font-size: 14px;">🛵 Заказ #${String(order.id).slice(0,5)} • ${order.restaurant}</span>
+                        <span style="font-size: 12px; color: ${info.color}; font-weight: 700; margin-top: 2px;">${info.banner}</span>
+                    </div>
+                    <div style="font-size: 24px;">${info.icon}</div>
+                </div>`;
+            }).join('');
+        }
+
+        // Открываем статус конкретного заказа на весь экран
+        async function openOrderStatus(orderId) {
+            window.currentViewingOrderId = orderId;
+            const { data: order } = await supabaseClient.from('orders').select('*').eq('id', orderId).maybeSingle();
+            if (order) {
+                updateFullStatusUI(order);
+                showScreen('status');
+            }
+        }
+
+        // Обновляем большой экран статуса
+        function updateFullStatusUI(order) {
             document.getElementById('st-res-name').innerText = order.restaurant;
             document.getElementById('st-price').innerText = order.total_price + ' сом';
 
-            let statusText = "Проверяем оплату...";
-            let icon = "💸";
-            let bannerDesc = "Ожидаем подтверждения...";
-            let detailDesc = "Менеджер проверяет поступление средств.";
-            let statusColor = "#FF9800"; // Оранжевый
+            const info = getStatusData(order.status);
 
-            if (order.status === 'paid') {
-                statusText = "Оплата получена!";
-                icon = "💳";
-                bannerDesc = "Передаем на кухню...";
-                detailDesc = "Оплата подтверждена. Заказ передан в ресторан и курьеру.";
-                statusColor = "#8BC34A"; // Светло-зеленый
-            } else if (order.status === 'cooking') {
-                statusText = "Заказ на кухне!";
-                icon = "👨‍🍳";
-                bannerDesc = "Уже готовим...";
-                detailDesc = "Ресторан готовит ваш заказ. Курьер скоро заберет его и поедет к вам!";
-                statusColor = "#FF9800"; 
-            } else if (order.status === 'delivery') {
-                statusText = "Курьер в пути!";
-                icon = "🛵";
-                bannerDesc = "Везем к вам!";
-                detailDesc = "Курьер забрал заказ и едет к вам!";
-                statusColor = "#2196F3"; // Синий
-            } else if (order.status === 'completed') {
-                statusText = "Заказ доставлен!";
-                icon = "✅";
-                bannerDesc = "Приятного аппетита!";
-                detailDesc = "Спасибо, что выбрали нас!";
-                statusColor = "#4CAF50"; // Зеленый
-                setTimeout(() => checkActiveOrder(), 5000);
-            } else if (order.status === 'canceled') {
-                statusText = "Заказ отменен";
-                icon = "❌";
-                bannerDesc = "Отменен";
-                detailDesc = "Скорее всего, деньги не поступили. Попробуйте оплатить снова или свяжитесь с поддержкой.";
-                statusColor = "#d32f2f"; // Красный
-                setTimeout(() => checkActiveOrder(), 5000);
-            }
-
-            if(document.getElementById('st-status-icon')) document.getElementById('st-status-icon').innerText = icon;
-            if(document.getElementById('st-status-desc')) document.getElementById('st-status-desc').innerText = detailDesc;
+            if(document.getElementById('st-status-icon')) document.getElementById('st-status-icon').innerText = info.icon;
+            if(document.getElementById('st-status-desc')) document.getElementById('st-status-desc').innerText = info.desc;
             
             const stText = document.getElementById('st-status-text');
-            if(stText) { stText.innerText = statusText; stText.style.color = statusColor; }
-            
-            const bText = document.getElementById('banner-status-text');
-            if(bText) { bText.innerText = bannerDesc; bText.style.color = statusColor; }
+            if(stText) { stText.innerText = info.text; stText.style.color = info.color; }
         }
+
+        // Запускаем проверку при загрузке приложения
+        checkActiveOrder();
 
         // Вызываем проверку при загрузке сайта (если юзер закрыл приложение и зашел снова)
         checkActiveOrder();
