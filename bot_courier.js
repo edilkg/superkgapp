@@ -34,45 +34,48 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
         const courierId = ctx.from.id;
 
         try {
-            const { data: orderCheck, error: checkErr } = await supabase.from('orders').select('courier_id, restaurant').eq('id', orderId).maybeSingle();
+            // 👉 ОБНОВЛЕНО: Достаем телефон, ID и имя клиента из базы
+            const { data: orderCheck, error: checkErr } = await supabase.from('orders').select('courier_id, restaurant, phone, client_id, client_name').eq('id', orderId).maybeSingle();
             
             if (checkErr || !orderCheck) return ctx.answerCbQuery("❌ Заказ не найден", { show_alert: true });
             if (orderCheck.courier_id && orderCheck.courier_id !== courierId) return ctx.answerCbQuery("❌ Этот заказ уже взял другой курьер", { show_alert: true });
 
             await supabase.from('orders').update({ courier_id: courierId }).eq('id', orderId);
 
-            // 👉 ОБНОВЛЕНО: Достаем телефон курьера из базы
             const { data: courierData } = await supabase.from('couriers').select('name, phone').eq('id', courierId).maybeSingle();
             
             const cName = courierData?.name || ctx.from.first_name || 'Курьер';
             const cPhone = courierData?.phone || 'Номер не указан';
-            
-            // Если есть юзернейм - пишем его, если нет - даем прямую ссылку на профиль
             const cProfile = ctx.from.username ? `@${ctx.from.username}` : `<a href="tg://user?id=${courierId}">Профиль</a>`;
 
-            // Собираем красивое сообщение для админа и ресторана
             const notifyMessage = `🛵 Курьер выехал в ресторан за заказом <b>#${String(orderId).slice(0,5)}</b>\n\n👤 Курьер: <b>${cName}</b>\n📞 Телефон: ${cPhone}\n💬 Telegram: ${cProfile}`;
 
-            // Уведомляем админа (с поддержкой HTML)
-            try { 
-                await bot.telegram.sendMessage(ADMIN_GROUP_ID, notifyMessage, { parse_mode: 'HTML' }); 
-            } catch(e) {}
+            try { await bot.telegram.sendMessage(ADMIN_GROUP_ID, notifyMessage, { parse_mode: 'HTML' }); } catch(e) {}
 
-            // Уведомляем ресторан (с поддержкой HTML)
             if (orderCheck.restaurant) {
                 const { data: restData } = await supabase.from('restaurants').select('id').eq('name', orderCheck.restaurant).maybeSingle();
                 if (restData) {
-                    try { 
-                        await restBot.telegram.sendMessage(restData.id, notifyMessage, { parse_mode: 'HTML' }); 
-                    } catch(e) {}
+                    try { await restBot.telegram.sendMessage(restData.id, notifyMessage, { parse_mode: 'HTML' }); } catch(e) {}
                 }
             }
 
-            await ctx.editMessageText(
-                ctx.callbackQuery.message.text + `\n\n✅ ВЫ ПРИНЯЛИ ЗАКАЗ!\nОтправляйтесь в ресторан. Как только заберете еду, нажмите кнопку ниже:`,
-                Markup.inlineKeyboard([[Markup.button.callback('📦 Я взял заказ (Еду к клиенту)', `courier_picked_up_${orderId}`)]])
-            );
+            // 👉 ОБНОВЛЕНО: Формируем текст для курьера с номером клиента
+            const clientPhone = orderCheck.phone || 'Не указан';
+            const clientName = orderCheck.client_name || 'Гость';
+
+            const newText = ctx.callbackQuery.message.text + `\n\n✅ ВЫ ПРИНЯЛИ ЗАКАЗ!\nОтправляйтесь в ресторан.\n\n👤 Клиент: ${clientName}\n📞 Телефон клиента: ${clientPhone}\n\nКак только заберете еду, нажмите кнопку ниже:`;
+
+            // Создаем кнопки
+            const buttons = [
+                [Markup.button.callback('📦 Я взял заказ (Еду к клиенту)', `courier_picked_up_${orderId}`)]
+            ];
             
+            // Если у клиента есть Telegram ID, добавляем кнопку связи
+            if (orderCheck.client_id && orderCheck.client_id != 111) {
+                buttons.push([Markup.button.url('💬 Написать клиенту', `tg://user?id=${orderCheck.client_id}`)]);
+            }
+
+            await ctx.editMessageText(newText, Markup.inlineKeyboard(buttons));
             await ctx.answerCbQuery("✅ Вы назначены на заказ!");
         } catch (err) {
             console.error("Ошибка при взятии заказа курьером:", err.message);
@@ -101,9 +104,17 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 try { await bot.telegram.sendMessage(order.client_id, clientMessage, { parse_mode: 'HTML' }); } catch(e){}
             }
 
+            // 👉 ОБНОВЛЕНО: Сохраняем кнопку связи с клиентом на этапе "В пути"
+            const buttons = [
+                [Markup.button.callback('✅ Я доставил заказ', `courier_delivered_${orderId}`)]
+            ];
+            if (order && order.client_id && order.client_id != 111) {
+                buttons.push([Markup.button.url('💬 Написать клиенту', `tg://user?id=${order.client_id}`)]);
+            }
+
             await ctx.editMessageText(
                 ctx.callbackQuery.message.text + `\n\n🛵 ВЫ В ПУТИ К КЛИЕНТУ!\nКак только отдадите еду, нажмите кнопку:`,
-                Markup.inlineKeyboard([[Markup.button.callback('✅ Я доставил заказ', `courier_delivered_${orderId}`)]])
+                Markup.inlineKeyboard(buttons)
             );
             await ctx.answerCbQuery("Выехали к клиенту!");
         } catch (err) {
