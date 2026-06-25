@@ -355,21 +355,6 @@
         #modal-map { background: var(--bg-color); z-index: 2500; position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; }
         #modal-map.hidden { display: none !important; }
         #fullscreen-map { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        
-        /* ЦЕНТРАЛЬНЫЙ МАРКЕР С ТЕНЬЮ (Поднят выше на 40% для удобства как в Яндексе) */
-        .center-marker-container {
-            position: absolute; top: 25%; left: 50%; 
-            transform: translate(-50%, -100%); 
-            z-index: 2000; pointer-events: none;
-            display: flex; flex-direction: column; align-items: center;
-        }
-        .center-marker-icon {
-            position: relative;
-            width: 32px; height: 32px; background: #E65100; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.2); 
-            transition: transform 0.2s ease, margin-bottom 0.2s ease;
-        }
 
         /* КОРРЕКЦИЯ РОДИТЕЛЬСКОЙ ПАНЕЛИ ДЛЯ ПОДСКАЗОК */
         .map-bottom-panel { 
@@ -431,28 +416,57 @@
             color: #888888;
             margin-top: 2px;
         }
-        /* Длинная ножка маркера */
-        .center-marker-icon::before {
-            content: ''; position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%);
-            border-width: 14px 10px 0; border-style: solid; border-color: #E65100 transparent transparent transparent;
-        }
-        /* Белая точка внутри маркера */
-        .center-marker-icon::after {
-            content: ''; width: 10px; height: 10px; background: white; border-radius: 50%; z-index: 1;
-        }
-        .center-marker-shadow {
-            width: 12px; height: 6px; background: rgba(0,0,0,0.3); border-radius: 50%;
-            margin-top: 14px; /* Отступ под ножку */
-            transition: transform 0.2s ease, opacity 0.2s ease;
-        }
-        
-        /* Анимация при перетаскивании */
-        .center-marker-container.is-dragging .center-marker-icon {
-            transform: scale(1.1); margin-bottom: 15px;
-        }
-        .center-marker-container.is-dragging .center-marker-shadow {
-            transform: scale(0.6); opacity: 0.5;
-        }
+/* 1. КОНТЕЙНЕР МАРКЕРА */
+.center-marker-container {
+    position: absolute; top: 25%; left: 50%; 
+    transform: translate(-50%, -100%); 
+    z-index: 2000; pointer-events: none;
+    display: flex; flex-direction: column; align-items: center;
+}
+
+/* 2. ЖЕЛТЫЙ КВАДРАТ (Основа) */
+.center-marker-icon {
+    position: relative;
+    width: 44px; height: 44px; 
+    background-color: var(--main-yellow); 
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'/%3E%3Cpolyline points='9 22 9 12 15 12 15 22'/%3E%3C/svg%3E");
+    background-size: 24px;
+    background-repeat: no-repeat;
+    background-position: center;
+    border-radius: 14px; 
+    border: 2px solid #ffffff; 
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15); 
+    transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+    z-index: 2;
+}
+
+/* 3. ДЛИННАЯ ТОНКАЯ НОЖКА (Теперь просто острая игла) */
+.center-marker-icon::before {
+    content: ''; 
+    position: absolute; 
+    bottom: -22px; 
+    left: 50%; 
+    transform: translateX(-50%);
+    width: 2px; 
+    height: 24px; 
+    background: #111;
+    z-index: -1; 
+}
+
+/* 4. ТЕНЬ НА ЗЕМЛЕ (Подтянули под иголочку) */
+.center-marker-shadow {
+    width: 14px; height: 4px; background: rgba(0,0,0,0.25); border-radius: 50%;
+    margin-top: 20px; 
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* 5. АНИМАЦИЯ ПРИ ПЕРЕТАСКИВАНИИ КАРТЫ */
+.center-marker-container.is-dragging .center-marker-icon {
+    transform: translateY(-16px); 
+}
+.center-marker-container.is-dragging .center-marker-shadow {
+    transform: scale(0.5); opacity: 0.3; 
+}
         
         /* КНОПКИ ПОВЕРХ КАРТЫ */
         .map-floating-controls { 
@@ -767,8 +781,15 @@
         </div>
 
         <div class="search-container">
-            <input type="text" id="search-input" class="search-bar" placeholder="🔍 Найти ресторан" oninput="handleSearch()">
-        </div>
+    <div style="position: relative; display: flex; align-items: center; width: 100%;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 14px;">
+            <path d="m21 21-4.34-4.34"/>
+            <circle cx="11" cy="11" r="8"/>
+        </svg>
+        
+        <input type="text" id="search-input" class="search-bar" placeholder="Найти ресторан" oninput="handleSearch()" style="padding-left: 42px;">
+    </div>
+</div>
         
         <div class="main-categories">
             <div class="cat-circle" onclick="toggleFilter(this, 'burgers')">
@@ -917,8 +938,8 @@
         </div>
         <div class="map-floating-controls">
             <div class="map-buttons-row">
-                <div class="btn-round" onclick="onBackClick()">←</div>
-                <div class="btn-round" onclick="locateUser()" title="Мое местоположение">✈️</div>
+                <div class="btn-round" onclick="onBackClick()"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left-icon lucide-chevron-left"><path d="m15 18-6-6 6-6"/></svg></div>
+                <div class="btn-round" onclick="locateUser()" title="Мое местоположение"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-navigation-icon lucide-navigation"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg></div>
             </div>
             
             <div class="map-bottom-panel">
@@ -2157,17 +2178,22 @@ function filterMenu(resId, category, btn) {
             checkoutMap.setView(centerLatLng, 16, {animate: false});
         }
 
+
+
         function locateUser() {
     if (!navigator.geolocation) return alert("Браузер не поддерживает GPS");
     if(tg) tg.HapticFeedback.impactOccurred('medium');
 
-    // --- 🟢 НАЧАЛО: ЗАМОРОЗКА С ИДЕАЛЬНОЙ SVG АНИМАЦИЕЙ ---
     const locateBtn = document.querySelector('div[onclick="locateUser()"]');
-    let originalText = '✈️';
+    
+    // 1. Создаем пустую переменную для сохранения оригинальной картинки
+    let originalContent = ''; 
     
     if (locateBtn) {
-        originalText = locateBtn.innerText;
-        // Вставляем симметричную SVG-иконку обновления
+        // 2. ВАЖНО: сохраняем ВЕСЬ HTML (твой SVG код), а не просто текст
+        originalContent = locateBtn.innerHTML; 
+        
+        // Вставляем крутящуюся SVG-иконку обновления
         locateBtn.innerHTML = `
             <svg class="spin-svg" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
@@ -2177,7 +2203,6 @@ function filterMenu(resId, category, btn) {
         locateBtn.style.pointerEvents = 'none'; // Блокируем клики
         locateBtn.style.opacity = '0.7';
     }
-    // --- 🟢 КОНЕЦ ЗАМОРОЗКИ ---
 
     navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -2189,7 +2214,8 @@ function filterMenu(resId, category, btn) {
 
             // --- 🟢 РАЗМОРОЗКА ПРИ УСПЕХЕ ---
             if (locateBtn) {
-                locateBtn.innerHTML = originalText; // Возвращаем самолетик обратно
+                // Возвращаем сохраненную SVG-иконку навигации
+                locateBtn.innerHTML = originalContent; 
                 locateBtn.style.pointerEvents = 'auto';
                 locateBtn.style.opacity = '1';
             }
@@ -2203,7 +2229,7 @@ function filterMenu(resId, category, btn) {
 
             // --- 🟢 РАЗМОРОЗКА ПРИ ОШИБКЕ ---
             if (locateBtn) {
-                locateBtn.innerHTML = originalText;
+                locateBtn.innerHTML = originalContent;
                 locateBtn.style.pointerEvents = 'auto';
                 locateBtn.style.opacity = '1';
             }
