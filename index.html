@@ -416,9 +416,7 @@
             color: #888888;
             margin-top: 2px;
         }
-/* 1. КОНТЕЙНЕР МАРКЕРА *//* --- НОВЫЙ ДИЗАЙН МАРКЕРА --- */
-
-/* 1. Контейнер (держит всё вместе) */
+/* 1. КОНТЕЙНЕР МАРКЕРА */
 .center-marker-container {
     position: absolute; top: 25%; left: 50%; 
     transform: translate(-50%, -100%); 
@@ -426,7 +424,7 @@
     display: flex; flex-direction: column; align-items: center;
 }
 
-/* 2. Желтый квадрат с домиком */
+/* 2. ЖЕЛТЫЙ КВАДРАТ (Основа) */
 .center-marker-icon {
     position: relative;
     width: 38px; height: 38px; 
@@ -436,40 +434,39 @@
     background-repeat: no-repeat;
     background-position: center;
     border-radius: 14px; 
-    border: 3px solid #ffffff; 
+    border: 2px solid #ffffff; 
     box-shadow: 0 4px 10px rgba(0,0,0,0.15); 
     transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
     z-index: 2;
 }
 
-/* 3. Тонкая ножка-игла (рисуется прямо под квадратом) */
-.center-marker-icon::after {
+/* 3. ДЛИННАЯ ТОНКАЯ НОЖКА (Теперь просто острая игла) */
+.center-marker-icon::before {
     content: ''; 
     position: absolute; 
-    bottom: -18px; /* Вылет ножки вниз */
+    bottom: -22px; 
     left: 50%; 
-    margin-left: -1px; /* Центрируем 2px линию */
+    transform: translateX(-50%);
     width: 2px; 
-    height: 20px; 
+    height: 24px; 
     background: #111;
     z-index: -1; 
 }
 
-/* 4. Тень на земле */
+/* 4. ТЕНЬ НА ЗЕМЛЕ (Подтянули под иголочку) */
 .center-marker-shadow {
-    width: 14px; height: 5px; background: rgba(0,0,0,0.25); border-radius: 50%;
-    margin-top: 17px; /* Сдвиг тени, чтобы она была под кончиком иглы */
+    width: 14px; height: 4px; background: rgba(0,0,0,0.25); border-radius: 50%;
+    margin-top: 20px; 
     transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
-/* 5. Анимация прыжка при перетаскивании */
+/* 5. АНИМАЦИЯ ПРИ ПЕРЕТАСКИВАНИИ КАРТЫ */
 .center-marker-container.is-dragging .center-marker-icon {
     transform: translateY(-16px); 
 }
 .center-marker-container.is-dragging .center-marker-shadow {
     transform: scale(0.5); opacity: 0.3; 
-}
-        
+} 
         /* КНОПКИ ПОВЕРХ КАРТЫ */
         .map-floating-controls { 
             position: absolute; bottom: 0; left: 0; right: 0; z-index: 3000; 
