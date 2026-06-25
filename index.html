@@ -953,9 +953,9 @@
     <div style="height: 12px;"></div>
 
     <input type="text" id="map-kv" placeholder="🏠 (номер дома, кв. название дома и т.д)" class="full-width-input" style="background: #f0f0f0; margin-bottom: 16px; width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box;">
-    
-    <button class="btn-yellow" style="width: 100%; padding: 14px; font-size: 16px; font-weight: bold; border-radius: 8px; border: none; background: #ffca28; cursor: pointer;" onclick="confirmMapAddress()">Готово</button>
-</div>
+                
+                <button class="btn-yellow" style="width: 100%;" onclick="confirmMapAddress()">Готово</button>
+            </div>
         </div>
     </div>
 
@@ -1935,40 +1935,47 @@ function filterMenu(resId, category, btn) {
         }
 
         function recalcCheckoutDelivery(resLat, resLon) {
-    const submitButton = document.querySelector('#modal-map .btn-yellow');
-    
-    // ЕСЛИ МЫ НА ГЛАВНОЙ СТРАНИЦЕ (ресторан еще не выбран)
-    if (!cartActiveTabResId || !database[cartActiveTabResId]) {
-        currentDeliveryFee = 0;
-        if (submitButton) {
-            submitButton.classList.remove('disabled');
-            submitButton.style.pointerEvents = 'auto';
-            submitButton.innerText = 'Сохранить адрес';
-        }
-        return;
-    }
+            const priceElement = document.getElementById('modal-map-price');
+            const submitButton = document.querySelector('#modal-map .btn-yellow');
+            
+            // ЕСЛИ МЫ НА ГЛАВНОЙ СТРАНИЦЕ (ресторан еще не выбран)
+            if (!cartActiveTabResId || !database[cartActiveTabResId]) {
+                currentDeliveryFee = 0;
+                priceElement.innerText = 'Укажите адрес';
+                priceElement.style.color = '#888';
+                priceElement.style.fontSize = '14px';
+                
+                submitButton.classList.remove('disabled');
+                submitButton.style.pointerEvents = 'auto';
+                submitButton.innerText = 'Сохранить адрес'; // МЕНЯЕМ ТЕКСТ КНОПКИ
+                return;
+            }
 
-    // ЕСЛИ МЫ В КОРЗИНЕ (считаем доставку)
-    const straightDist = getDistance(resLat, resLon, clientLat, clientLon);
-    const MAX_DISTANCE_KM = 15; 
+            // ЕСЛИ МЫ В КОРЗИНЕ (считаем доставку)
+            const straightDist = getDistance(resLat, resLon, clientLat, clientLon);
+            const MAX_DISTANCE_KM = 15; 
 
-    if (straightDist > MAX_DISTANCE_KM) {
-        currentDeliveryFee = 0; 
-        if (submitButton) {
-            submitButton.classList.add('disabled');
-            submitButton.style.pointerEvents = 'none';
-            submitButton.innerText = 'Слишком далеко';
+            if (straightDist > MAX_DISTANCE_KM) {
+                currentDeliveryFee = 0; 
+                priceElement.innerText = 'Вне зоны доставки';
+                priceElement.style.color = '#d32f2f'; 
+                priceElement.style.fontSize = '14px'; 
+                
+                submitButton.classList.add('disabled');
+                submitButton.style.pointerEvents = 'none';
+                submitButton.innerText = 'Слишком далеко';
+            } else {
+                currentDeliveryFee = calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon);
+                priceElement.innerText = currentDeliveryFee + ' сом';
+                priceElement.style.color = '#E65100';
+                priceElement.style.fontSize = '20px';
+                
+                submitButton.classList.remove('disabled');
+                submitButton.style.pointerEvents = 'auto';
+                submitButton.innerText = 'Готово'; // МЕНЯЕМ ТЕКСТ ОБРАТНО
+            }
+            updateReceipt();
         }
-    } else {
-        currentDeliveryFee = calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon);
-        if (submitButton) {
-            submitButton.classList.remove('disabled');
-            submitButton.style.pointerEvents = 'auto';
-            submitButton.innerText = 'Готово'; 
-        }
-    }
-    updateReceipt();
-}
 
         function confirmMapAddress() {
             orderAddressData.street = document.getElementById('map-street').value;
@@ -2105,51 +2112,49 @@ function filterMenu(resId, category, btn) {
         
 
         function initCheckoutMap(resLat, resLon) {
-    if (!checkoutMap) {
-        checkoutMap = L.map('fullscreen-map', {zoomControl: false}).setView([clientLat, clientLon], 16);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(checkoutMap);
-        
-        const resIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180209.png', iconSize: [32, 32] });
-        
-        // ИЗМЕНЕНО: Теперь попап пишет "Ваше местонахождение" вместо "Ресторан"
-        checkoutResMarker = L.marker([resLat, resLon], {icon: resIcon}).addTo(checkoutMap).bindPopup("Ваше местонахождение");
-        
-        const centerMarkerEl = document.querySelector('.center-marker-container');
-        const bottomPanel = document.querySelector('.map-floating-controls');
+            if (!checkoutMap) {
+                checkoutMap = L.map('fullscreen-map', {zoomControl: false}).setView([clientLat, clientLon], 16);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(checkoutMap);
+                
+                const resIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180209.png', iconSize: [32, 32] });
+                checkoutResMarker = L.marker([resLat, resLon], {icon: resIcon}).addTo(checkoutMap).bindPopup("Ресторан");
+                
+                const centerMarkerEl = document.querySelector('.center-marker-container');
+                const bottomPanel = document.querySelector('.map-floating-controls');
 
-        // Срабатывает исключительно тогда, когда пользователь двигает карту пальцем
-        checkoutMap.on('dragstart', function() {
-            mapWasDragged = true; 
-            if (centerMarkerEl) centerMarkerEl.classList.add('is-dragging');
-            if (bottomPanel) bottomPanel.classList.add('hidden-panel'); 
-            document.getElementById('map-street').value = 'Определение адреса...'; 
-        });
+                // Срабатывает исключительно тогда, когда пользователь двигает карту пальцем
+                checkoutMap.on('dragstart', function() {
+                    mapWasDragged = true; 
+                    if (centerMarkerEl) centerMarkerEl.classList.add('is-dragging');
+                    if (bottomPanel) bottomPanel.classList.add('hidden-panel'); 
+                    document.getElementById('map-street').value = 'Определение адреса...'; 
+                });
 
-        // Вызывается только по окончании ручного перемещения карты
-        checkoutMap.on('moveend', function() {
-            if (!mapWasDragged) return; // Полный игнор программных перемещений от автокомплита
-            
-            mapWasDragged = false; 
-            if (centerMarkerEl) centerMarkerEl.classList.remove('is-dragging');
-            if (bottomPanel) bottomPanel.classList.remove('hidden-panel'); 
-            
-            // Извлекаем координаты из-под маркера (теперь точно на высоте 25% видимой области)
-            const mapSize = checkoutMap.getSize();
-            const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.25);
-            const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
-            
-            clientLat = latlng.lat; 
-            clientLon = latlng.lng;
-            reverseGeocode(clientLat, clientLon);
-        });
-        
-        setMapCenterToMarker(clientLat, clientLon);
-    } else {
-        setMapCenterToMarker(clientLat, clientLon);
-        checkoutResMarker.setLatLng([resLat, resLon]);
-    }
-    recalcCheckoutDelivery(resLat, resLon);
-}
+                // Вызывается только по окончании ручного перемещения карты
+                checkoutMap.on('moveend', function() {
+                    if (!mapWasDragged) return; // Полный игнор программных перемещений от автокомплита
+                    
+                    mapWasDragged = false; 
+                    if (centerMarkerEl) centerMarkerEl.classList.remove('is-dragging');
+                    if (bottomPanel) bottomPanel.classList.remove('hidden-panel'); 
+                    
+                    // Извлекаем координаты из-под маркера (теперь точно на высоте 25% видимой области)
+                    const mapSize = checkoutMap.getSize();
+                    const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.25);
+                    const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
+                    
+                    clientLat = latlng.lat; 
+                    clientLon = latlng.lng;
+                    reverseGeocode(clientLat, clientLon);
+                });
+                
+                setMapCenterToMarker(clientLat, clientLon);
+            } else {
+                setMapCenterToMarker(clientLat, clientLon);
+                checkoutResMarker.setLatLng([resLat, resLon]);
+            }
+            recalcCheckoutDelivery(resLat, resLon);
+        }
 
         // УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы GPS-точка оказалась ровно под маркером на 25% экрана
         function setMapCenterToMarker(lat, lon) {
