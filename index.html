@@ -700,6 +700,14 @@
     padding: 14px;
     font-size: 14px;
 }
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+.spin-anim {
+    animation: spin 1s linear infinite;
+    display: inline-block; /* Обязательно для работы transform */
+}
 </style>
 </head>
 <body>
@@ -2146,23 +2154,56 @@ function filterMenu(resId, category, btn) {
         }
 
         function locateUser() {
-            if (!navigator.geolocation) return alert("Браузер не поддерживает GPS");
-            if(tg) tg.HapticFeedback.impactOccurred('medium');
-            
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    clientLat = position.coords.latitude; 
-                    clientLon = position.coords.longitude;
-                    mapWasDragged = false; // Блокируем перезапись события moveend
-                    setMapCenterToMarker(clientLat, clientLon);
-                    reverseGeocode(clientLat, clientLon);
-                },
-                (error) => {
-                    if (error.code === 1) alert("Разрешите доступ к геолокации в настройках телефона");
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
-            );
-        }
+    if (!navigator.geolocation) return alert("Браузер не поддерживает GPS");
+    if(tg) tg.HapticFeedback.impactOccurred('medium');
+
+    // --- 🟢 НАЧАЛО: ЗАМОРОЗКА КНОПКИ GPS С АНИМАЦИЕЙ ---
+    const locateBtn = document.querySelector('div[onclick="locateUser()"]');
+    let originalText = '✈️';
+    
+    if (locateBtn) {
+        originalText = locateBtn.innerText;
+        locateBtn.innerText = '↻'; // Используем значок обновления
+        locateBtn.classList.add('spin-anim'); // Запускаем CSS-анимацию вращения
+        locateBtn.style.pointerEvents = 'none'; // Блокируем клики
+        locateBtn.style.opacity = '0.5';
+    }
+    // --- 🟢 КОНЕЦ ЗАМОРОЗКИ ---
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            clientLat = position.coords.latitude; 
+            clientLon = position.coords.longitude;
+            mapWasDragged = false; 
+            setMapCenterToMarker(clientLat, clientLon);
+            reverseGeocode(clientLat, clientLon);
+
+            // --- 🟢 РАЗМОРОЗКА ПРИ УСПЕХЕ ---
+            if (locateBtn) {
+                locateBtn.classList.remove('spin-anim'); // Останавливаем вращение
+                locateBtn.innerText = originalText;      // Возвращаем самолетик
+                locateBtn.style.pointerEvents = 'auto';
+                locateBtn.style.opacity = '1';
+            }
+        },
+        (error) => {
+            if (error.code === 1) {
+                alert("Разрешите доступ к геолокации в настройках телефона");
+            } else {
+                alert("Не удалось определить местоположение. Проверьте GPS.");
+            }
+
+            // --- 🟢 РАЗМОРОЗКА ПРИ ОШИБКЕ ---
+            if (locateBtn) {
+                locateBtn.classList.remove('spin-anim');
+                locateBtn.innerText = originalText;
+                locateBtn.style.pointerEvents = 'auto';
+                locateBtn.style.opacity = '1';
+            }
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+}
 
         function recalcCheckoutDelivery(resLat, resLon) {
             // Считаем расстояние по прямой
