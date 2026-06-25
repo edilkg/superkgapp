@@ -775,7 +775,7 @@
             <img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=100" class="logo-img" loading="lazy" alt="logo">
             <div class="header-address" onclick="onHeaderAddressClick()" style="cursor: pointer; overflow: hidden; padding-right: 10px;">
                 <span style="color: var(--text-gray); font-size: 11px; display: flex; align-items: center; gap: 4px;">ДОСТАВИТЬ ПО АДРЕСУ <span style="font-size: 14px; font-weight: bold;">›</span></span>
-                <span id="current-city-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; width: 100%; font-size: 15px; font-weight: 700;">Чолпон-Ата</span>
+                <span id="current-city-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; width: 100%; font-size: 15px; font-weight: 700;">Укажите адрес 📍</span>
             </div>
         </div>
 
@@ -879,8 +879,8 @@
 
             <div id="block-delivery">
                 <h3 class="section-title" style="margin-top: 0; padding: 0 0 12px 0;">Адрес доставки</h3>
-                <div id="saved-addresses-wrapper" class="hidden"><div id="saved-addresses-list"></div></div>
-                <div class="mini-map-card" onclick="openMapModal()">
+                
+                <div class="mini-map-card" onclick="onHeaderAddressClick()">
                     <div id="checkout-mini-map" class="mini-map-container"></div>
                     <div class="mini-map-info">
                         <div class="mini-map-text">
@@ -890,7 +890,6 @@
                         <div class="mini-map-icon">›</div>
                     </div>
                 </div>
-                <button class="btn-save-address" onclick="saveCurrentAddress()" style="margin-bottom: 8px;">⭐ Сохранить этот адрес</button>
                 
                 <div class="door-delivery-btn" id="door-delivery-btn" onclick="toggleDoorDelivery()">
                     <div class="door-info">
@@ -942,18 +941,21 @@
             </div>
             
             <div class="map-bottom-panel">
-    <button type="button" onclick="locateUser()" class="full-width-input" style="background: #ffffff; border: 2px solid var(--main-yellow, #ffca28); font-weight: bold; margin-bottom: 12px; padding: 12px; border-radius: 8px; width: 100%; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; box-sizing: border-box; outline: none;">
+    <button type="button" onclick="locateUser()" class="full-width-input" style="background: #FCE000; border: 2px solid var(--main-yellow, #ffca28); font-weight: bold; margin-bottom: 12px; padding: 12px; border-radius: 8px; width: 100%; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; box-sizing: border-box; outline: none;">
         🎯 Определить где я
     </button>
 
     <div style="position: relative; width: 100%;">
-        <input type="text" id="map-street" placeholder="📍 (Советская 10 или народный супермаркет)" onchange="geocodeAddressFromInput()" class="full-width-input" style="background: #f0f0f0; font-weight: bold; border: 2px solid var(--main-yellow, #ffca28); margin-bottom: 0; width: 100%; padding: 12px; border-radius: 8px; box-sizing: border-box;">
+        <input type="text" id="map-street" placeholder="📍 Советская 10 или народный супермаркет" onchange="geocodeAddressFromInput()" class="full-width-input" style="background: #f0f0f0; font-weight: bold; border: 2px solid var(--main-yellow, #ffca28); margin-bottom: 0; width: 100%; padding: 12px; border-radius: 8px; box-sizing: border-box;">
         <div id="search-suggestions" class="search-suggestions-container"></div>
     </div>
     <div style="height: 12px;"></div>
 
-    <input type="text" id="map-kv" placeholder="🏠 (номер дома, кв. название дома и т.д)" class="full-width-input" style="background: #f0f0f0; margin-bottom: 16px; width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box;">
-                
+    <input type="text" id="map-kv" placeholder="🏠 номер дома, кв. название дома и т.д" class="full-width-input" style="background: #f0f0f0; margin-bottom: 16px; width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box;">
+                <div id="delivery-info-block" style="display: none; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 16px; margin-bottom: 16px;">
+        <span style="color: #555; font-size: 14px; font-weight: 600;">Доставка:</span>
+        <span id="modal-map-price" style="font-weight: 800; font-size: 20px; color: #E65100;">0 сом</span>
+    </div>
                 <button class="btn-yellow" style="width: 100%;" onclick="confirmMapAddress()">Готово</button>
             </div>
         </div>
@@ -1123,15 +1125,22 @@
             // ПЕРЕХВАТ НАЖАТИЯ "НАЗАД" ОТ TELEGRAM
             if (tg.BackButton) {
                 tg.BackButton.onClick(function() {
-                    // Если открыта модалка блюда — просто скрываем её
                     const productModal = document.getElementById('modal-product');
                     const addressModal = document.getElementById('modal-address');
+                    const myAddressesModal = document.getElementById('modal-my-addresses'); // <-- Добавили
+                    const otherQrsModal = document.getElementById('modal-other-qrs'); // <-- Добавили заодно
                     
                     if (productModal && !productModal.classList.contains('hidden')) {
                         productModal.classList.add('hidden');
                     } 
                     else if (addressModal && !addressModal.classList.contains('hidden')) {
                         addressModal.classList.add('hidden');
+                    }
+                    else if (myAddressesModal && !myAddressesModal.classList.contains('hidden')) {
+                        myAddressesModal.classList.add('hidden'); // <-- Закрываем "Мои адреса"
+                    }
+                    else if (otherQrsModal && !otherQrsModal.classList.contains('hidden')) {
+                        otherQrsModal.classList.add('hidden'); // <-- Закрываем QR-коды
                     }
                     else {
                         window.history.back(); // Делаем системный шаг назад
@@ -1379,7 +1388,7 @@ function renderRestaurants(searchQuery = '') {
             // Если мы уже узнали координаты юзера, считаем цену
             if (clientLat && clientLon) {
                 const straightDist = getDistance(res.lat, res.lon, clientLat, clientLon);
-                const MAX_DISTANCE_KM = 15; 
+                const MAX_DISTANCE_KM = 25; 
                 
                 if (straightDist > MAX_DISTANCE_KM) {
                     deliveryText = `<div class="res-desc" style="color: #d32f2f; font-weight: 600;">🚫 Слишком далеко (${straightDist.toFixed(1)} км)</div>`;
@@ -1432,8 +1441,6 @@ function renderRestaurants(searchQuery = '') {
 }
 
         renderRestaurants();
-
-        function handleSearch() {}
 
         async function openMenu(resId) {
             currentRestaurantId = resId;
@@ -1780,48 +1787,59 @@ function filterMenu(resId, category, btn) {
         // ОФОРМЛЕНИЕ И КАРТА
         // ==========================================
 
-        function openMapModal() {
-            document.getElementById('modal-map').classList.remove('hidden');
-            history.pushState({modal: 'map'}, '');
-            
-            const activeRes = database[cartActiveTabResId];
-            
-            // Защита: если корзина пустая и открыли с главной, берем GPS юзера или дефолтные координаты
-            const resLat = activeRes ? activeRes.lat : (clientLat || 42.6482);
-            const resLon = activeRes ? activeRes.lon : (clientLon || 77.0855);
-            
-            setTimeout(() => { 
-                if (checkoutMap) checkoutMap.invalidateSize(); 
-                initCheckoutMap(resLat, resLon); 
-            }, 50);
-            
-            document.getElementById('map-street').value = orderAddressData.street || '';
-            document.getElementById('map-kv').value = orderAddressData.kv || '';
-            document.getElementById('map-comment').value = orderAddressData.comment || '';
-        }
+       function openMapModal() {
+    document.getElementById('modal-map').classList.remove('hidden');
+    history.pushState({modal: 'map'}, '');
+    
+    const activeRes = database[cartActiveTabResId];
+    const resLat = activeRes ? activeRes.lat : (clientLat || 42.6482);
+    const resLon = activeRes ? activeRes.lon : (clientLon || 77.0855);
+    
+    // ЖЕЛЕЗОБЕТОННОЕ УПРАВЛЕНИЕ КНОПКОЙ И БЛОКОМ СРАЗУ ПРИ ОТКРЫТИИ
+    const isCartVisible = !document.getElementById('screen-cart-list').classList.contains('hidden');
+    const submitButton = document.querySelector('#modal-map .btn-yellow');
+    const deliveryBlock = document.getElementById('delivery-info-block');
 
+    if (!isCartVisible) {
+        // Если открыли с ГЛАВНОЙ страницы
+        if (submitButton) submitButton.innerText = 'Сохранить адрес';
+        if (deliveryBlock) deliveryBlock.style.display = 'none';
+    } else {
+        // Если открыли со страницы ОФОРМЛЕНИЯ ЗАКАЗА
+        if (submitButton) submitButton.innerText = 'Готово';
+        if (deliveryBlock) deliveryBlock.style.display = 'flex';
+    }
+
+    setTimeout(() => { 
+        if (checkoutMap) checkoutMap.invalidateSize(); 
+        initCheckoutMap(resLat, resLon); 
+    }, 50);
+    
+    document.getElementById('map-street').value = orderAddressData.street || '';
+    document.getElementById('map-kv').value = orderAddressData.kv || '';
+    // СТРОКУ С КОММЕНТАРИЕМ КУРЬЕРУ УДАЛИЛИ, ЧТОБЫ КОД БОЛЬШЕ НЕ КРАШИЛСЯ!
+}
         // ==========================================
         // ЛОГИКА ОКНА "МОИ АДРЕСА"
         // ==========================================
         let tempSelectedAddressIndex = 0;
 
         function onHeaderAddressClick() {
-            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-            
-            // Если есть хотя бы один сохраненный адрес, открываем список
-            if (saved.length > 0) {
-                tempSelectedAddressIndex = 0; 
-                // Пытаемся найти текущий выбранный адрес по координатам
-                const currentSavedIndex = saved.findIndex(a => a.lat === clientLat && a.lon === clientLon);
-                if (currentSavedIndex !== -1) tempSelectedAddressIndex = currentSavedIndex;
-                
-                renderMyAddressesModal();
-                document.getElementById('modal-my-addresses').classList.remove('hidden');
-            } else {
-                // Если адресов нет, сразу кидаем на карту
-                openMapModal();
-            }
-        }
+    let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+    
+    // СТРОГОЕ УСЛОВИЕ: Если адресов вообще нет — сразу открываем карту!
+    if (saved.length === 0) {
+        openMapModal();
+    } else {
+        // Если есть хотя бы один — открываем твоё окно списка
+        tempSelectedAddressIndex = 0; 
+        const currentSavedIndex = saved.findIndex(a => a.lat === clientLat && a.lon === clientLon);
+        if (currentSavedIndex !== -1) tempSelectedAddressIndex = currentSavedIndex;
+        
+        renderMyAddressesModal();
+        document.getElementById('modal-my-addresses').classList.remove('hidden');
+    }
+}
 
         function closeMyAddressesIfOverlay(event) {
             if(event.target.id === 'modal-my-addresses') {
@@ -1830,37 +1848,42 @@ function filterMenu(resId, category, btn) {
         }
 
         function renderMyAddressesModal() {
-            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-            const container = document.getElementById('my-addresses-list');
-            
-            if (saved.length === 0) {
-                document.getElementById('modal-my-addresses').classList.add('hidden');
-                openMapModal();
-                return;
-            }
+    let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+    const container = document.getElementById('my-addresses-list');
+    
+    // Если адресов в памяти устройства ещё нет — выводим красивую заглушку
+    if (saved.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; color: #777; padding: 30px 10px; font-size: 14px; font-weight: 600; line-height: 1.4;">
+                📍 У вас пока нет сохранённых адресов.<br>Нажмите кнопку ниже, чтобы добавить первый адрес!
+            </div>
+        `;
+        return;
+    }
 
-            container.innerHTML = saved.map((a, i) => {
-                const isActive = (tempSelectedAddressIndex === i);
-                return `
-                <div style="display: flex; align-items: center; background: ${isActive ? '#fffcf0' : '#f5f5f5'}; border: 1px solid ${isActive ? '#FCE000' : 'transparent'}; padding: 14px 16px; border-radius: 16px; margin-bottom: 10px; cursor: pointer; transition: 0.2s;" onclick="selectAddressFromModal(${i})">
-                    <div style="width: 20px; height: 20px; border-radius: 50%; border: 2px solid ${isActive ? '#E65100' : '#ccc'}; display: flex; align-items: center; justify-content: center; margin-right: 12px; flex-shrink: 0;">
-                        ${isActive ? '<div style="width: 10px; height: 10px; background: #E65100; border-radius: 50%;"></div>' : ''}
-                    </div>
-                    
-                    <div style="flex-grow: 1; font-size: 15px; font-weight: 600; color: #111;">
-                        ${a.text}
-                    </div>
-                    
-                    <div onclick="event.stopPropagation(); editAddressFromModal(${i})" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: #1ea1f2; background: #eef7ff; border-radius: 8px; margin-left: 8px;" title="Редактировать">
-                        ✏️
-                    </div>
-                    
-                    <div onclick="event.stopPropagation(); deleteAddressFromModal(${i})" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: #d32f2f; background: #ffebee; border-radius: 8px; margin-left: 8px;" title="Удалить">
-                        🗑️
-                    </div>
-                </div>
-            `}).join('');
-        }
+    container.innerHTML = saved.map((a, i) => {
+        const isActive = (tempSelectedAddressIndex === i);
+        return `
+        <div style="display: flex; align-items: center; background: ${isActive ? '#fffcf0' : '#f5f5f5'}; border: 1px solid ${isActive ? '#FCE000' : 'transparent'}; padding: 14px 16px; border-radius: 16px; margin-bottom: 10px; cursor: pointer; transition: 0.2s;" onclick="selectAddressFromModal(${i})">
+            <div style="width: 20px; height: 20px; border-radius: 50%; border: 2px solid ${isActive ? '#E65100' : '#ccc'}; display: flex; align-items: center; justify-content: center; margin-right: 12px; flex-shrink: 0;">
+                ${isActive ? '<div style="width: 10px; height: 10px; background: #E65100; border-radius: 50%;"></div>' : ''}
+            </div>
+            
+            <div style="flex-grow: 1; font-size: 15px; font-weight: 600; color: #111; word-break: break-word;">
+                ${a.text}
+            </div>
+            
+            <div onclick="event.stopPropagation(); editAddressFromModal(${i})" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: #1ea1f2; background: #eef7ff; border-radius: 8px; margin-left: 8px;" title="Редактировать">
+                ✏️
+            </div>
+            
+            <div onclick="event.stopPropagation(); deleteAddressFromModal(${i})" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: #d32f2f; background: #ffebee; border-radius: 8px; margin-left: 8px;" title="Удалить">
+                🗑️
+            </div>
+        </div>
+        `;
+    }).join('');
+}
 
         function selectAddressFromModal(index) {
             tempSelectedAddressIndex = index;
@@ -1903,111 +1926,204 @@ function filterMenu(resId, category, btn) {
             // Очищаем текущие инпуты, чтобы открыть "чистую" карту
             document.getElementById('map-street').value = '';
             document.getElementById('map-kv').value = '';
-            document.getElementById('map-comment').value = '';
+            // Строку с очисткой map-comment удалили, чтобы код не падал
             orderAddressData = { street: '', pod: '', kv: '', comment: '' };
             
             openMapModal();
         }
 
-        function confirmAddressFromModal() {
-            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-            if (saved.length > 0 && saved[tempSelectedAddressIndex]) {
-                const data = saved[tempSelectedAddressIndex];
-                
-                // Применяем выбранные данные в систему
-                orderAddressData.street = data.street;
-                orderAddressData.pod = data.pod || '';
-                orderAddressData.kv = data.kv || '';
-                orderAddressData.comment = data.comment || '';
-                clientLat = data.lat;
-                clientLon = data.lon;
-                
-                // Обновляем текст в шапке главного меню
-                document.getElementById('current-city-display').innerText = data.text;
-                
-                // Если мы в корзине - пересчитываем доставку и карту
-                updateCheckoutSummaryUI();
-                updateReceipt();
-            }
-            
-            document.getElementById('modal-my-addresses').classList.add('hidden');
-            if(tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+       function confirmAddressFromModal() {
+    let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+    if (saved.length > 0 && saved[tempSelectedAddressIndex]) {
+        const data = saved[tempSelectedAddressIndex];
+        
+        // Записываем адрес в глобальные переменные системы
+        orderAddressData.street = data.street;
+        orderAddressData.pod = data.pod || '';
+        orderAddressData.kv = data.kv || '';
+        orderAddressData.comment = '';
+        clientLat = data.lat;
+        clientLon = data.lon;
+        
+        // 1. Обновляем адрес в верхней шапке главного меню
+        const cityDisplay = document.getElementById('current-city-display');
+        if (cityDisplay) cityDisplay.innerText = data.text;
+        
+        // 2. ЖЕЛЕЗНО обновляем адрес и на странице оформления заказа (в корзине)
+        if (typeof updateCheckoutSummaryUI === 'function') {
+            updateCheckoutSummaryUI();
         }
+        
+        // 3. Пересчитываем динамическую стоимость доставки для страницы оформления
+        if (typeof cartActiveTabResId !== 'undefined' && cartActiveTabResId && typeof database !== 'undefined' && database[cartActiveTabResId]) {
+            const resLat = database[cartActiveTabResId].lat;
+            const resLon = database[cartActiveTabResId].lon;
+            
+            // Вызываем расчет доставки для карты корзины
+            recalcCheckoutDelivery(resLat, resLon);
+        }
+        
+        // 4. Обновляем чек заказа и перерисовываем расстояния ресторанов на главной
+        if (typeof updateReceipt === 'function') updateReceipt();
+        if (typeof renderRestaurants === 'function') renderRestaurants();
+    }
+    
+    // Закрываем окно списка адресов
+    document.getElementById('modal-my-addresses').classList.add('hidden');
+    
+    if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+    }
+}
 
         function recalcCheckoutDelivery(resLat, resLon) {
-            const priceElement = document.getElementById('modal-map-price');
-            const submitButton = document.querySelector('#modal-map .btn-yellow');
-            
-            // ЕСЛИ МЫ НА ГЛАВНОЙ СТРАНИЦЕ (ресторан еще не выбран)
-            if (!cartActiveTabResId || !database[cartActiveTabResId]) {
-                currentDeliveryFee = 0;
-                priceElement.innerText = 'Укажите адрес';
-                priceElement.style.color = '#888';
-                priceElement.style.fontSize = '14px';
-                
-                submitButton.classList.remove('disabled');
-                submitButton.style.pointerEvents = 'auto';
-                submitButton.innerText = 'Сохранить адрес'; // МЕНЯЕМ ТЕКСТ КНОПКИ
-                return;
-            }
+    const priceElement = document.getElementById('modal-map-price');
+    const submitButton = document.querySelector('#modal-map .btn-yellow');
+    const deliveryBlock = document.getElementById('delivery-info-block');
+    
+    const isCartVisible = !document.getElementById('screen-cart-list').classList.contains('hidden');
 
-            // ЕСЛИ МЫ В КОРЗИНЕ (считаем доставку)
-            const straightDist = getDistance(resLat, resLon, clientLat, clientLon);
-            const MAX_DISTANCE_KM = 15; 
+    // КООРДИНАТЫ ЦЕНТРОВ ВАШИХ ГОРОДОВ (Глобальная зона)
+    const cityCenters = {
+        'Чолпон-Ата': { lat: 42.6482, lon: 77.0855 },
+        'Бостери': { lat: 42.6353, lon: 77.1933 },
+        'Бишкек': { lat: 42.8746, lon: 74.5698 },
+        'Балыкчы': { lat: 42.4602, lon: 76.1871 }
+    };
+    
+    // Безопасно получаем текущий город (по умолчанию Чолпон-Ата)
+    const activeCity = (typeof currentCity !== 'undefined' && currentCity) ? currentCity : 'Чолпон-Ата';
+    const center = cityCenters[activeCity] || cityCenters['Чолпон-Ата'];
 
-            if (straightDist > MAX_DISTANCE_KM) {
-                currentDeliveryFee = 0; 
-                priceElement.innerText = 'Вне зоны доставки';
-                priceElement.style.color = '#d32f2f'; 
-                priceElement.style.fontSize = '14px'; 
-                
-                submitButton.classList.add('disabled');
-                submitButton.style.pointerEvents = 'none';
-                submitButton.innerText = 'Слишком далеко';
-            } else {
-                currentDeliveryFee = calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon);
-                priceElement.innerText = currentDeliveryFee + ' сом';
-                priceElement.style.color = '#E65100';
-                priceElement.style.fontSize = '20px';
-                
-                submitButton.classList.remove('disabled');
-                submitButton.style.pointerEvents = 'auto';
-                submitButton.innerText = 'Готово'; // МЕНЯЕМ ТЕКСТ ОБРАТНО
+    // =======================================================
+    // 1. ЛОГИКА ДЛЯ ГЛАВНОГО ЭКРАНА (Глобальная проверка)
+    // =======================================================
+    if (!isCartVisible || !cartActiveTabResId || (typeof database !== 'undefined' && !database[cartActiveTabResId])) {
+        currentDeliveryFee = 0;
+        if (deliveryBlock) deliveryBlock.style.display = 'none';
+
+        if (clientLat && clientLon) {
+            // Считаем дистанцию от центра выбранного города до маркера клиента
+            const distFromCenter = getDistance(center.lat, center.lon, clientLat, clientLon);
+            const GLOBAL_MAX_DIST = 25; // Максимальный радиус работы от центра города (20 км)
+
+            if (distFromCenter > GLOBAL_MAX_DIST) {
+                // Если юзер поставил точку где-то в горах или другом городе
+                if (submitButton) {
+                    submitButton.classList.add('disabled');
+                    submitButton.style.pointerEvents = 'none';
+                    submitButton.innerText = 'Слишком далеко 😔';
+                }
+                return; // Блокируем кнопку и выходим
             }
-            updateReceipt();
         }
+
+        // Если точка в пределах рабочей зоны города
+        if (submitButton) {
+            submitButton.classList.remove('disabled');
+            submitButton.style.pointerEvents = 'auto';
+            submitButton.innerText = 'Сохранить адрес';
+        }
+        return;
+    }
+
+    // =======================================================
+    // 2. ЛОГИКА ДЛЯ КОРЗИНЫ (Локальная проверка ресторана)
+    // =======================================================
+    if (deliveryBlock) deliveryBlock.style.display = 'flex'; 
+
+    if (!clientLat || !clientLon) {
+        if (priceElement) priceElement.innerText = 'Укажите адрес';
+        if (submitButton) {
+            submitButton.classList.remove('disabled');
+            submitButton.style.pointerEvents = 'auto';
+            submitButton.innerText = 'Готово';
+        }
+        return;
+    }
+
+    const straightDist = getDistance(resLat, resLon, clientLat, clientLon);
+    const MAX_DISTANCE_KM = 15; // Локальное ограничение доставки именно от этого ресторана
+
+    if (straightDist > MAX_DISTANCE_KM) {
+        currentDeliveryFee = 0; 
+        if (priceElement) {
+            priceElement.innerText = 'Вне зоны';
+            priceElement.style.color = '#d32f2f'; 
+            priceElement.style.fontSize = '16px'; 
+        }
+        if (submitButton) {
+            submitButton.classList.add('disabled');
+            submitButton.style.pointerEvents = 'none';
+            submitButton.innerText = 'Слишком далеко 😔';
+        }
+    } else {
+        currentDeliveryFee = typeof calculateDynamicDeliveryFee === 'function' ? calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon) : 0;
+        if (priceElement) {
+            priceElement.innerText = currentDeliveryFee + ' сом';
+            priceElement.style.color = '#E65100';
+            priceElement.style.fontSize = '20px';
+        }
+        if (submitButton) {
+            submitButton.classList.remove('disabled');
+            submitButton.style.pointerEvents = 'auto';
+            submitButton.innerText = 'Готово'; 
+        }
+    }
+    
+    if (typeof updateReceipt === 'function') {
+        updateReceipt();
+    }
+}
 
         function confirmMapAddress() {
-            orderAddressData.street = document.getElementById('map-street').value;
-            orderAddressData.pod = '';
-            orderAddressData.kv = document.getElementById('map-kv').value;
-            orderAddressData.comment = document.getElementById('map-comment').value;
+    const inputStreet = document.getElementById('map-street').value.trim();
+    const inputKv = document.getElementById('map-kv').value.trim();
 
-            if (!orderAddressData.street) return alert("Пожалуйста, укажите улицу!");
+    if (!inputStreet || inputStreet === 'Определение адреса...' || inputStreet === 'Адрес не определён') {
+        alert("Пожалуйста, укажите корректный адрес.");
+        return;
+    }
 
-            // АВТО-СОХРАНЕНИЕ АДРЕСА 
-            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-            let text = orderAddressData.street;
-            if (orderAddressData.kv) text += `, кв.${orderAddressData.kv}`;
-            
-            // Если такого адреса еще нет в списке, добавляем его наверх
-            const existingIndex = saved.findIndex(a => a.street === orderAddressData.street && a.kv === orderAddressData.kv);
-            if (existingIndex === -1) {
-                saved.unshift({ text: text, ...orderAddressData, lat: clientLat, lon: clientLon });
-                localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
-                renderSavedAddressesUI(); // Обновляем список в корзине
-            }
+    orderAddressData.street = inputStreet;
+    orderAddressData.kv = inputKv;
+    orderAddressData.comment = ''; 
 
-            // Обновляем интерфейсы
-            if (!document.getElementById('screen-cart-list').classList.contains('hidden')) {
-                updateCheckoutSummaryUI();
-                updateReceipt();
-            } else {
-                // Если мы на главной странице
-                document.getElementById('current-city-display').innerText = text; 
-            }
-            onBackClick();
-        }
+    // Сохраняем в локальную память телефона для списка адресов
+    let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+    let displayStr = inputStreet;
+    if (inputKv) displayStr += `, ${inputKv}`;
+
+    const exists = saved.some(a => a.street === inputStreet && a.kv === inputKv);
+    if (!exists) {
+        saved.push({
+            text: displayStr,
+            street: inputStreet,
+            kv: inputKv,
+            lat: clientLat,
+            lon: clientLon
+        });
+        localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+    }
+
+    const isCartVisible = !document.getElementById('screen-cart-list').classList.contains('hidden');
+
+    // Синхронно обновляем экраны
+    if (isCartVisible) {
+        updateCheckoutSummaryUI();
+        updateReceipt();
+    } else {
+        const cityDisplay = document.getElementById('current-city-display');
+        if (cityDisplay) cityDisplay.innerText = displayStr;
+        renderRestaurants();
+    }
+
+    document.getElementById('modal-map').classList.add('hidden');
+
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+    }
+}
 
 
         async function geocodeAddressFromInput() {
@@ -2108,53 +2224,59 @@ function filterMenu(resId, category, btn) {
             if (cartActiveTabResId && database[cartActiveTabResId]) {
                 recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
             }
+            if (typeof recalcCheckoutDelivery === 'function') {
+        const activeRes = database[cartActiveTabResId];
+        recalcCheckoutDelivery(activeRes ? activeRes.lat : 0, activeRes ? activeRes.lon : 0);
+    }
+            
         }
         
 
         function initCheckoutMap(resLat, resLon) {
-            if (!checkoutMap) {
-                checkoutMap = L.map('fullscreen-map', {zoomControl: false}).setView([clientLat, clientLon], 16);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(checkoutMap);
-                
-                const resIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180209.png', iconSize: [32, 32] });
-                checkoutResMarker = L.marker([resLat, resLon], {icon: resIcon}).addTo(checkoutMap).bindPopup("Ресторан");
-                
-                const centerMarkerEl = document.querySelector('.center-marker-container');
-                const bottomPanel = document.querySelector('.map-floating-controls');
+    // ЗАЩИТА: Если координаты клиента еще null, инициализируем карту на координатах ресторана или дефолте
+    const startLat = clientLat || resLat || 42.6482;
+    const startLon = clientLon || resLon || 77.0855;
 
-                // Срабатывает исключительно тогда, когда пользователь двигает карту пальцем
-                checkoutMap.on('dragstart', function() {
-                    mapWasDragged = true; 
-                    if (centerMarkerEl) centerMarkerEl.classList.add('is-dragging');
-                    if (bottomPanel) bottomPanel.classList.add('hidden-panel'); 
-                    document.getElementById('map-street').value = 'Определение адреса...'; 
-                });
+    if (!checkoutMap) {
+        checkoutMap = L.map('fullscreen-map', {zoomControl: false}).setView([startLat, startLon], 16);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(checkoutMap);
+        
+        const resIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180209.png', iconSize: [32, 32] });
+        checkoutResMarker = L.marker([resLat, resLon], {icon: resIcon}).addTo(checkoutMap).bindPopup("Ресторан");
+        
+        const centerMarkerEl = document.querySelector('.center-marker-container');
+        const bottomPanel = document.querySelector('.map-floating-controls');
 
-                // Вызывается только по окончании ручного перемещения карты
-                checkoutMap.on('moveend', function() {
-                    if (!mapWasDragged) return; // Полный игнор программных перемещений от автокомплита
-                    
-                    mapWasDragged = false; 
-                    if (centerMarkerEl) centerMarkerEl.classList.remove('is-dragging');
-                    if (bottomPanel) bottomPanel.classList.remove('hidden-panel'); 
-                    
-                    // Извлекаем координаты из-под маркера (теперь точно на высоте 25% видимой области)
-                    const mapSize = checkoutMap.getSize();
-                    const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.25);
-                    const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
-                    
-                    clientLat = latlng.lat; 
-                    clientLon = latlng.lng;
-                    reverseGeocode(clientLat, clientLon);
-                });
-                
-                setMapCenterToMarker(clientLat, clientLon);
-            } else {
-                setMapCenterToMarker(clientLat, clientLon);
-                checkoutResMarker.setLatLng([resLat, resLon]);
-            }
-            recalcCheckoutDelivery(resLat, resLon);
-        }
+        checkoutMap.on('dragstart', function() {
+            mapWasDragged = true; 
+            if (centerMarkerEl) centerMarkerEl.classList.add('is-dragging');
+            if (bottomPanel) bottomPanel.classList.add('hidden-panel'); 
+            document.getElementById('map-street').value = 'Определение адреса...'; 
+        });
+
+        checkoutMap.on('moveend', function() {
+            if (!mapWasDragged) return; 
+            
+            mapWasDragged = false; 
+            if (centerMarkerEl) centerMarkerEl.classList.remove('is-dragging');
+            if (bottomPanel) bottomPanel.classList.remove('hidden-panel'); 
+            
+            const mapSize = checkoutMap.getSize();
+            const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.25);
+            const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
+            
+            clientLat = latlng.lat; 
+            clientLon = latlng.lng;
+            reverseGeocode(clientLat, clientLon);
+        });
+        
+        setMapCenterToMarker(startLat, startLon);
+    } else {
+        setMapCenterToMarker(startLat, startLon);
+        checkoutResMarker.setLatLng([resLat, resLon]);
+    }
+    recalcCheckoutDelivery(resLat, resLon);
+}
 
         // УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы GPS-точка оказалась ровно под маркером на 25% экрана
         function setMapCenterToMarker(lat, lon) {
@@ -2234,62 +2356,8 @@ function filterMenu(resId, category, btn) {
     );
 }
 
-        function recalcCheckoutDelivery(resLat, resLon) {
-            // Считаем расстояние по прямой
-            const straightDist = getDistance(resLat, resLon, clientLat, clientLon);
-            
-            // === ОГРАНИЧЕНИЕ ЗОНЫ ДОСТАВКИ (МАКСИМУМ 15 КМ) ===
-            const MAX_DISTANCE_KM = 15; 
-            
-            const priceElement = document.getElementById('modal-map-price');
-            const submitButton = document.querySelector('#modal-map .btn-yellow'); // Кнопка "Готово" на карте
 
-            if (straightDist > MAX_DISTANCE_KM) {
-                // Если точка слишком далеко
-                currentDeliveryFee = 0; // Обнуляем цену
-                priceElement.innerText = 'Вне зоны доставки';
-                priceElement.style.color = '#d32f2f'; // Делаем текст красным
-                priceElement.style.fontSize = '14px'; // Уменьшаем шрифт, чтобы влезло
-                
-                // Блокируем кнопку "Готово"
-                submitButton.classList.add('disabled');
-                submitButton.style.pointerEvents = 'none';
-                submitButton.innerText = 'Слишком далеко от ресторана';
-                
-                // Вибрируем, чтобы клиент понял, что что-то не так
-                if(tg) tg.HapticFeedback.notificationOccurred('error');
-            } else {
-                // Если точка в пределах нормы (стандартный расчет)
-                currentDeliveryFee = calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon);
-                
-                // Возвращаем нормальный вид цены
-                priceElement.innerText = currentDeliveryFee + ' сом';
-                priceElement.style.color = '#E65100';
-                priceElement.style.fontSize = '20px';
-                
-                // Разблокируем кнопку "Готово"
-                submitButton.classList.remove('disabled');
-                submitButton.style.pointerEvents = 'auto';
-                submitButton.innerText = 'Готово';
-            }
-            
-            // Обновляем общий чек на странице оформления
-            updateReceipt();
-        }
-
-        function saveCurrentAddress() {
-            if (!orderAddressData.street) return alert("Сначала выберите адрес на карте!");
-            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-            if (saved.find(a => a.street === orderAddressData.street && a.kv === orderAddressData.kv)) return alert("Этот адрес уже сохранен!");
-
-            let text = orderAddressData.street;
-            if (orderAddressData.kv) text += `, кв.${orderAddressData.kv}`;
-
-            saved.unshift({ text: text, ...orderAddressData, lat: clientLat, lon: clientLon });
-            localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
-            renderSavedAddressesUI();
-            if(tg) tg.HapticFeedback.notificationOccurred('success');
-        }
+       
 
         function deleteSavedAddress(index) {
             let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
@@ -2317,6 +2385,10 @@ function filterMenu(resId, category, btn) {
         function renderSavedAddressesUI() {
             let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
             const wrapper = document.getElementById('saved-addresses-wrapper');
+            
+            // ЗАЩИТА: Если блока нет в HTML (мы его удалили), просто выходим, не ломая код
+            if (!wrapper) return; 
+            
             if (saved.length === 0) { wrapper.classList.add('hidden'); return; }
             wrapper.classList.remove('hidden');
             document.getElementById('saved-addresses-list').innerHTML = saved.map((a, i) => `
@@ -2801,7 +2873,7 @@ function copyPaymentNumber() {
                                 reverseGeocode(clientLat, clientLon);
                             },
                             (err) => {
-                                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Определить0 местоположение';
+                                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Определить местоположение';
                             },
                             { enableHighAccuracy: true, timeout: 5000 }
                         );
