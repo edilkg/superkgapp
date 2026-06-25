@@ -41,7 +41,7 @@ app.post('/web-data', async (req, res) => {
         const { type, user, phone, address, restaurantName, totalPrice, comment, resComment, isDoorDelivery, cutlery, items } = req.body;
         if (type !== 'food') return res.status(400).json({ error: 'Тип не еда' });
 
-        // 👉 БРОНЕЖИЛЕТ ОТ СПАМА (МАКСИМУМ 3 ЗАКАЗА НА СЕРВЕРЕ)
+        // 👉 БРОНЕЖИЛЕТ ОТ СПАМА (МАКСИМУМ 2 ЗАКАЗА НА СЕРВЕРЕ)
         if (user && user.id && user.id != 111) {
             const { data: activeUserOrders } = await supabase
                 .from('orders')
@@ -49,8 +49,8 @@ app.post('/web-data', async (req, res) => {
                 .eq('client_id', user.id)
                 .in('status', ['waiting_payment', 'paid', 'cooking', 'delivery']);
             
-            if (activeUserOrders && activeUserOrders.length >= 3) {
-                return res.status(400).json({ error: 'У вас уже есть 3 активных заказа! Дождитесь их завершения.' });
+            if (activeUserOrders && activeUserOrders.length >= 2) {
+                return res.status(400).json({ error: 'У вас уже есть 2 активных заказа! Дождитесь их завершения.' });
             }
         }
 
