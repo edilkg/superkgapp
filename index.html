@@ -704,9 +704,16 @@
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
-.spin-anim {
+
+.spin-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     animation: spin 1s linear infinite;
-    display: inline-block; /* Обязательно для работы transform */
+    font-size: 34px; /* Делаем иконку большой */
+    font-weight: 800; /* Делаем её жирнее */
+    line-height: 1;
+    color: #111; /* Цвет иконки */
 }
 </style>
 </head>
@@ -2157,16 +2164,16 @@ function filterMenu(resId, category, btn) {
     if (!navigator.geolocation) return alert("Браузер не поддерживает GPS");
     if(tg) tg.HapticFeedback.impactOccurred('medium');
 
-    // --- 🟢 НАЧАЛО: ЗАМОРОЗКА КНОПКИ GPS С АНИМАЦИЕЙ ---
+    // --- 🟢 НАЧАЛО: ЗАМОРОЗКА КНОПКИ GPS ---
     const locateBtn = document.querySelector('div[onclick="locateUser()"]');
     let originalText = '✈️';
     
     if (locateBtn) {
         originalText = locateBtn.innerText;
-        locateBtn.innerText = '↻'; // Используем значок обновления
-        locateBtn.classList.add('spin-anim'); // Запускаем CSS-анимацию вращения
-        locateBtn.style.pointerEvents = 'none'; // Блокируем клики
-        locateBtn.style.opacity = '0.5';
+        // Вставляем иконку через span с новым классом spin-icon
+        locateBtn.innerHTML = '<span class="spin-icon">↻</span>'; 
+        locateBtn.style.pointerEvents = 'none'; // Блокируем двойные клики
+        locateBtn.style.opacity = '0.7';
     }
     // --- 🟢 КОНЕЦ ЗАМОРОЗКИ ---
 
@@ -2180,8 +2187,7 @@ function filterMenu(resId, category, btn) {
 
             // --- 🟢 РАЗМОРОЗКА ПРИ УСПЕХЕ ---
             if (locateBtn) {
-                locateBtn.classList.remove('spin-anim'); // Останавливаем вращение
-                locateBtn.innerText = originalText;      // Возвращаем самолетик
+                locateBtn.innerHTML = originalText; // Возвращаем самолетик     
                 locateBtn.style.pointerEvents = 'auto';
                 locateBtn.style.opacity = '1';
             }
@@ -2195,8 +2201,7 @@ function filterMenu(resId, category, btn) {
 
             // --- 🟢 РАЗМОРОЗКА ПРИ ОШИБКЕ ---
             if (locateBtn) {
-                locateBtn.classList.remove('spin-anim');
-                locateBtn.innerText = originalText;
+                locateBtn.innerHTML = originalText;
                 locateBtn.style.pointerEvents = 'auto';
                 locateBtn.style.opacity = '1';
             }
