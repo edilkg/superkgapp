@@ -700,20 +700,17 @@
     padding: 14px;
     font-size: 14px;
 }
-@keyframes spin {
+@keyframes spin-perfect {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
 
-.spin-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    animation: spin 1s linear infinite;
-    font-size: 34px; /* Делаем иконку большой */
-    font-weight: 800; /* Делаем её жирнее */
-    line-height: 1;
-    color: #111; /* Цвет иконки */
+.spin-svg {
+    animation: spin-perfect 1s linear infinite;
+    width: 28px; /* Размер иконки (можно сделать больше/меньше) */
+    height: 28px;
+    transform-origin: center center; /* Железобетонно фиксируем центр */
+    display: block;
 }
 </style>
 </head>
@@ -2164,15 +2161,20 @@ function filterMenu(resId, category, btn) {
     if (!navigator.geolocation) return alert("Браузер не поддерживает GPS");
     if(tg) tg.HapticFeedback.impactOccurred('medium');
 
-    // --- 🟢 НАЧАЛО: ЗАМОРОЗКА КНОПКИ GPS ---
+    // --- 🟢 НАЧАЛО: ЗАМОРОЗКА С ИДЕАЛЬНОЙ SVG АНИМАЦИЕЙ ---
     const locateBtn = document.querySelector('div[onclick="locateUser()"]');
     let originalText = '✈️';
     
     if (locateBtn) {
         originalText = locateBtn.innerText;
-        // Вставляем иконку через span с новым классом spin-icon
-        locateBtn.innerHTML = '<span class="spin-icon">↻</span>'; 
-        locateBtn.style.pointerEvents = 'none'; // Блокируем двойные клики
+        // Вставляем симметричную SVG-иконку обновления
+        locateBtn.innerHTML = `
+            <svg class="spin-svg" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
+                <path d="M21 3v5h-5"></path>
+            </svg>
+        `; 
+        locateBtn.style.pointerEvents = 'none'; // Блокируем клики
         locateBtn.style.opacity = '0.7';
     }
     // --- 🟢 КОНЕЦ ЗАМОРОЗКИ ---
@@ -2187,7 +2189,7 @@ function filterMenu(resId, category, btn) {
 
             // --- 🟢 РАЗМОРОЗКА ПРИ УСПЕХЕ ---
             if (locateBtn) {
-                locateBtn.innerHTML = originalText; // Возвращаем самолетик     
+                locateBtn.innerHTML = originalText; // Возвращаем самолетик обратно
                 locateBtn.style.pointerEvents = 'auto';
                 locateBtn.style.opacity = '1';
             }
