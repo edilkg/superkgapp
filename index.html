@@ -2331,13 +2331,21 @@ function filterMenu(resId, category, btn) {
 
     const resComment = document.getElementById('res-comment').value; 
 
-    // --- 🟢 НАЧАЛО: НАША НОВАЯ ЗАМОРОЗКА КНОПКИ ---
+    // --- 🟢 НАЧАЛО: УЛУЧШЕННАЯ ЗАМОРОЗКА КНОПКИ ---
     const payBtn = document.getElementById('main-pay-btn') || document.getElementById('pay-btn');
     let originalBtnText = 'Оформить'; 
+
+    // 1. Если используется нативная кнопка Telegram MainButton
+    if (tg && tg.MainButton && tg.MainButton.isVisible) {
+        tg.MainButton.showProgress(); // Показывает крутящийся лоадер в кнопке ТГ
+    }
+
+    // 2. Если используется обычная HTML-кнопка
     if (payBtn) {
         originalBtnText = payBtn.innerText; // Запоминаем старый текст
         payBtn.innerText = '⏳ Обработка...';
-        payBtn.style.pointerEvents = 'none'; // Жестко блокируем двойной клик
+        payBtn.disabled = true; // Надежная блокировка нажатий
+        payBtn.style.pointerEvents = 'none'; // Жестко блокируем клики
         payBtn.style.opacity = '0.7';
     }
     // --- 🟢 КОНЕЦ ЗАМОРОЗКИ ---
@@ -2363,7 +2371,7 @@ function filterMenu(resId, category, btn) {
         items: Object.values(cartItems).filter(item => item.resId === cartActiveTabResId)
     };
 
-    if(tg) tg.HapticFeedback.notificationOccurred('success');
+    if(tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
     
     try {
         const response = await fetch('https://tamak-backend.onrender.com/web-data', {
@@ -2386,16 +2394,21 @@ function filterMenu(resId, category, btn) {
             for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
             recalcTotal();
 
-            openOrderStatus(result.orderId);
+            openOrderStatus(result.orderId); // Переход на экран статуса
         } else {
             alert("Ошибка при заказе: " + (result.error || "Неизвестная ошибка"));
         }
     } catch (e) { 
         alert("Ошибка сети: " + e.message); 
     } finally {
-        // --- 🟢 НАЧАЛО: РАЗМОРОЗКА КНОПКИ (при ошибке или успехе) ---
+        // --- 🟢 НАЧАЛО: РАЗМОРОЗКА КНОПКИ ---
+        if (tg && tg.MainButton && tg.MainButton.isVisible) {
+            tg.MainButton.hideProgress(); // Убираем лоадер с нативной кнопки
+        }
+        
         if (payBtn) {
-            payBtn.innerText = originalBtnText;
+            payBtn.innerText = originalBtnText; // Возвращаем исходный текст
+            payBtn.disabled = false; // Снимаем блокировку
             payBtn.style.pointerEvents = 'auto'; // Снова разрешаем кликать
             payBtn.style.opacity = '1';
         }
