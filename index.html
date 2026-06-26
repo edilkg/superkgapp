@@ -1932,53 +1932,89 @@ function filterMenu(resId, category, btn) {
             openMapModal();
         }
 
-       function confirmAddressFromModal() {
-    let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-    if (saved.length > 0 && saved[tempSelectedAddressIndex]) {
-        const data = saved[tempSelectedAddressIndex];
+       // ==========================================
+        // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (С ПРИОРИТЕТОМ СОХРАНЕННОГО АДРЕСА)
+        // ==========================================
+        const geoOverlay = document.getElementById('geo-modal-overlay');
+        const btnConfirmGeo = document.getElementById('btn-geo-confirm');
+        const btnSkipGeo = document.getElementById('btn-geo-skip');
         
-        // Записываем адрес в глобальные переменные системы
-        orderAddressData.street = data.street;
-        orderAddressData.pod = data.pod || '';
-        orderAddressData.kv = data.kv || '';
-        orderAddressData.comment = '';
-        clientLat = data.lat;
-        clientLon = data.lon;
-        
-        // 👉 ОБНОВЛЯЕМ МАРКЕРЫ ДЛЯ ПОСЛЕДУЮЩИХ ПЕРЕЗАГРУЗОК СТРАНИЦЫ
-        localStorage.setItem('tamak_last_lat', clientLat);
-        localStorage.setItem('tamak_last_lon', clientLon);
-        localStorage.setItem('tamak_last_street', data.street);
-        localStorage.setItem('tamak_last_kv', data.kv || '');
-        
-        // 1. Обновляем адрес в верхней шапке главного меню
-        const cityDisplay = document.getElementById('current-city-display');
-        if (cityDisplay) cityDisplay.innerText = data.text;
-        
-        // 2. ЖЕЛЕЗНО обновляем адрес и на странице оформления заказа (в корзине)
-        if (typeof updateCheckoutSummaryUI === 'function') {
-            updateCheckoutSummaryUI();
+        // Подключаем API Телеграма
+        const tgApp = window.Telegram?.WebApp;
+
+        // Проверяем наличие ранее сохраненного адреса
+        const savedLat = localStorage.getItem('tamak_last_lat');
+        const savedLon = localStorage.getItem('tamak_last_lon');
+        const savedStreet = localStorage.getItem('tamak_last_street');
+        const savedKv = localStorage.getItem('tamak_last_kv') || '';
+        let allSavedAddresses = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+
+        let isAddressRestored = false;
+
+        // Если есть сохраненные маркеры или список адресов — восстанавливаем
+        if (savedLat && savedLon && savedStreet) {
+            clientLat = parseFloat(savedLat);
+            clientLon = parseFloat(savedLon);
+            orderAddressData.street = savedStreet;
+            orderAddressData.kv = savedKv;
+            isAddressRestored = true;
+        } else if (allSavedAddresses.length > 0) {
+            const firstAddr = allSavedAddresses[0];
+            clientLat = parseFloat(firstAddr.lat);
+            clientLon = parseFloat(firstAddr.lon);
+            orderAddressData.street = firstAddr.street;
+            orderAddressData.kv = firstAddr.kv || '';
+            isAddressRestored = true;
         }
-        
-        // 3. Пересчитываем динамическую стоимость доставки для страницы оформления
-        if (typeof cartActiveTabResId !== 'undefined' && cartActiveTabResId && typeof database !== 'undefined' && database[cartActiveTabResId]) {
-            const resLat = database[cartActiveTabResId].lat;
-            const resLon = database[cartActiveTabResId].lon;
-            recalcCheckoutDelivery(resLat, resLon);
+
+        // ЛОГИКА РАСПРЕДЕЛЕНИЯ:
+        if (isAddressRestored) {
+            // Если адрес сохранен — мгновенно выводим его везде и НЕ опрашиваем живой GPS
+            let finalDisplayString = orderAddressData.street;
+            if (orderAddressData.kv) finalDisplayString += `, ${orderAddressData.kv}`;
+
+            const cityDisplay = document.getElementById('current-city-display');
+            if (cityDisplay) cityDisplay.innerText = finalDisplayString;
+            
+            renderRestaurants();
+            if (typeof updateCheckoutSummaryUI === 'function') {
+                updateCheckoutSummaryUI();
+            }
+        } else {
+            // Если адреса НЕТ — запускаем строгую проверку Telegram
+            if (tgApp && tgApp.LocationManager) {
+                tgApp.LocationManager.init(() => {
+                    // 👉 ЖЕСТКАЯ ПРОВЕРКА: Если нет доступа в боте ИЛИ выключен GPS на телефоне
+                    if (!tgApp.LocationManager.isAccessGranted || !tgApp.LocationManager.isLocationEnabled) {
+                        geoOverlay.style.display = 'flex';
+                    } else {
+                        // Если всё включено, пробуем найти координаты
+                        tgApp.LocationManager.getLocation((data) => {
+                            if (data && data.latitude) {
+                                clientLat = data.latitude;
+                                clientLon = data.longitude;
+                                localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                                reverseGeocode(clientLat, clientLon);
+                            } else {
+                                // 👉 ЗАЩИТА: Если по какой-то причине координаты не пришли (сбой связи/GPS отвалился) 
+                                // жестко выводим модалку для сопровождения
+                                geoOverlay.style.display = 'flex';
+                            }
+                        });
+                    }
+                });
+            } else {
+                // Резервный вариант для обычного браузера
+                if (!localStorage.getItem('user_geo')) {
+                    geoOverlay.style.display = 'flex';
+                } else {
+                    let sg = JSON.parse(localStorage.getItem('user_geo'));
+                    clientLat = sg.lat;
+                    clientLon = sg.lon;
+                    reverseGeocode(clientLat, clientLon);
+                }
+            }
         }
-        
-        // 4. Обновляем чек заказа и перерисовываем расстояния ресторанов на главной
-        if (typeof updateReceipt === 'function') updateReceipt();
-        if (typeof renderRestaurants === 'function') renderRestaurants();
-    }
-    
-    // Закрываем окно списка адресов
-    document.getElementById('modal-my-addresses').classList.add('hidden');
-    
-    if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-    }
-}
 
         function recalcCheckoutDelivery(resLat, resLon) {
     const priceElement = document.getElementById('modal-map-price');
