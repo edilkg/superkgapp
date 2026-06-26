@@ -1933,7 +1933,7 @@ function filterMenu(resId, category, btn) {
         }
 
        // ==========================================
-        // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (КАК У CLICK FOOD)
+        // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (КАК У CLICK FOOD + АДРЕСА)
         // ==========================================
         const geoOverlay = document.getElementById('geo-modal-overlay');
         const btnConfirmGeo = document.getElementById('btn-geo-confirm');
@@ -1946,10 +1946,10 @@ function filterMenu(resId, category, btn) {
         if (tgApp && tgApp.LocationManager) {
             tgApp.LocationManager.init(() => {
                 if (!tgApp.LocationManager.isAccessGranted) {
-                    // ЕСЛИ ДОСТУПА НЕТ ИЛИ ВЫКЛЮЧЕНО — ВЫВОДИМ ТВОЕ ОКНО!
+                    // ЕСЛИ ДОСТУПА В БОТЕ НЕТ — ВЫВОДИМ ОКНО
                     geoOverlay.style.display = 'flex';
                 } else {
-                    // 👇 ЕСЛИ ВСЕ ВКЛЮЧЕНО: ПРОСТО БЕРЕМ ПЕРВЫЙ СОХРАНЕННЫЙ АДРЕС 👇
+                    // 👇 ЕСЛИ ДОСТУП В БОТЕ ЕСТЬ: Проверяем сохраненные адреса 👇
                     let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
                     
                     if (saved.length > 0) {
@@ -1966,14 +1966,18 @@ function filterMenu(resId, category, btn) {
                         renderRestaurants();
                         if (typeof updateCheckoutSummaryUI === 'function') updateCheckoutSummaryUI();
                     } else {
-                        // Если сохраненных адресов НЕТ -> ищем по GPS, как было у тебя
+                        // Если сохраненных адресов НЕТ -> ищем по GPS
                         tgApp.LocationManager.getLocation((data) => {
                             if (data && data.latitude) {
+                                // ВСЕ СУПЕР, GPS РАБОТАЕТ
                                 clientLat = data.latitude;
                                 clientLon = data.longitude;
                                 localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                                // --- НОВОЕ: Сразу определяем улицу в фоне ---
                                 reverseGeocode(clientLat, clientLon);
+                            } else {
+                                // 👇 КРИТИЧЕСКИЙ ФИКС: Если боту доступ дали, но ГЕО ВЫКЛЮЧЕНО В ШТОРКЕ ТЕЛЕФОНА 👇
+                                // Telegram возвращает пустоту. Мы обязаны показать окно!
+                                geoOverlay.style.display = 'flex';
                             }
                         });
                     }
@@ -1984,7 +1988,6 @@ function filterMenu(resId, category, btn) {
             let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
             
             if (saved.length > 0) {
-                // Если есть сохраненный адрес, выводим его
                 clientLat = saved[0].lat;
                 clientLon = saved[0].lon;
                 orderAddressData.street = saved[0].street;
@@ -2005,6 +2008,54 @@ function filterMenu(resId, category, btn) {
                 reverseGeocode(clientLat, clientLon);
             }
         }
+
+        // 2. Обработка клика по желтой кнопке "Текущее местоположение"
+        btnConfirmGeo.addEventListener('click', () => {
+            if(tgApp && tgApp.HapticFeedback) tgApp.HapticFeedback.impactOccurred('medium');
+            
+            if (tgApp && tgApp.LocationManager) {
+                if (tgApp.LocationManager.isAccessRequested && !tgApp.LocationManager.isAccessGranted) {
+                    tgApp.LocationManager.openSettings(); 
+                    btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">🔄</span> Я включил, повторить';
+                } else {
+                    btnConfirmGeo.innerText = "Определяем...🙏";
+                    
+                    tgApp.LocationManager.getLocation((data) => {
+                        if (data && data.latitude) {
+                            clientLat = data.latitude;
+                            clientLon = data.longitude;
+                            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                            geoOverlay.style.display = 'none';
+                            if(tgApp.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('success');
+                            reverseGeocode(clientLat, clientLon);
+                            btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Текущее местоположение';
+                        } else {
+                            // 👇 КРИТИЧЕСКИЙ ФИКС 2: Если юзер нажал кнопку, но забыл включить GPS в шторке
+                            alert("Пожалуйста, включите Геолокацию (GPS) в шторке телефона!");
+                            btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Повторить поиск';
+                        }
+                    });
+                }
+            } 
+            else {
+                btnConfirmGeo.innerText = "Определяем...";
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        clientLat = pos.coords.latitude;
+                        clientLon = pos.coords.longitude;
+                        localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                        geoOverlay.style.display = 'none';
+                        reverseGeocode(clientLat, clientLon);
+                        btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Текущее местоположение';
+                    },
+                    (err) => {
+                        alert("Включите GPS в шторке телефона!");
+                        btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Определить местоположение';
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            }
+        });
 
         function recalcCheckoutDelivery(resLat, resLon) {
     const priceElement = document.getElementById('modal-map-price');
