@@ -2744,43 +2744,69 @@ function copyPaymentNumber() {
             if(event.target.classList.contains('pm-overlay')) closeProductModal();
         }
         // ==========================================
-        // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (КАК У CLICK FOOD)
-        // ==========================================
-        const geoOverlay = document.getElementById('geo-modal-overlay');
-        const btnConfirmGeo = document.getElementById('btn-geo-confirm');
-        const btnSkipGeo = document.getElementById('btn-geo-skip');
-        
-        // Подключаем API Телеграма
-        const tgApp = window.Telegram?.WebApp;
+// НАТИВНАЯ ГЕОЛОКАЦИЯ И СОХРАНЕННЫЕ АДРЕСА
+// ==========================================
+const geoOverlay = document.getElementById('geo-modal-overlay');
+const btnConfirmGeo = document.getElementById('btn-geo-confirm');
+const btnSkipGeo = document.getElementById('btn-geo-skip');
 
-        // 1. Проверяем при входе, есть ли уже доступ к геолокации
-        if (tgApp && tgApp.LocationManager) {
-            tgApp.LocationManager.init(() => {
-                if (!tgApp.LocationManager.isAccessGranted) {
-                    geoOverlay.style.display = 'flex';
-                } else {
-                    tgApp.LocationManager.getLocation((data) => {
-                        if (data && data.latitude) {
-                            clientLat = data.latitude;
-                            clientLon = data.longitude;
-                            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                            // --- НОВОЕ: Сразу определяем улицу в фоне ---
-                            reverseGeocode(clientLat, clientLon);
-                        }
-                    });
-                }
-            });
-        } else {
-            // Резервный вариант для браузера
-            if (!localStorage.getItem('user_geo')) {
+const tgApp = window.Telegram?.WebApp;
+
+// 1. Сначала проверяем, есть ли сохраненный адрес (чтобы не мучать юзера GPS-запросами)
+const lastLat = localStorage.getItem('tamak_last_lat');
+const lastLon = localStorage.getItem('tamak_last_lon');
+const lastStreet = localStorage.getItem('tamak_last_street');
+let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+
+let hasSavedAddress = false;
+
+if (lastLat && lastLon && lastStreet) {
+    clientLat = parseFloat(lastLat);
+    clientLon = parseFloat(lastLon);
+    orderAddressData.street = lastStreet;
+    hasSavedAddress = true;
+} else if (saved.length > 0) {
+    clientLat = saved[0].lat;
+    clientLon = saved[0].lon;
+    orderAddressData.street = saved[0].text || saved[0].street;
+    orderAddressData.kv = saved[0].kv || '';
+    hasSavedAddress = true;
+}
+
+if (hasSavedAddress) {
+    // 2. Если адрес есть — сразу ставим его в шапку и пересчитываем цены доставки
+    const cityDisplay = document.getElementById('current-city-display');
+    if (cityDisplay) cityDisplay.innerText = orderAddressData.street;
+    renderRestaurants();
+} else {
+    // 3. Если адреса НЕТ, только тогда запускаем проверку геолокации Telegram
+    if (tgApp && tgApp.LocationManager) {
+        tgApp.LocationManager.init(() => {
+            if (!tgApp.LocationManager.isAccessGranted) {
                 geoOverlay.style.display = 'flex';
             } else {
-                let sg = JSON.parse(localStorage.getItem('user_geo'));
-                clientLat = sg.lat;
-                clientLon = sg.lon;
-                reverseGeocode(clientLat, clientLon);
+                tgApp.LocationManager.getLocation((data) => {
+                    if (data && data.latitude) {
+                        clientLat = data.latitude;
+                        clientLon = data.longitude;
+                        localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                        reverseGeocode(clientLat, clientLon);
+                    }
+                });
             }
+        });
+    } else {
+        // Резервный вариант для браузера
+        if (!localStorage.getItem('user_geo')) {
+            geoOverlay.style.display = 'flex';
+        } else {
+            let sg = JSON.parse(localStorage.getItem('user_geo'));
+            clientLat = sg.lat;
+            clientLon = sg.lon;
+            reverseGeocode(clientLat, clientLon);
         }
+    }
+}
 
         // 2. Обработка клика по желтой кнопке (когда юзер разрешает GPS первый раз)
         btnConfirmGeo.addEventListener('click', () => {
