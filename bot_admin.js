@@ -65,7 +65,8 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             // ОТПРАВКА КУРЬЕРАМ
             const { data: couriers } = await supabase.from('couriers').select('id').eq('status', 'active');
             if (couriers && couriers.length > 0) {
-                let msgCourier = `🔥 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n🏢 Ресторан: ${order.restaurant || 'Не указан'}\n📍 Куда: ${order.address}\n💰 Оплата: ${order.total_price} сом\n\nКто заберет?`;
+                // ДОБАВЛЕН КОММЕНТАРИЙ СО ССЫЛКОЙ НА 2ГИС!
+                let msgCourier = `🔥 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n🏢 Ресторан: ${order.restaurant || 'Не указан'}\n📍 Куда: ${order.address}\n💬 Детали: ${order.comment || 'Нет'}\n💰 Оплата: ${order.total_price} сом\n\nКто заберет?`;
                 for (const courier of couriers) {
                     try {
                         await courierBot.telegram.sendMessage(courier.id, msgCourier, Markup.inlineKeyboard([

@@ -63,7 +63,10 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             const clientPhone = orderCheck.phone || 'Не указан';
             const clientName = orderCheck.client_name || 'Гость';
 
-            const newText = ctx.callbackQuery.message.text + `\n\n✅ ВЫ ПРИНЯЛИ ЗАКАЗ!\nОтправляйтесь в ресторан.\n\n👤 Клиент: ${clientName}\n📞 Телефон клиента: ${clientPhone}\n\nКак только заберете еду, нажмите кнопку ниже:`;
+            const originalMsg = ctx.callbackQuery.message.text;
+const appendText = `\n\n✅ ВЫ ПРИНЯЛИ ЗАКАЗ!\nОтправляйтесь в ресторан.\n\n👤 Клиент: ${clientName}\n📞 Телефон клиента: ${clientPhone}\n\nКак только заберете еду, нажмите кнопку ниже:`;
+// Простая проверка, чтобы не склеивать undefined
+const newText = (originalMsg ? originalMsg : "Заказ") + appendText;
 
             // Создаем кнопки
             const buttons = [
