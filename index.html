@@ -2744,41 +2744,94 @@ function copyPaymentNumber() {
             if(event.target.classList.contains('pm-overlay')) closeProductModal();
         }
         // ==========================================
-        // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (КАК У CLICK FOOD)
+        // ИНИЦИАЛИЗАЦИЯ АДРЕСА И ОПРОС ГЕОЛОКАЦИИ СИСТЕМЫ
         // ==========================================
         const geoOverlay = document.getElementById('geo-modal-overlay');
         const btnConfirmGeo = document.getElementById('btn-geo-confirm');
         const btnSkipGeo = document.getElementById('btn-geo-skip');
-        
-        // Подключаем API Телеграма
         const tgApp = window.Telegram?.WebApp;
 
-        // 1. Проверяем при входе, есть ли уже доступ к геолокации
         if (tgApp && tgApp.LocationManager) {
             tgApp.LocationManager.init(() => {
-                if (!tgApp.LocationManager.isAccessGranted) {
-                    geoOverlay.style.display = 'flex';
+                // 👉 ПРОВЕРКА КАК БЫЛО: Если доступ в боте не гранатован ИЛИ GPS выключен в шторке устройства
+                if (!tgApp.LocationManager.isAccessGranted || !tgApp.LocationManager.isLocationEnabled) {
+                    geoOverlay.style.display = 'flex'; // Показываем окно требования включить гео
                 } else {
-                    tgApp.LocationManager.getLocation((data) => {
-                        if (data && data.latitude) {
-                            clientLat = data.latitude;
-                            clientLon = data.longitude;
-                            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                            // --- НОВОЕ: Сразу определяем улицу в фоне ---
-                            reverseGeocode(clientLat, clientLon);
+                    // Если с геолокацией всё ОК, проверяем сохраненные адреса юзера для автоподстановки
+                    const savedLat = localStorage.getItem('tamak_last_lat');
+                    const savedLon = localStorage.getItem('tamak_last_lon');
+                    const savedStreet = localStorage.getItem('tamak_last_street');
+                    const savedKv = localStorage.getItem('tamak_last_kv') || '';
+                    let allSavedAddresses = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+
+                    let isAddressRestored = false;
+
+                    if (savedLat && savedLon && savedStreet) {
+                        clientLat = parseFloat(savedLat);
+                        clientLon = parseFloat(savedLon);
+                        orderAddressData.street = savedStreet;
+                        orderAddressData.kv = savedKv;
+                        isAddressRestored = true;
+                    } else if (allSavedAddresses.length > 0) {
+                        const firstAddr = allSavedAddresses[0];
+                        clientLat = parseFloat(firstAddr.lat);
+                        clientLon = parseFloat(firstAddr.lon);
+                        orderAddressData.street = firstAddr.street;
+                        orderAddressData.kv = firstAddr.kv || '';
+                        isAddressRestored = true;
+                    }
+
+                    if (isAddressRestored) {
+                        // Если адрес успешно восстановили из памяти — выводим его
+                        let finalDisplayString = orderAddressData.street;
+                        if (orderAddressData.kv) finalDisplayString += `, ${orderAddressData.kv}`;
+
+                        const cityDisplay = document.getElementById('current-city-display');
+                        if (cityDisplay) cityDisplay.innerText = finalDisplayString;
+                        
+                        renderRestaurants();
+                        if (typeof updateCheckoutSummaryUI === 'function') {
+                            updateCheckoutSummaryUI();
                         }
-                    });
+                    } else {
+                        // Если у юзера устройство чистое и сохраненных адресов нет — берем текущую GPS точку
+                        tgApp.LocationManager.getLocation((data) => {
+                            if (data && data.latitude) {
+                                clientLat = data.latitude;
+                                clientLon = data.longitude;
+                                localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                                reverseGeocode(clientLat, clientLon);
+                            }
+                        });
+                    }
                 }
             });
         } else {
-            // Резервный вариант для браузера
-            if (!localStorage.getItem('user_geo')) {
+            // Резервный вариант проверки для обычного браузера
+            const savedLat = localStorage.getItem('tamak_last_lat');
+            const savedLon = localStorage.getItem('tamak_last_lon');
+            const savedStreet = localStorage.getItem('tamak_last_street');
+
+            if (!localStorage.getItem('user_geo') && !savedLat) {
                 geoOverlay.style.display = 'flex';
             } else {
-                let sg = JSON.parse(localStorage.getItem('user_geo'));
-                clientLat = sg.lat;
-                clientLon = sg.lon;
-                reverseGeocode(clientLat, clientLon);
+                if (savedLat && savedLon && savedStreet) {
+                    clientLat = parseFloat(savedLat);
+                    clientLon = parseFloat(savedLon);
+                    orderAddressData.street = savedStreet;
+                    orderAddressData.kv = localStorage.getItem('tamak_last_kv') || '';
+                    
+                    let finalDisplayString = orderAddressData.street;
+                    if (orderAddressData.kv) finalDisplayString += `, ${orderAddressData.kv}`;
+                    const cityDisplay = document.getElementById('current-city-display');
+                    if (cityDisplay) cityDisplay.innerText = finalDisplayString;
+                    renderRestaurants();
+                } else {
+                    let sg = JSON.parse(localStorage.getItem('user_geo'));
+                    clientLat = sg.lat;
+                    clientLon = sg.lon;
+                    reverseGeocode(clientLat, clientLon);
+                }
             }
         }
 
