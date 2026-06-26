@@ -54,15 +54,15 @@ app.post('/web-data', async (req, res) => {
             }
         }
 
-        // Собираем детали доставки курьеру (БЕЗ комментария заведению)
+        // Собираем детали доставки курьеру
         let extraDetails = [];
         if (isDoorDelivery) extraDetails.push('🚪 До двери: Да');
+        if (cutlery > 0) extraDetails.push(`🍴 Приборы: ${cutlery} шт`);
         if (comment) extraDetails.push(`📍 Ориентир: ${comment}`);
 
-        // Добавляем точные координаты и навигацию для курьера
+        // 🗺 ОСТАВЛЯЕМ ТОЛЬКО ССЫЛКУ НА 2ГИС (Цифры координат убрали!)
         if (dest_lat && dest_lon) {
-            extraDetails.push(`📌 Координаты: ${dest_lat}, ${dest_lon}`);
-            // В 2ГИС сначала идет lon (долгота), затем lat (широта)
+            // В ссылке 2ГИС сначала идет lon (долгота), затем lat (широта)
             extraDetails.push(`🗺 2ГИС: https://2gis.kg/geo/${dest_lon},${dest_lat}`);
         }
 
@@ -74,7 +74,7 @@ app.post('/web-data', async (req, res) => {
             address: address,
             restaurant: restaurantName,
             total_price: totalPrice,
-            comment: extraDetails.join(' | '), // <-- Теперь здесь только данные для курьера
+            comment: extraDetails.join(' | '), // <-- Ссылка склеится в комментарий красиво через палочку
             items: items,
             status: 'waiting_payment'
         }]).select();
@@ -85,7 +85,7 @@ app.post('/web-data', async (req, res) => {
         // Моментально отвечаем фронтенду
         res.status(200).json({ success: true, orderId: newOrder.id });
 
-        // Отправляем админу и дальше курьеру
+        // Отправляем админу и курьерам
         adminActions.sendOrderToAdmin(newOrder);
 
     } catch (err) {
