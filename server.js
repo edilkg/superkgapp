@@ -38,7 +38,7 @@ const adminActions = setupAdminBot(bot, restBot, courierBot, supabase, ADMIN_GRO
 // ==========================================
 app.post('/web-data', async (req, res) => {
     try {
-        const { type, user, phone, address, restaurantName, totalPrice, comment, resComment, isDoorDelivery, cutlery, items } = req.body;
+        const { type, user, phone, address, restaurantName, totalPrice, comment, isDoorDelivery, cutlery, items, dest_lat, dest_lon } = req.body;
         if (type !== 'food') return res.status(400).json({ error: 'Тип не еда' });
 
         // 👉 БРОНЕЖИЛЕТ ОТ СПАМА (МАКСИМУМ 2 ЗАКАЗА НА СЕРВЕРЕ)
@@ -54,14 +54,19 @@ app.post('/web-data', async (req, res) => {
             }
         }
 
-        // Собираем все комментарии и опции
+        // Собираем детали доставки курьеру (БЕЗ комментария заведению)
         let extraDetails = [];
         if (isDoorDelivery) extraDetails.push('🚪 До двери: Да');
-        if (cutlery > 0) extraDetails.push(`🍴 Приборы: ${cutlery} шт`);
         if (comment) extraDetails.push(`📍 Ориентир: ${comment}`);
-        if (resComment) extraDetails.push(`💬 Заведению: ${resComment}`);
 
-        // Сохраняем в базу
+        // Добавляем точные координаты и навигацию для курьера
+        if (dest_lat && dest_lon) {
+            extraDetails.push(`📌 Координаты: ${dest_lat}, ${dest_lon}`);
+            // В 2ГИС сначала идет lon (долгота), затем lat (широта)
+            extraDetails.push(`🗺 2ГИС: https://2gis.kg/geo/${dest_lon},${dest_lat}`);
+        }
+
+        // Сохраняем в базу данных Supabase
         const { data: orderData, error: dbError } = await supabase.from('orders').insert([{
             client_id: user?.id || null,
             client_name: user?.first_name || 'Гость',
@@ -69,7 +74,7 @@ app.post('/web-data', async (req, res) => {
             address: address,
             restaurant: restaurantName,
             total_price: totalPrice,
-            comment: extraDetails.join(' | '),
+            comment: extraDetails.join(' | '), // <-- Теперь здесь только данные для курьера
             items: items,
             status: 'waiting_payment'
         }]).select();
@@ -77,10 +82,10 @@ app.post('/web-data', async (req, res) => {
         if (dbError) throw dbError;
         const newOrder = orderData[0];
 
-        // Моментально отвечаем браузеру
+        // Моментально отвечаем фронтенду
         res.status(200).json({ success: true, orderId: newOrder.id });
 
-        // Отправляем админу
+        // Отправляем админу и дальше курьеру
         adminActions.sendOrderToAdmin(newOrder);
 
     } catch (err) {
