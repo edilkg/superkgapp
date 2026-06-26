@@ -1945,6 +1945,12 @@ function filterMenu(resId, category, btn) {
         clientLat = data.lat;
         clientLon = data.lon;
         
+        // 👉 ОБНОВЛЯЕМ МАРКЕРЫ ДЛЯ ПОСЛЕДУЮЩИХ ПЕРЕЗАГРУЗОК СТРАНИЦЫ
+        localStorage.setItem('tamak_last_lat', clientLat);
+        localStorage.setItem('tamak_last_lon', clientLon);
+        localStorage.setItem('tamak_last_street', data.street);
+        localStorage.setItem('tamak_last_kv', data.kv || '');
+        
         // 1. Обновляем адрес в верхней шапке главного меню
         const cityDisplay = document.getElementById('current-city-display');
         if (cityDisplay) cityDisplay.innerText = data.text;
@@ -1958,8 +1964,6 @@ function filterMenu(resId, category, btn) {
         if (typeof cartActiveTabResId !== 'undefined' && cartActiveTabResId && typeof database !== 'undefined' && database[cartActiveTabResId]) {
             const resLat = database[cartActiveTabResId].lat;
             const resLon = database[cartActiveTabResId].lon;
-            
-            // Вызываем расчет доставки для карты корзины
             recalcCheckoutDelivery(resLat, resLon);
         }
         
@@ -2744,14 +2748,16 @@ function copyPaymentNumber() {
             if(event.target.classList.contains('pm-overlay')) closeProductModal();
         }
         // ==========================================
-        // ИНИЦИАЛИЗАЦИЯ АДРЕСА И ОПРОС ГЕОЛОКАЦИИ
+        // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (С ПРИОРИТЕТОМ СОХРАНЕННОГО АДРЕСА)
         // ==========================================
         const geoOverlay = document.getElementById('geo-modal-overlay');
         const btnConfirmGeo = document.getElementById('btn-geo-confirm');
         const btnSkipGeo = document.getElementById('btn-geo-skip');
+        
+        // Подключаем API Телеграма
         const tgApp = window.Telegram?.WebApp;
 
-        // 1. ПЕРВЫМ ДЕЛОМ проверяем сохраненные адреса юзера
+        // Проверяем наличие ранее сохраненного адреса
         const savedLat = localStorage.getItem('tamak_last_lat');
         const savedLon = localStorage.getItem('tamak_last_lon');
         const savedStreet = localStorage.getItem('tamak_last_street');
@@ -2760,6 +2766,7 @@ function copyPaymentNumber() {
 
         let isAddressRestored = false;
 
+        // Если есть сохраненные маркеры или список адресов — восстанавливаем
         if (savedLat && savedLon && savedStreet) {
             clientLat = parseFloat(savedLat);
             clientLon = parseFloat(savedLon);
@@ -2775,9 +2782,9 @@ function copyPaymentNumber() {
             isAddressRestored = true;
         }
 
-        // 2. ЛОГИКА ДЕЙСТВИЙ:
+        // ЛОГИКА РАСПРЕДЕЛЕНИЯ:
         if (isAddressRestored) {
-            // А. Если адрес есть — СРАЗУ выводим его и НЕ просим включить гео
+            // Если адрес сохранен — мгновенно выводим его везде и НЕ опрашиваем живой GPS
             let finalDisplayString = orderAddressData.street;
             if (orderAddressData.kv) finalDisplayString += `, ${orderAddressData.kv}`;
 
@@ -2789,14 +2796,12 @@ function copyPaymentNumber() {
                 updateCheckoutSummaryUI();
             }
         } else {
-            // Б. Если адреса НЕТ — запускаем твою оригинальную проверку Telegram
+            // Если адреса НЕТ — запускаем твой оригинальный рабочий код проверки Telegram
             if (tgApp && tgApp.LocationManager) {
                 tgApp.LocationManager.init(() => {
-                    // Вернул как было у тебя: проверяем только доступ в боте
                     if (!tgApp.LocationManager.isAccessGranted) {
                         geoOverlay.style.display = 'flex';
                     } else {
-                        // Если доступ есть — просто берем координаты
                         tgApp.LocationManager.getLocation((data) => {
                             if (data && data.latitude) {
                                 clientLat = data.latitude;
