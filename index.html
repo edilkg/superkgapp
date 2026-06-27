@@ -2309,61 +2309,87 @@ function confirmAddressFromModal() {
 
 
         function locateUser() {
-    if (!navigator.geolocation) return alert("Браузер не поддерживает GPS");
-    if(tg) tg.HapticFeedback.impactOccurred('medium');
+    // Легкая вибрация при клике
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+    }
 
-    const locateBtn = document.querySelector('div[onclick="locateUser()"]');
-    
-    // 1. Создаем пустую переменную для сохранения оригинальной картинки
-    let originalContent = ''; 
-    
+    // Ищем кнопку, на которую нажал юзер, чтобы повесить SVG-лоадер
+    const locateBtn = document.querySelector('[onclick="locateUser()"]');
+    let originalContent = '';
+
     if (locateBtn) {
-        // 2. ВАЖНО: сохраняем ВЕСЬ HTML (твой SVG код), а не просто текст
-        originalContent = locateBtn.innerHTML; 
-        
-        // Вставляем крутящуюся SVG-иконку обновления
+        originalContent = locateBtn.innerHTML;
         locateBtn.innerHTML = `
             <svg class="spin-svg" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
                 <path d="M21 3v5h-5"></path>
             </svg>
-        `; 
-        locateBtn.style.pointerEvents = 'none'; // Блокируем клики
+        `;
+        locateBtn.style.pointerEvents = 'none';
         locateBtn.style.opacity = '0.7';
     }
 
-    navigator.geolocation.getCurrentPosition(
-        (position) => {
-            clientLat = position.coords.latitude; 
-            clientLon = position.coords.longitude;
-            mapWasDragged = false; 
-            setMapCenterToMarker(clientLat, clientLon);
-            reverseGeocode(clientLat, clientLon);
+    // Crash-proof: Безопасная функция разморозки кнопки [cite: 63]
+    const restoreBtn = () => {
+        if (locateBtn) {
+            locateBtn.innerHTML = originalContent;
+            locateBtn.style.pointerEvents = 'auto';
+            locateBtn.style.opacity = '1';
+        }
+    };
 
-            // --- 🟢 РАЗМОРОЗКА ПРИ УСПЕХЕ ---
-            if (locateBtn) {
-                // Возвращаем сохраненную SVG-иконку навигации
-                locateBtn.innerHTML = originalContent; 
-                locateBtn.style.pointerEvents = 'auto';
-                locateBtn.style.opacity = '1';
-            }
-        },
-        (error) => {
-            if (error.code === 1) {
-                alert("Разрешите доступ к геолокации в настройках телефона");
+    const geoOverlay = document.getElementById('geo-modal-overlay');
+    const tgApp = window.Telegram?.WebApp;
+
+    // 👉 ГЛАВНОЕ ИСПРАВЛЕНИЕ: Интеграция с LocationManager Телеграма
+    if (tgApp && tgApp.LocationManager) {
+        tgApp.LocationManager.init(() => {
+            // ПРОВЕРЯЕМ: Если доступа нет или GPS выключен в шторке
+            if (!tgApp.LocationManager.isAccessGranted || !tgApp.LocationManager.isLocationEnabled) {
+                restoreBtn();
+                geoOverlay.style.display = 'flex'; // Вызываем твое красивое окно!
             } else {
-                alert("Не удалось определить местоположение. Проверьте GPS.");
+                // Если все ок, запрашиваем координаты
+                tgApp.LocationManager.getLocation((data) => {
+                    restoreBtn();
+                    if (data && data.latitude) {
+                        clientLat = data.latitude;
+                        clientLon = data.longitude;
+                        mapWasDragged = false;
+                        setMapCenterToMarker(clientLat, clientLon);
+                        reverseGeocode(clientLat, clientLon);
+                    } else {
+                        // Защита от непредвиденных сбоев API: снова просим проверить настройки
+                        geoOverlay.style.display = 'flex'; 
+                    }
+                });
             }
-
-            // --- 🟢 РАЗМОРОЗКА ПРИ ОШИБКЕ ---
-            if (locateBtn) {
-                locateBtn.innerHTML = originalContent;
-                locateBtn.style.pointerEvents = 'auto';
-                locateBtn.style.opacity = '1';
-            }
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-    );
+        });
+    } else {
+        // Резервный вариант для обычного браузера (вне Телеграма)
+        if (!navigator.geolocation) {
+            restoreBtn();
+            return alert("Браузер не поддерживает GPS");
+        }
+        
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                restoreBtn();
+                clientLat = position.coords.latitude;
+                clientLon = position.coords.longitude;
+                mapWasDragged = false;
+                setMapCenterToMarker(clientLat, clientLon);
+                reverseGeocode(clientLat, clientLon);
+            },
+            (error) => {
+                restoreBtn();
+                // Вместо старого alert теперь показываем твое модальное окно!
+                geoOverlay.style.display = 'flex'; 
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    }
 }
 
 
@@ -2926,8 +2952,6 @@ function copyPaymentNumber() {
             }
         });
 
-        // 2. Обработка клика по желтой кнопке (когда юзер разрешает GPS первый раз)
-        btnConfirmGeo.addEventListener('click', () => {
             if(tgApp && tgApp.HapticFeedback) tgApp.HapticFeedback.impactOccurred('medium');
             
             if (tgApp && tgApp.LocationManager) {
@@ -2969,60 +2993,6 @@ function copyPaymentNumber() {
                     },
                     { enableHighAccuracy: true, timeout: 10000 }
                 );
-            }
-        });
-
-        // 3. Обработка кнопки "Ввести вручную"
-        btnSkipGeo.addEventListener('click', () => {
-            geoOverlay.style.display = 'none'; 
-        });
-
-        // 4. АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПРИ ВОЗВРАТЕ ИЗ НАСТРОЕК (Без кнопок)
-        document.addEventListener("visibilitychange", function() {
-            // Срабатывает, когда пользователь возвращается в Telegram (вкладка становится видимой)
-            if (document.visibilityState === 'visible') {
-                
-                // Проверяем, висит ли на экране окно запроса геолокации
-                if (geoOverlay.style.display !== 'none') {
-                    
-                    // Меняем текст, чтобы юзер видел, что приложение не зависло, а "думает"
-                    btnConfirmGeo.innerText = "Ищем ваше местоположение...";
-
-                    if (tgApp && tgApp.LocationManager) {
-                        tgApp.LocationManager.getLocation((data) => {
-                            if (data && data.latitude) {
-                                // Если гео включили, берем координаты
-                                clientLat = data.latitude;
-                                clientLon = data.longitude;
-                                localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                                
-                                // Убираем окно запроса
-                                geoOverlay.style.display = 'none';
-                                
-                                // Переводим координаты в улицу
-                                reverseGeocode(clientLat, clientLon);
-                            } else {
-                                // Если вернулся, но так и не включил гео, возвращаем исходный текст кнопки
-                                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Открыть настройки';
-                            }
-                        });
-                    } else if (navigator.geolocation) {
-                        // Резервный метод для браузера
-                        navigator.geolocation.getCurrentPosition(
-                            (pos) => {
-                                clientLat = pos.coords.latitude;
-                                clientLon = pos.coords.longitude;
-                                localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                                geoOverlay.style.display = 'none';
-                                reverseGeocode(clientLat, clientLon);
-                            },
-                            (err) => {
-                                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Определить местоположение';
-                            },
-                            { enableHighAccuracy: true, timeout: 5000 }
-                        );
-                    }
-                }
             }
         });
 
