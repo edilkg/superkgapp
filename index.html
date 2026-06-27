@@ -2782,9 +2782,6 @@ function copyPaymentNumber() {
         const btnConfirmGeo = document.getElementById('btn-geo-confirm');
         const btnSkipGeo = document.getElementById('btn-geo-skip');
         
-        const geoModalTitle = geoOverlay.querySelector('h2');
-        const geoModalText = geoOverlay.querySelector('p');
-        
         const tgApp = window.Telegram?.WebApp;
 
         // 👉 1. ПРОВЕРЯЕМ, ЕСТЬ ЛИ УЖЕ СОХРАНЕННЫЙ АДРЕС В ПАМЯТИ
@@ -2811,7 +2808,7 @@ function copyPaymentNumber() {
             isAddressRestored = true;
         }
 
-        // 👉 1.5. ВОССТАНАВЛИВАЕМ ФОНОВЫЙ ИНТЕРФЕЙС
+        // 👉 1.5. ВОССТАНАВЛИВАЕМ ФОНОВЫЙ ИНТЕРФЕЙС (Для Старичков)
         if (isAddressRestored) {
             let finalDisplayString = orderAddressData.street;
             if (orderAddressData.kv) finalDisplayString += `, ${orderAddressData.kv}`;
@@ -2825,8 +2822,11 @@ function copyPaymentNumber() {
             if (typeof updateCheckoutSummaryUI === 'function') updateCheckoutSummaryUI();
         }
 
-        // 👉 2. УМНОЕ ПЕРЕКЛЮЧЕНИЕ ТЕКСТА ОКНА (Для карты и ручных нажатий)
+        // 👉 2. УМНОЕ ПЕРЕКЛЮЧЕНИЕ ТЕКСТА ОКНА
         function updateGeoModalDesign(hasAddress) {
+            const geoModalTitle = document.querySelector('#geo-modal-overlay h2');
+            const geoModalText = document.querySelector('#geo-modal-overlay p');
+            
             if (hasAddress) {
                 geoModalTitle.innerText = "Включите геолокацию";
                 geoModalText.innerText = "Включите GPS в шторке телефона, чтобы при необходимости быстро найти себя на карте при оформлении заказа.";
@@ -2840,11 +2840,9 @@ function copyPaymentNumber() {
             }
         }
 
-        // 👉 3. ФУНКЦИЯ АВТО-СОХРАНЕНИЯ: Если юзер зашел впервые, сразу сохраняем в "Мои адреса"
+        // 👉 3. ФУНКЦИЯ АВТО-СОХРАНЕНИЯ ТОЛЬКО ДЛЯ НОВИЧКОВ
         function autoSaveFirstAddress(lat, lon) {
-            reverseGeocode(lat, lon); // Переводим координаты в текст
-            
-            // Ждем долю секунды, пока Nominatim вернет название улицы, и сохраняем
+            reverseGeocode(lat, lon);
             setTimeout(() => {
                 if (orderAddressData.street && orderAddressData.street !== "Адрес не определён") {
                     let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
@@ -2866,48 +2864,51 @@ function copyPaymentNumber() {
             }, 800);
         }
 
-        // 👉 4. СТРОГАЯ ПРОВЕРКА ГЕОЛОКАЦИИ НА СТАРТЕ (Только для новых юзеров!)
-        // Если адрес уже сохранен, этот блок полностью игнорируется (окон не будет, адрес не перезапишется)
-        if (!isAddressRestored) {
-            if (tgApp && tgApp.LocationManager) {
-                tgApp.LocationManager.init(() => {
-                    if ((tgApp.LocationManager.isAccessRequested && !tgApp.LocationManager.isAccessGranted) || tgApp.LocationManager.isLocationAvailable === false) {
-                        updateGeoModalDesign(false);
-                        geoOverlay.style.display = 'flex';
-                    } else {
-                        tgApp.LocationManager.getLocation((data) => {
-                            if (data && data.latitude) {
+        // 👉 4. СТРОГАЯ ПРОВЕРКА ГЕОЛОКАЦИИ НА СТАРТЕ ДЛЯ ВСЕХ 
+        // (Окно покажется всем, у кого выключен GPS. Но у старичков мы НЕ забираем координаты)
+        if (tgApp && tgApp.LocationManager) {
+            tgApp.LocationManager.init(() => {
+                if ((tgApp.LocationManager.isAccessRequested && !tgApp.LocationManager.isAccessGranted) || tgApp.LocationManager.isLocationAvailable === false) {
+                    updateGeoModalDesign(isAddressRestored);
+                    geoOverlay.style.display = 'flex';
+                } else {
+                    tgApp.LocationManager.getLocation((data) => {
+                        if (data && data.latitude) {
+                            // ЕСЛИ НОВИЧОК - сохраняем и ставим адрес. Если старичок - ничего не делаем.
+                            if (!isAddressRestored) {
                                 clientLat = data.latitude;
                                 clientLon = data.longitude;
                                 localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                                autoSaveFirstAddress(clientLat, clientLon); // Сразу сохраняем новичку
-                            } else {
-                                updateGeoModalDesign(false);
-                                geoOverlay.style.display = 'flex';
+                                autoSaveFirstAddress(clientLat, clientLon);
                             }
-                        });
-                    }
-                });
-            } else {
-                // Резервный вариант для обычного браузера
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                        (position) => {
+                        } else {
+                            updateGeoModalDesign(isAddressRestored);
+                            geoOverlay.style.display = 'flex';
+                        }
+                    });
+                }
+            });
+        } else {
+            // Резервный вариант для обычного браузера
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        if (!isAddressRestored) {
                             clientLat = position.coords.latitude;
                             clientLon = position.coords.longitude;
                             localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                             autoSaveFirstAddress(clientLat, clientLon);
-                        },
-                        (error) => {
-                            updateGeoModalDesign(false);
-                            geoOverlay.style.display = 'flex';
-                        },
-                        { enableHighAccuracy: true, timeout: 5000 }
-                    );
-                } else {
-                    updateGeoModalDesign(false);
-                    geoOverlay.style.display = 'flex';
-                }
+                        }
+                    },
+                    (error) => {
+                        updateGeoModalDesign(isAddressRestored);
+                        geoOverlay.style.display = 'flex';
+                    },
+                    { enableHighAccuracy: true, timeout: 5000 }
+                );
+            } else {
+                updateGeoModalDesign(isAddressRestored);
+                geoOverlay.style.display = 'flex';
             }
         }
 
@@ -2924,16 +2925,15 @@ function copyPaymentNumber() {
                     
                     tgApp.LocationManager.getLocation((data) => {
                         if (data && data.latitude) {
-                            clientLat = data.latitude;
-                            clientLon = data.longitude;
-                            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                             geoOverlay.style.display = 'none';
                             if(tgApp.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('success');
                             
+                            // ЕСЛИ НОВИЧОК - берем адрес
                             if (!isAddressRestored) {
+                                clientLat = data.latitude;
+                                clientLon = data.longitude;
+                                localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                                 autoSaveFirstAddress(clientLat, clientLon);
-                            } else {
-                                reverseGeocode(clientLat, clientLon);
                             }
                             updateGeoModalDesign(isAddressRestored); 
                         } else {
@@ -2946,14 +2946,13 @@ function copyPaymentNumber() {
                 btnConfirmGeo.innerText = "Определяем...";
                 navigator.geolocation.getCurrentPosition(
                     (pos) => {
-                        clientLat = pos.coords.latitude;
-                        clientLon = pos.coords.longitude;
-                        localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                         geoOverlay.style.display = 'none';
-                        
-                        if (!isAddressRestored) autoSaveFirstAddress(clientLat, clientLon);
-                        else reverseGeocode(clientLat, clientLon);
-                        
+                        if (!isAddressRestored) {
+                            clientLat = pos.coords.latitude;
+                            clientLon = pos.coords.longitude;
+                            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                            autoSaveFirstAddress(clientLat, clientLon);
+                        }
                         updateGeoModalDesign(isAddressRestored);
                     },
                     (err) => {
@@ -2973,19 +2972,19 @@ function copyPaymentNumber() {
         document.addEventListener("visibilitychange", function() {
             if (document.visibilityState === 'visible') {
                 if (geoOverlay.style.display !== 'none') {
-                    btnConfirmGeo.innerText = "Ищем местоположение...";
+                    btnConfirmGeo.innerText = "Проверяем...";
 
                     if (tgApp && tgApp.LocationManager) {
                         tgApp.LocationManager.getLocation((data) => {
                             if (data && data.latitude) {
-                                clientLat = data.latitude;
-                                clientLon = data.longitude;
-                                localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                                 geoOverlay.style.display = 'none';
                                 
-                                if (!isAddressRestored) autoSaveFirstAddress(clientLat, clientLon);
-                                else reverseGeocode(clientLat, clientLon);
-                                
+                                if (!isAddressRestored) {
+                                    clientLat = data.latitude;
+                                    clientLon = data.longitude;
+                                    localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                                    autoSaveFirstAddress(clientLat, clientLon);
+                                }
                                 updateGeoModalDesign(isAddressRestored);
                             } else {
                                 btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Включите GPS в шторке';
@@ -2994,14 +2993,14 @@ function copyPaymentNumber() {
                     } else if (navigator.geolocation) {
                         navigator.geolocation.getCurrentPosition(
                             (pos) => {
-                                clientLat = pos.coords.latitude;
-                                clientLon = pos.coords.longitude;
-                                localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                                 geoOverlay.style.display = 'none';
                                 
-                                if (!isAddressRestored) autoSaveFirstAddress(clientLat, clientLon);
-                                else reverseGeocode(clientLat, clientLon);
-                                
+                                if (!isAddressRestored) {
+                                    clientLat = pos.coords.latitude;
+                                    clientLon = pos.coords.longitude;
+                                    localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                                    autoSaveFirstAddress(clientLat, clientLon);
+                                }
                                 updateGeoModalDesign(isAddressRestored);
                             },
                             (err) => {
