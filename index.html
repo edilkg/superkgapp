@@ -3029,8 +3029,6 @@ function copyPaymentNumber() {
                     tgApp.LocationManager.openSettings(); 
                     btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">🔄</span> Я включил, повторить';
                 } else {
-                    btnConfirmGeo.innerText = "Секундочку🙏";
-                    
                     tgApp.LocationManager.getLocation((data) => {
                         if (data && data.latitude) {
                             geoOverlay.style.display = 'none';
