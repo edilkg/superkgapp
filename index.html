@@ -2776,56 +2776,20 @@ function copyPaymentNumber() {
             if(event.target.classList.contains('pm-overlay')) closeProductModal();
         }
        // ==========================================
-        // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (С ПАМЯТЬЮ И СТРОГИМ СОПРОВОЖДЕНИЕМ)
+        // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (ПОЛНАЯ ИНТЕГРАЦИЯ CLOUDSTORAGE)
         // ==========================================
         const geoOverlay = document.getElementById('geo-modal-overlay');
         const btnConfirmGeo = document.getElementById('btn-geo-confirm');
         const btnSkipGeo = document.getElementById('btn-geo-skip');
         
         const tgApp = window.Telegram?.WebApp;
-
-        // 👉 1. ПРОВЕРЯЕМ, ЕСТЬ ЛИ УЖЕ СОХРАНЕННЫЙ АДРЕС В ПАМЯТИ
-        const savedLat = localStorage.getItem('tamak_last_lat');
-        const savedLon = localStorage.getItem('tamak_last_lon');
-        const savedStreet = localStorage.getItem('tamak_last_street');
-        const savedKv = localStorage.getItem('tamak_last_kv') || '';
-        let allSavedAddresses = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-
         let isAddressRestored = false;
 
-        if (savedLat && savedLon && savedStreet) {
-            clientLat = parseFloat(savedLat);
-            clientLon = parseFloat(savedLon);
-            orderAddressData.street = savedStreet;
-            orderAddressData.kv = savedKv;
-            isAddressRestored = true;
-        } else if (allSavedAddresses.length > 0) {
-            const firstAddr = allSavedAddresses[0];
-            clientLat = parseFloat(firstAddr.lat);
-            clientLon = parseFloat(firstAddr.lon);
-            orderAddressData.street = firstAddr.street;
-            orderAddressData.kv = firstAddr.kv || '';
-            isAddressRestored = true;
-        }
-
-        // 👉 1.5. ВОССТАНАВЛИВАЕМ ФОНОВЫЙ ИНТЕРФЕЙС (Для Старичков)
-        if (isAddressRestored) {
-            let finalDisplayString = orderAddressData.street;
-            if (orderAddressData.kv) finalDisplayString += `, ${orderAddressData.kv}`;
-
-            const cityDisplay = document.getElementById('current-city-display');
-            if (cityDisplay) {
-                cityDisplay.innerText = finalDisplayString;
-            }
-            
-            renderRestaurants();
-            if (typeof updateCheckoutSummaryUI === 'function') updateCheckoutSummaryUI();
-        }
-
-        // 👉 2. УМНОЕ ПЕРЕКЛЮЧЕНИЕ ТЕКСТА ОКНА
+        // 👉 1. УМНОЕ ПЕРЕКЛЮЧЕНИЕ ТЕКСТА ОКНА
         function updateGeoModalDesign(hasAddress) {
             const geoModalTitle = document.querySelector('#geo-modal-overlay h2');
             const geoModalText = document.querySelector('#geo-modal-overlay p');
+            if (!geoModalTitle || !geoModalText) return;
             
             if (hasAddress) {
                 geoModalTitle.innerText = "Включите геолокацию";
@@ -2840,57 +2804,81 @@ function copyPaymentNumber() {
             }
         }
 
-        // 👉 3. ФУНКЦИЯ АВТО-СОХРАНЕНИЯ ТОЛЬКО ДЛЯ НОВИЧКОВ
+        // 👉 2. УНИВЕРСАЛЬНАЯ ФУНКЦИЯ СОХРАНЕНИЯ (И в Облако Телеграма, и Локально)
+        function saveAddressToCloudAndLocal(lat, lon, street, kv = '') {
+            let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+            
+            const isDuplicate = saved.some(addr => addr.street === street && addr.kv === kv);
+            if (!isDuplicate) {
+                saved.push({ text: street, street: street, kv: kv, lat: lat, lon: lon });
+            }
+
+            // Запись локально (чтобы моментально работали твои старые функции)
+            localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+            localStorage.setItem('tamak_last_lat', lat);
+            localStorage.setItem('tamak_last_lon', lon);
+            localStorage.setItem('tamak_last_street', street);
+            localStorage.setItem('tamak_last_kv', kv);
+
+            // СИНХРОНИЗАЦИЯ: Отправляем бэкап в бессмертное Облако Telegram
+            if (tgApp && tgApp.CloudStorage) {
+                tgApp.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+                tgApp.CloudStorage.setItem('tamak_last_lat', lat.toString());
+                tgApp.CloudStorage.setItem('tamak_last_lon', lon.toString());
+                tgApp.CloudStorage.setItem('tamak_last_street', street);
+                tgApp.CloudStorage.setItem('tamak_last_kv', kv);
+            }
+        }
+
+        // 👉 3. ФУНКЦИЯ АВТО-СОХРАНЕНИЯ ДЛЯ НОВИЧКОВ
         function autoSaveFirstAddress(lat, lon) {
             reverseGeocode(lat, lon);
             setTimeout(() => {
                 if (orderAddressData.street && orderAddressData.street !== "Адрес не определён") {
-                    let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-                    if (saved.length === 0) { 
-                        saved.push({
-                            text: orderAddressData.street,
-                            street: orderAddressData.street,
-                            kv: '',
-                            lat: lat,
-                            lon: lon
-                        });
-                        localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
-                        localStorage.setItem('tamak_last_lat', lat);
-                        localStorage.setItem('tamak_last_lon', lon);
-                        localStorage.setItem('tamak_last_street', orderAddressData.street);
-                        isAddressRestored = true; // Теперь он "старичок"
+                    let currentAddresses = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+                    if (currentAddresses.length === 0) {
+                        saveAddressToCloudAndLocal(lat, lon, orderAddressData.street, '');
+                        isAddressRestored = true;
                     }
                 }
             }, 800);
         }
 
-        // 👉 4. СТРОГАЯ ПРОВЕРКА ГЕОЛОКАЦИИ НА СТАРТЕ ДЛЯ ВСЕХ 
-        // (Окно покажется всем, у кого выключен GPS. Но у старичков мы НЕ забираем координаты)
-        if (tgApp && tgApp.LocationManager) {
-            tgApp.LocationManager.init(() => {
-                if ((tgApp.LocationManager.isAccessRequested && !tgApp.LocationManager.isAccessGranted) || tgApp.LocationManager.isLocationAvailable === false) {
-                    updateGeoModalDesign(isAddressRestored);
-                    geoOverlay.style.display = 'flex';
-                } else {
-                    tgApp.LocationManager.getLocation((data) => {
-                        if (data && data.latitude) {
-                            // ЕСЛИ НОВИЧОК - сохраняем и ставим адрес. Если старичок - ничего не делаем.
-                            if (!isAddressRestored) {
+        // 👉 4. ГЛАВНАЯ ЛОГИКА ИНИЦИАЛИЗАЦИИ ИНТЕРФЕЙСА И GPS
+        function initGeoLogic() {
+            // Восстанавливаем фоновый интерфейс (Для Старичков из Облака)
+            if (isAddressRestored) {
+                let finalDisplayString = orderAddressData.street;
+                if (orderAddressData.kv) finalDisplayString += `, ${orderAddressData.kv}`;
+
+                const cityDisplay = document.getElementById('current-city-display');
+                if (cityDisplay) cityDisplay.innerText = finalDisplayString;
+                
+                renderRestaurants();
+                if (typeof updateCheckoutSummaryUI === 'function') updateCheckoutSummaryUI();
+            }
+
+            // Проверка настроек GPS на старте
+            if (tgApp && tgApp.LocationManager) {
+                tgApp.LocationManager.init(() => {
+                    if ((tgApp.LocationManager.isAccessRequested && !tgApp.LocationManager.isAccessGranted) || tgApp.LocationManager.isLocationAvailable === false) {
+                        updateGeoModalDesign(isAddressRestored);
+                        geoOverlay.style.display = 'flex';
+                    } else {
+                        tgApp.LocationManager.getLocation((data) => {
+                            if (data && data.latitude && !isAddressRestored) {
                                 clientLat = data.latitude;
                                 clientLon = data.longitude;
                                 localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                                 autoSaveFirstAddress(clientLat, clientLon);
+                            } else if (!data || !data.latitude) {
+                                updateGeoModalDesign(isAddressRestored);
+                                geoOverlay.style.display = 'flex';
                             }
-                        } else {
-                            updateGeoModalDesign(isAddressRestored);
-                            geoOverlay.style.display = 'flex';
-                        }
-                    });
-                }
-            });
-        } else {
-            // Резервный вариант для обычного браузера
-            if (navigator.geolocation) {
+                        });
+                    }
+                });
+            } else if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
                         if (!isAddressRestored) {
@@ -2912,7 +2900,56 @@ function copyPaymentNumber() {
             }
         }
 
-        // 5. Обработка клика по желтой кнопке внутри окна
+        // 👉 5. СТАРТ: АБСОЛЮТНЫЙ ЗАПРОС К ОБЛАКУ ТЕЛЕГРАМА ПРИ КАЖДОМ ВХОДЕ
+        if (tgApp && tgApp.CloudStorage) {
+            tgApp.CloudStorage.getItems(['tamak_saved_addresses', 'tamak_last_lat', 'tamak_last_lon', 'tamak_last_street', 'tamak_last_kv'], (err, values) => {
+                if (!err && values && values['tamak_last_street']) {
+                    // Синхронизируем облако в локальную память устройства
+                    localStorage.setItem('tamak_saved_addresses', values['tamak_saved_addresses'] || '[]');
+                    localStorage.setItem('tamak_last_lat', values['tamak_last_lat']);
+                    localStorage.setItem('tamak_last_lon', values['tamak_last_lon']);
+                    localStorage.setItem('tamak_last_street', values['tamak_last_street']);
+                    if (values['tamak_last_kv']) localStorage.setItem('tamak_last_kv', values['tamak_last_kv']);
+                    
+                    clientLat = parseFloat(values['tamak_last_lat']);
+                    clientLon = parseFloat(values['tamak_last_lon']);
+                    orderAddressData.street = values['tamak_last_street'];
+                    orderAddressData.kv = values['tamak_last_kv'] || '';
+                    isAddressRestored = true;
+                } else {
+                    // Резервный переход: Если в облаке пусто, подтягиваем старый localStorage
+                    const localStreet = localStorage.getItem('tamak_last_street');
+                    const localLat = localStorage.getItem('tamak_last_lat');
+                    const localLon = localStorage.getItem('tamak_last_lon');
+                    if (localStreet && localLat && localLon) {
+                        clientLat = parseFloat(localLat);
+                        clientLon = parseFloat(localLon);
+                        orderAddressData.street = localStreet;
+                        orderAddressData.kv = localStorage.getItem('tamak_last_kv') || '';
+                        isAddressRestored = true;
+                        
+                        // Сразу бэкапим эту сессию в Облако Telegram на будущее
+                        saveAddressToCloudAndLocal(clientLat, clientLon, orderAddressData.street, orderAddressData.kv);
+                    }
+                }
+                initGeoLogic();
+            });
+        } else {
+            // Стандартный fallback вне телеграма
+            const localStreet = localStorage.getItem('tamak_last_street');
+            const localLat = localStorage.getItem('tamak_last_lat');
+            const localLon = localStorage.getItem('tamak_last_lon');
+            if (localStreet && localLat && localLon) {
+                clientLat = parseFloat(localLat);
+                clientLon = parseFloat(localLon);
+                orderAddressData.street = localStreet;
+                orderAddressData.kv = localStorage.getItem('tamak_last_kv') || '';
+                isAddressRestored = true;
+            }
+            initGeoLogic();
+        }
+
+        // 6. Обработка клика по желтой кнопке внутри окна
         btnConfirmGeo.addEventListener('click', () => {
             if(tgApp && tgApp.HapticFeedback) tgApp.HapticFeedback.impactOccurred('medium');
             
@@ -2928,7 +2965,6 @@ function copyPaymentNumber() {
                             geoOverlay.style.display = 'none';
                             if(tgApp.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('success');
                             
-                            // ЕСЛИ НОВИЧОК - берем адрес
                             if (!isAddressRestored) {
                                 clientLat = data.latitude;
                                 clientLon = data.longitude;
@@ -2963,12 +2999,12 @@ function copyPaymentNumber() {
             }
         });
 
-        // 6. Обработка кнопки "Ввести вручную" (или "Позже")
+        // 7. Обработка кнопки "Ввести вручную" (или "Позже")
         btnSkipGeo.addEventListener('click', () => {
             geoOverlay.style.display = 'none'; 
         });
 
-        // 7. АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПРИ ВОЗВРАТЕ ИЗ НАСТРОЕК (Без кнопок)
+        // 8. АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПРИ ВОЗВРАТЕ ИЗ НАСТРОЕК (Без кнопок)
         document.addEventListener("visibilitychange", function() {
             if (document.visibilityState === 'visible') {
                 if (geoOverlay.style.display !== 'none') {
@@ -2978,7 +3014,6 @@ function copyPaymentNumber() {
                         tgApp.LocationManager.getLocation((data) => {
                             if (data && data.latitude) {
                                 geoOverlay.style.display = 'none';
-                                
                                 if (!isAddressRestored) {
                                     clientLat = data.latitude;
                                     clientLon = data.longitude;
@@ -2994,7 +3029,6 @@ function copyPaymentNumber() {
                         navigator.geolocation.getCurrentPosition(
                             (pos) => {
                                 geoOverlay.style.display = 'none';
-                                
                                 if (!isAddressRestored) {
                                     clientLat = pos.coords.latitude;
                                     clientLon = pos.coords.longitude;
