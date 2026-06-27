@@ -2754,7 +2754,7 @@ function copyPaymentNumber() {
             if(event.target.classList.contains('pm-overlay')) closeProductModal();
         }
        // ==========================================
-        // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (С ПАМЯТЬЮ АДРЕСОВ)
+        // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (С ПАМЯТЬЮ И СТРОГИМ СОПРОВОЖДЕНИЕМ)
         // ==========================================
         const geoOverlay = document.getElementById('geo-modal-overlay');
         const btnConfirmGeo = document.getElementById('btn-geo-confirm');
@@ -2763,7 +2763,7 @@ function copyPaymentNumber() {
         // Подключаем API Телеграма
         const tgApp = window.Telegram?.WebApp;
 
-        // 👉 1. ПРОВЕРЯЕМ, ЕСТЬ ЛИ УЖЕ СОХРАНЕННЫЙ АДРЕС (ЧТОБЫ НЕ СПРАШИВАТЬ GPS)
+        // 👉 1. ПРОВЕРЯЕМ, ЕСТЬ ЛИ УЖЕ СОХРАНЕННЫЙ АДРЕС
         const savedLat = localStorage.getItem('tamak_last_lat');
         const savedLon = localStorage.getItem('tamak_last_lon');
         const savedStreet = localStorage.getItem('tamak_last_street');
@@ -2788,7 +2788,7 @@ function copyPaymentNumber() {
         }
 
         if (isAddressRestored) {
-            // 👉 2А. ЕСЛИ АДРЕС ЕСТЬ: Выводим его и вообще не трогаем Telegram Геолокацию
+            // 👉 2А. ЕСЛИ АДРЕС ЕСТЬ: Выводим его и не мучаем юзера проверками
             let finalDisplayString = orderAddressData.street;
             if (orderAddressData.kv) finalDisplayString += `, ${orderAddressData.kv}`;
 
@@ -2800,10 +2800,11 @@ function copyPaymentNumber() {
             renderRestaurants();
             if (typeof updateCheckoutSummaryUI === 'function') updateCheckoutSummaryUI();
         } else {
-            // 👉 2Б. ЕСЛИ АДРЕСА НЕТ: Выполняем твой ОРИГИНАЛЬНЫЙ рабочий код
+            // 👉 2Б. ЕСЛИ АДРЕСА НЕТ: Строгая проверка Telegram (Гео в боте + Гео в шторке)
             if (tgApp && tgApp.LocationManager) {
                 tgApp.LocationManager.init(() => {
-                    if (!tgApp.LocationManager.isAccessGranted) {
+                    // ПРОВЕРЯЕМ: нет доступа в боте ИЛИ выключен GPS в телефоне
+                    if (!tgApp.LocationManager.isAccessGranted || !tgApp.LocationManager.isLocationEnabled) {
                         geoOverlay.style.display = 'flex';
                     } else {
                         tgApp.LocationManager.getLocation((data) => {
@@ -2811,8 +2812,10 @@ function copyPaymentNumber() {
                                 clientLat = data.latitude;
                                 clientLon = data.longitude;
                                 localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                                // --- НОВОЕ: Сразу определяем улицу в фоне ---
                                 reverseGeocode(clientLat, clientLon);
+                            } else {
+                                // Защита: если данные пустые (GPS выключен в шторке) - выводим модалку
+                                geoOverlay.style.display = 'flex';
                             }
                         });
                     }
@@ -2830,12 +2833,13 @@ function copyPaymentNumber() {
             }
         }
 
-        // 3. Обработка клика по желтой кнопке (когда юзер разрешает GPS первый раз)
+        // 3. Обработка клика по желтой кнопке (Строгое сопровождение юзера)
         btnConfirmGeo.addEventListener('click', () => {
             if(tgApp && tgApp.HapticFeedback) tgApp.HapticFeedback.impactOccurred('medium');
             
             if (tgApp && tgApp.LocationManager) {
                 if (tgApp.LocationManager.isAccessRequested && !tgApp.LocationManager.isAccessGranted) {
+                    // Ведем в настройки бота
                     tgApp.LocationManager.openSettings(); 
                     btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">🔄</span> Я включил, повторить';
                 } else {
@@ -2848,10 +2852,12 @@ function copyPaymentNumber() {
                             localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                             geoOverlay.style.display = 'none';
                             if(tgApp.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('success');
-                            // --- НОВОЕ: Сразу переводим точку в название улицы ---
                             reverseGeocode(clientLat, clientLon);
+                            btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Текущее местоположение';
                         } else {
-                            btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Открыть настройки';
+                            // Если нажал кнопку, но забыл включить GPS в шторке
+                            alert("Пожалуйста, включите Геолокацию (GPS) в шторке телефона!");
+                            btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Повторить поиск';
                         }
                     });
                 }
@@ -2864,8 +2870,8 @@ function copyPaymentNumber() {
                         clientLon = pos.coords.longitude;
                         localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                         geoOverlay.style.display = 'none';
-                        // --- НОВОЕ: Сразу переводим точку в название улицы ---
                         reverseGeocode(clientLat, clientLon);
+                        btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Текущее местоположение';
                     },
                     (err) => {
                         alert("Включите GPS в шторке телефона!");
@@ -2883,35 +2889,24 @@ function copyPaymentNumber() {
 
         // 5. АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПРИ ВОЗВРАТЕ ИЗ НАСТРОЕК (Без кнопок)
         document.addEventListener("visibilitychange", function() {
-            // Срабатывает, когда пользователь возвращается в Telegram (вкладка становится видимой)
             if (document.visibilityState === 'visible') {
-                
-                // Проверяем, висит ли на экране окно запроса геолокации
                 if (geoOverlay.style.display !== 'none') {
-                    
-                    // Меняем текст, чтобы юзер видел, что приложение не зависло, а "думает"
                     btnConfirmGeo.innerText = "Ищем ваше местоположение...";
 
                     if (tgApp && tgApp.LocationManager) {
                         tgApp.LocationManager.getLocation((data) => {
                             if (data && data.latitude) {
-                                // Если гео включили, берем координаты
                                 clientLat = data.latitude;
                                 clientLon = data.longitude;
                                 localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                                
-                                // Убираем окно запроса
                                 geoOverlay.style.display = 'none';
-                                
-                                // Переводим координаты в улицу
                                 reverseGeocode(clientLat, clientLon);
+                                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Текущее местоположение';
                             } else {
-                                // Если вернулся, но так и не включил гео, возвращаем исходный текст кнопки
                                 btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Открыть настройки';
                             }
                         });
                     } else if (navigator.geolocation) {
-                        // Резервный метод для браузера
                         navigator.geolocation.getCurrentPosition(
                             (pos) => {
                                 clientLat = pos.coords.latitude;
@@ -2919,6 +2914,7 @@ function copyPaymentNumber() {
                                 localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                                 geoOverlay.style.display = 'none';
                                 reverseGeocode(clientLat, clientLon);
+                                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Текущее местоположение';
                             },
                             (err) => {
                                 btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Определить местоположение';
