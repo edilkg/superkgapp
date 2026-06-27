@@ -2782,6 +2782,10 @@ function copyPaymentNumber() {
         const btnConfirmGeo = document.getElementById('btn-geo-confirm');
         const btnSkipGeo = document.getElementById('btn-geo-skip');
         
+        // НОВОЕ: Находим заголовки модалки, чтобы менять их на лету без создания новых HTML
+        const geoModalTitle = geoOverlay.querySelector('h2');
+        const geoModalText = geoOverlay.querySelector('p');
+        
         // Подключаем API Телеграма
         const tgApp = window.Telegram?.WebApp;
 
@@ -2810,7 +2814,6 @@ function copyPaymentNumber() {
         }
 
         // 👉 1.5. ВОССТАНАВЛИВАЕМ ФОНОВЫЙ ИНТЕРФЕЙС
-        // Если адрес есть, рисуем его на заднем фоне. Так интерфейс не будет пустым, если всплывет модалка.
         if (isAddressRestored) {
             let finalDisplayString = orderAddressData.street;
             if (orderAddressData.kv) finalDisplayString += `, ${orderAddressData.kv}`;
@@ -2824,11 +2827,27 @@ function copyPaymentNumber() {
             if (typeof updateCheckoutSummaryUI === 'function') updateCheckoutSummaryUI();
         }
 
-        // 👉 2. СТРОГАЯ ПРОВЕРКА ГЕОЛОКАЦИИ НА СТАРТЕ 
+        // 👉 2. УМНОЕ ПЕРЕКЛЮЧЕНИЕ ТЕКСТА ОКНА (БЕЗ СОЗДАНИЯ НОВЫХ ОКОН)
+        function updateGeoModalDesign(hasAddress) {
+            if (hasAddress) {
+                geoModalTitle.innerText = "Включите геолокацию";
+                geoModalText.innerText = "Включите GPS в шторке телефона, чтобы при необходимости быстро найти себя на карте при оформлении заказа.";
+                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Я включил GPS';
+                btnSkipGeo.innerText = "Позже";
+            } else {
+                geoModalTitle.innerText = "Укажите адрес доставки";
+                geoModalText.innerText = "Разрешите доступ к геолокации, чтобы мы могли отображать актуальное меню и цены.";
+                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Текущее местоположение';
+                btnSkipGeo.innerText = "Ввести вручную";
+            }
+        }
+
+        // 👉 3. СТРОГАЯ ПРОВЕРКА ГЕОЛОКАЦИИ НА СТАРТЕ
         if (tgApp && tgApp.LocationManager) {
             tgApp.LocationManager.init(() => {
-                // ИСПРАВЛЕНО: Проверяем только если юзер УЖЕ запретил доступ, либо GPS аппаратно недоступен
+                // Если нет доступа к гео ИЛИ выключен сам GPS в телефоне
                 if ((tgApp.LocationManager.isAccessRequested && !tgApp.LocationManager.isAccessGranted) || tgApp.LocationManager.isLocationAvailable === false) {
+                    updateGeoModalDesign(isAddressRestored);
                     geoOverlay.style.display = 'flex';
                 } else {
                     tgApp.LocationManager.getLocation((data) => {
@@ -2838,7 +2857,8 @@ function copyPaymentNumber() {
                             localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                             reverseGeocode(clientLat, clientLon);
                         } else {
-                            // Если юзер прямо сейчас отклонил запрос или отключил GPS
+                            // Защита: если координаты пустые (GPS отключили в шторке во время загрузки)
+                            updateGeoModalDesign(isAddressRestored);
                             geoOverlay.style.display = 'flex';
                         }
                     });
@@ -2855,20 +2875,23 @@ function copyPaymentNumber() {
                         reverseGeocode(clientLat, clientLon);
                     },
                     (error) => {
+                        updateGeoModalDesign(isAddressRestored);
                         geoOverlay.style.display = 'flex';
                     },
                     { enableHighAccuracy: true, timeout: 5000 }
                 );
             } else {
+                updateGeoModalDesign(isAddressRestored);
                 geoOverlay.style.display = 'flex';
             }
         }
 
-        // Обработка клика по желтой кнопке (строго обернутая функция)
+        // 4. Обработка клика по желтой кнопке (Универсальная)
         btnConfirmGeo.addEventListener('click', () => {
             if(tgApp && tgApp.HapticFeedback) tgApp.HapticFeedback.impactOccurred('medium');
             
             if (tgApp && tgApp.LocationManager) {
+                // Если юзер запретил доступ боту
                 if (tgApp.LocationManager.isAccessRequested && !tgApp.LocationManager.isAccessGranted) {
                     tgApp.LocationManager.openSettings(); 
                     btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">🔄</span> Я включил, повторить';
@@ -2883,9 +2906,12 @@ function copyPaymentNumber() {
                             geoOverlay.style.display = 'none';
                             if(tgApp.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('success');
                             reverseGeocode(clientLat, clientLon);
+                            
+                            // Сбрасываем текст кнопки на случай, если окно когда-то откроется снова
+                            updateGeoModalDesign(isAddressRestored); 
                         } else {
-                            // БЕЗ ALERT'ов: просто меняем интерфейс
-                            btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Открыть настройки';
+                            // Если геолокация всё ещё недоступна (GPS в шторке не включен)
+                            btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Включите GPS в шторке';
                         }
                     });
                 }
@@ -2899,9 +2925,9 @@ function copyPaymentNumber() {
                         localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                         geoOverlay.style.display = 'none';
                         reverseGeocode(clientLat, clientLon);
+                        updateGeoModalDesign(isAddressRestored);
                     },
                     (err) => {
-                        // БЕЗ ALERT'ов: мягко просим включить GPS
                         btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Включите GPS';
                     },
                     { enableHighAccuracy: true, timeout: 10000 }
@@ -2909,16 +2935,16 @@ function copyPaymentNumber() {
             }
         });
 
-        // 4. Обработка кнопки "Ввести вручную"
+        // 5. Обработка кнопки "Ввести вручную" (или "Позже", если адрес уже есть)
         btnSkipGeo.addEventListener('click', () => {
             geoOverlay.style.display = 'none'; 
         });
 
-        // 5. АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПРИ ВОЗВРАТЕ ИЗ НАСТРОЕК (Без кнопок)
+        // 6. АВТОМАТИЧЕСКАЯ ПРОВЕРКА ПРИ ВОЗВРАТЕ ИЗ НАСТРОЕК (Без кнопок)
         document.addEventListener("visibilitychange", function() {
             if (document.visibilityState === 'visible') {
                 if (geoOverlay.style.display !== 'none') {
-                    btnConfirmGeo.innerText = "Ищем ваше местоположение...";
+                    btnConfirmGeo.innerText = "Ищем местоположение...";
 
                     if (tgApp && tgApp.LocationManager) {
                         tgApp.LocationManager.getLocation((data) => {
@@ -2928,9 +2954,9 @@ function copyPaymentNumber() {
                                 localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                                 geoOverlay.style.display = 'none';
                                 reverseGeocode(clientLat, clientLon);
-                                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Текущее местоположение';
+                                updateGeoModalDesign(isAddressRestored);
                             } else {
-                                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Открыть настройки';
+                                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Включите GPS в шторке';
                             }
                         });
                     } else if (navigator.geolocation) {
@@ -2941,59 +2967,15 @@ function copyPaymentNumber() {
                                 localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                                 geoOverlay.style.display = 'none';
                                 reverseGeocode(clientLat, clientLon);
-                                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Текущее местоположение';
+                                updateGeoModalDesign(isAddressRestored);
                             },
                             (err) => {
-                                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Определить местоположение';
+                                btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Включите GPS';
                             },
                             { enableHighAccuracy: true, timeout: 5000 }
                         );
                     }
                 }
-            }
-        });
-
-        // Обработка клика по желтой кнопке (строго обернутая функция)
-        btnConfirmGeo.addEventListener('click', () => {
-            if(tgApp && tgApp.HapticFeedback) tgApp.HapticFeedback.impactOccurred('medium');
-            
-            if (tgApp && tgApp.LocationManager) {
-                if (tgApp.LocationManager.isAccessRequested && !tgApp.LocationManager.isAccessGranted) {
-                    tgApp.LocationManager.openSettings(); 
-                    btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">🔄</span> Я включил, повторить';
-                } else {
-                    btnConfirmGeo.innerText = "Секундочку🙏";
-                    
-                    tgApp.LocationManager.getLocation((data) => {
-                        if (data && data.latitude) {
-                            clientLat = data.latitude;
-                            clientLon = data.longitude;
-                            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                            geoOverlay.style.display = 'none';
-                            if(tgApp.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('success');
-                            reverseGeocode(clientLat, clientLon);
-                        } else {
-                            btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Открыть настройки';
-                        }
-                    });
-                }
-            } 
-            else {
-                btnConfirmGeo.innerText = "Определяем...";
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                        clientLat = pos.coords.latitude;
-                        clientLon = pos.coords.longitude;
-                        localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                        geoOverlay.style.display = 'none';
-                        reverseGeocode(clientLat, clientLon);
-                    },
-                    (err) => {
-                        alert("Включите GPS в шторке телефона!");
-                        btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">📍</span> Определить местоположение';
-                    },
-                    { enableHighAccuracy: true, timeout: 10000 }
-                );
             }
         });
 
