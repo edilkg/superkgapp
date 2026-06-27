@@ -1946,139 +1946,149 @@ function filterMenu(resId, category, btn) {
         }
 
         function recalcCheckoutDelivery(resLat, resLon) {
-    const priceElement = document.getElementById('modal-map-price');
-    const submitButton = document.querySelector('#modal-map .btn-yellow');
-    const deliveryBlock = document.getElementById('delivery-info-block');
-    
-    const isCartVisible = !document.getElementById('screen-cart-list').classList.contains('hidden');
+            const priceElement = document.getElementById('modal-map-price');
+            const submitButton = document.querySelector('#modal-map .btn-yellow');
+            const deliveryBlock = document.getElementById('delivery-info-block');
+            
+            const isCartVisible = !document.getElementById('screen-cart-list').classList.contains('hidden');
 
-    // КООРДИНАТЫ ЦЕНТРОВ ВАШИХ ГОРОДОВ (Глобальная зона)
-    const cityCenters = {
-        'Чолпон-Ата': { lat: 42.6482, lon: 77.0855 },
-        'Бостери': { lat: 42.6353, lon: 77.1933 },
-        'Бишкек': { lat: 42.8746, lon: 74.5698 },
-        'Балыкчы': { lat: 42.4602, lon: 76.1871 }
-    };
-    
-    // Безопасно получаем текущий город (по умолчанию Чолпон-Ата)
-    const activeCity = (typeof currentCity !== 'undefined' && currentCity) ? currentCity : 'Чолпон-Ата';
-    const center = cityCenters[activeCity] || cityCenters['Чолпон-Ата'];
+            const cityCenters = {
+                'Чолпон-Ата': { lat: 42.6482, lon: 77.0855 },
+                'Бостери': { lat: 42.6353, lon: 77.1933 },
+                'Бишкек': { lat: 42.8746, lon: 74.5698 },
+                'Балыкчы': { lat: 42.4602, lon: 76.1871 }
+            };
+            
+            const activeCity = (typeof currentCity !== 'undefined' && currentCity) ? currentCity : 'Чолпон-Ата';
+            const center = cityCenters[activeCity] || cityCenters['Чолпон-Ата'];
 
-    // =======================================================
-    // 1. ЛОГИКА ДЛЯ ГЛАВНОГО ЭКРАНА (Глобальная проверка)
-    // =======================================================
-    if (!isCartVisible || !cartActiveTabResId || (typeof database !== 'undefined' && !database[cartActiveTabResId])) {
-        currentDeliveryFee = 0;
-        if (deliveryBlock) deliveryBlock.style.display = 'none';
+            // 👉 Подхватываем временные координаты, если карту передвигают в данный момент
+            const mapModal = document.getElementById('modal-map');
+            let calcLat = clientLat;
+            let calcLon = clientLon;
 
-        if (clientLat && clientLon) {
-            // Считаем дистанцию от центра выбранного города до маркера клиента
-            const distFromCenter = getDistance(center.lat, center.lon, clientLat, clientLon);
-            const GLOBAL_MAX_DIST = 25; // Максимальный радиус работы от центра города (20 км)
+            if (mapModal && !mapModal.classList.contains('hidden') && mapModal.dataset.dragLat) {
+                calcLat = parseFloat(mapModal.dataset.dragLat);
+                calcLon = parseFloat(mapModal.dataset.dragLon);
+            }
 
-            if (distFromCenter > GLOBAL_MAX_DIST) {
-                // Если юзер поставил точку где-то в горах или другом городе
+            if (!isCartVisible || !cartActiveTabResId || (typeof database !== 'undefined' && !database[cartActiveTabResId])) {
+                currentDeliveryFee = 0;
+                if (deliveryBlock) deliveryBlock.style.display = 'none';
+
+                if (calcLat && calcLon) {
+                    const distFromCenter = getDistance(center.lat, center.lon, calcLat, calcLon);
+                    const GLOBAL_MAX_DIST = 25; 
+
+                    if (distFromCenter > GLOBAL_MAX_DIST) {
+                        if (submitButton) {
+                            submitButton.classList.add('disabled');
+                            submitButton.style.pointerEvents = 'none';
+                            submitButton.innerText = 'Слишком далеко 😔';
+                        }
+                        return; 
+                    }
+                }
+
+                if (submitButton) {
+                    submitButton.classList.remove('disabled');
+                    submitButton.style.pointerEvents = 'auto';
+                    submitButton.innerText = 'Сохранить адрес';
+                }
+                return;
+            }
+
+            if (deliveryBlock) deliveryBlock.style.display = 'flex'; 
+
+            if (!calcLat || !calcLon) {
+                if (priceElement) priceElement.innerText = 'Укажите адрес';
+                if (submitButton) {
+                    submitButton.classList.remove('disabled');
+                    submitButton.style.pointerEvents = 'auto';
+                    submitButton.innerText = 'Готово';
+                }
+                return;
+            }
+
+            const straightDist = getDistance(resLat, resLon, calcLat, calcLon);
+            const MAX_DISTANCE_KM = 15; 
+
+            if (straightDist > MAX_DISTANCE_KM) {
+                currentDeliveryFee = 0; 
+                if (priceElement) {
+                    priceElement.innerText = 'Вне зоны';
+                    priceElement.style.color = '#d32f2f'; 
+                    priceElement.style.fontSize = '16px'; 
+                }
                 if (submitButton) {
                     submitButton.classList.add('disabled');
                     submitButton.style.pointerEvents = 'none';
                     submitButton.innerText = 'Слишком далеко 😔';
                 }
-                return; // Блокируем кнопку и выходим
+            } else {
+                currentDeliveryFee = typeof calculateDynamicDeliveryFee === 'function' ? calculateDynamicDeliveryFee(resLat, resLon, calcLat, calcLon) : 0;
+                if (priceElement) {
+                    priceElement.innerText = currentDeliveryFee + ' сом';
+                    priceElement.style.color = '#E65100';
+                    priceElement.style.fontSize = '20px';
+                }
+                if (submitButton) {
+                    submitButton.classList.remove('disabled');
+                    submitButton.style.pointerEvents = 'auto';
+                    submitButton.innerText = 'Готово'; 
+                }
+            }
+            
+            if (typeof updateReceipt === 'function') {
+                updateReceipt();
             }
         }
-
-        // Если точка в пределах рабочей зоны города
-        if (submitButton) {
-            submitButton.classList.remove('disabled');
-            submitButton.style.pointerEvents = 'auto';
-            submitButton.innerText = 'Сохранить адрес';
-        }
-        return;
-    }
-
-    // =======================================================
-    // 2. ЛОГИКА ДЛЯ КОРЗИНЫ (Локальная проверка ресторана)
-    // =======================================================
-    if (deliveryBlock) deliveryBlock.style.display = 'flex'; 
-
-    if (!clientLat || !clientLon) {
-        if (priceElement) priceElement.innerText = 'Укажите адрес';
-        if (submitButton) {
-            submitButton.classList.remove('disabled');
-            submitButton.style.pointerEvents = 'auto';
-            submitButton.innerText = 'Готово';
-        }
-        return;
-    }
-
-    const straightDist = getDistance(resLat, resLon, clientLat, clientLon);
-    const MAX_DISTANCE_KM = 15; // Локальное ограничение доставки именно от этого ресторана
-
-    if (straightDist > MAX_DISTANCE_KM) {
-        currentDeliveryFee = 0; 
-        if (priceElement) {
-            priceElement.innerText = 'Вне зоны';
-            priceElement.style.color = '#d32f2f'; 
-            priceElement.style.fontSize = '16px'; 
-        }
-        if (submitButton) {
-            submitButton.classList.add('disabled');
-            submitButton.style.pointerEvents = 'none';
-            submitButton.innerText = 'Слишком далеко 😔';
-        }
-    } else {
-        currentDeliveryFee = typeof calculateDynamicDeliveryFee === 'function' ? calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon) : 0;
-        if (priceElement) {
-            priceElement.innerText = currentDeliveryFee + ' сом';
-            priceElement.style.color = '#E65100';
-            priceElement.style.fontSize = '20px';
-        }
-        if (submitButton) {
-            submitButton.classList.remove('disabled');
-            submitButton.style.pointerEvents = 'auto';
-            submitButton.innerText = 'Готово'; 
-        }
-    }
-    
-    if (typeof updateReceipt === 'function') {
-        updateReceipt();
-    }
-}
 
         function confirmMapAddress() {
             const inputStreet = document.getElementById('map-street').value.trim();
             const inputKv = document.getElementById('map-kv').value.trim();
+            const mapModal = document.getElementById('modal-map');
 
             if (!inputStreet || inputStreet === 'Определение адреса...' || inputStreet === 'Адрес не определён') {
                 alert("Пожалуйста, укажите корректный адрес.");
                 return;
             }
 
+            // 👉 ПРИМЕНЯЕМ ВРЕМЕННЫЕ КООРДИНАТЫ ТОЛЬКО ПРИ НАЖАТИИ КНОПКИ
+            if (mapModal.dataset.dragLat && mapModal.dataset.dragLon) {
+                clientLat = parseFloat(mapModal.dataset.dragLat);
+                clientLon = parseFloat(mapModal.dataset.dragLon);
+                delete mapModal.dataset.dragLat;
+                delete mapModal.dataset.dragLon;
+            } else if (checkoutMap) {
+                // Страховка: если карту не двигали (например, нашли через поиск)
+                const mapSize = checkoutMap.getSize();
+                const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.25);
+                const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
+                clientLat = latlng.lat;
+                clientLon = latlng.lng;
+            }
+
             orderAddressData.street = inputStreet;
             orderAddressData.kv = inputKv;
             orderAddressData.comment = ''; 
 
-            // 👉 ПРОВЕРЯЕМ, РЕДАКТИРУЕМ ЛИ МЫ СТАРЫЙ АДРЕС
-            const mapModal = document.getElementById('modal-map');
             if (mapModal.dataset.editIndex !== undefined) {
                 let editIndex = parseInt(mapModal.dataset.editIndex);
                 let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
                 
-                // Защита от выхода за пределы массива
                 if (editIndex < saved.length) {
                     saved.splice(editIndex, 1);
                     localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
                     
-                    // Синхронизация с облаком Телеграма при удалении старой версии
                     const tgApp = window.Telegram?.WebApp;
                     if (tgApp && tgApp.CloudStorage) {
                         tgApp.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
                     }
                 }
-                delete mapModal.dataset.editIndex; // Сбрасываем после успешного использования
+                delete mapModal.dataset.editIndex; 
             }
 
-            // ИСПОЛЬЗУЕМ ЕДИНУЮ ФУНКЦИЮ ДЛЯ СОХРАНЕНИЯ ВЕЗДЕ (В Локал и в Облако)
             if (typeof saveAddressToCloudAndLocal === 'function') {
                 saveAddressToCloudAndLocal(clientLat, clientLon, inputStreet, inputKv);
             }
@@ -2096,7 +2106,7 @@ function filterMenu(resId, category, btn) {
                 renderRestaurants();
             }
 
-            document.getElementById('modal-map').classList.add('hidden');
+            mapModal.classList.add('hidden');
 
             if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
                 window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
@@ -2223,25 +2233,28 @@ function confirmAddressFromModal() {
                     }
 
                     const inputStreet = document.getElementById('map-street');
+                    const mapModal = document.getElementById('modal-map');
+                    const isMapOpen = mapModal && !mapModal.classList.contains('hidden');
 
                     if (fullAddress) {
                         if (inputStreet) inputStreet.value = fullAddress;
-                        orderAddressData.street = fullAddress;
+                        if (!isMapOpen) orderAddressData.street = fullAddress;
                     } else {
                         const fallback = data.address.city || data.address.town || data.address.village || "Адрес не определён";
                         if (inputStreet) inputStreet.value = fallback;
-                        orderAddressData.street = fallback;
-                        fullAddress = fallback; // Сохраняем для шапки
+                        if (!isMapOpen) orderAddressData.street = fallback;
+                        fullAddress = fallback; 
                     }
                     
-                    // --- ОБНОВЛЯЕМ АДРЕС В ШАПКЕ ГЛАВНОЙ СТРАНИЦЫ ---
-                    const cityDisplay = document.getElementById('current-city-display');
-                    if (cityDisplay) {
-                        cityDisplay.innerText = fullAddress;
+                    // 👉 ОБНОВЛЯЕМ ГЛОБАЛЬНЫЙ UI ТОЛЬКО ЕСЛИ КАРТА ЗАКРЫТА (Например, на старте)
+                    if (!isMapOpen) {
+                        const cityDisplay = document.getElementById('current-city-display');
+                        if (cityDisplay) {
+                            cityDisplay.innerText = fullAddress;
+                        }
+                        updateCheckoutSummaryUI();
+                        renderRestaurants();
                     }
-                    
-                    updateCheckoutSummaryUI();
-                    renderRestaurants();
                 }
             } catch(e) {
                 console.error("Ошибка определения адреса:", e);
@@ -2251,58 +2264,59 @@ function confirmAddressFromModal() {
                 recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
             }
             if (typeof recalcCheckoutDelivery === 'function') {
-        const activeRes = database[cartActiveTabResId];
-        recalcCheckoutDelivery(activeRes ? activeRes.lat : 0, activeRes ? activeRes.lon : 0);
-    }
-            
+                const activeRes = database[cartActiveTabResId];
+                recalcCheckoutDelivery(activeRes ? activeRes.lat : 0, activeRes ? activeRes.lon : 0);
+            }
         }
         
 
         function initCheckoutMap(resLat, resLon) {
-    // ЗАЩИТА: Если координаты клиента еще null, инициализируем карту на координатах ресторана или дефолте
-    const startLat = clientLat || resLat || 42.6482;
-    const startLon = clientLon || resLon || 77.0855;
+            const startLat = clientLat || resLat || 42.6482;
+            const startLon = clientLon || resLon || 77.0855;
+            const mapModal = document.getElementById('modal-map');
 
-    if (!checkoutMap) {
-        checkoutMap = L.map('fullscreen-map', {zoomControl: false}).setView([startLat, startLon], 16);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(checkoutMap);
-        
-        const resIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180209.png', iconSize: [32, 32] });
-        checkoutResMarker = L.marker([resLat, resLon], {icon: resIcon}).addTo(checkoutMap).bindPopup("Это вы");
-        
-        const centerMarkerEl = document.querySelector('.center-marker-container');
-        const bottomPanel = document.querySelector('.map-floating-controls');
+            if (!checkoutMap) {
+                checkoutMap = L.map('fullscreen-map', {zoomControl: false}).setView([startLat, startLon], 16);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(checkoutMap);
+                
+                const resIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180209.png', iconSize: [32, 32] });
+                checkoutResMarker = L.marker([resLat, resLon], {icon: resIcon}).addTo(checkoutMap).bindPopup("Ваше местонахождение");
+                
+                const centerMarkerEl = document.querySelector('.center-marker-container');
+                const bottomPanel = document.querySelector('.map-floating-controls');
 
-        checkoutMap.on('dragstart', function() {
-            mapWasDragged = true; 
-            if (centerMarkerEl) centerMarkerEl.classList.add('is-dragging');
-            if (bottomPanel) bottomPanel.classList.add('hidden-panel'); 
-            document.getElementById('map-street').value = 'Определение адреса...'; 
-        });
+                checkoutMap.on('dragstart', function() {
+                    mapWasDragged = true; 
+                    if (centerMarkerEl) centerMarkerEl.classList.add('is-dragging');
+                    if (bottomPanel) bottomPanel.classList.add('hidden-panel'); 
+                    document.getElementById('map-street').value = 'Определение адреса...'; 
+                });
 
-        checkoutMap.on('moveend', function() {
-            if (!mapWasDragged) return; 
-            
-            mapWasDragged = false; 
-            if (centerMarkerEl) centerMarkerEl.classList.remove('is-dragging');
-            if (bottomPanel) bottomPanel.classList.remove('hidden-panel'); 
-            
-            const mapSize = checkoutMap.getSize();
-            const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.25);
-            const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
-            
-            clientLat = latlng.lat; 
-            clientLon = latlng.lng;
-            reverseGeocode(clientLat, clientLon);
-        });
-        
-        setMapCenterToMarker(startLat, startLon);
-    } else {
-        setMapCenterToMarker(startLat, startLon);
-        checkoutResMarker.setLatLng([resLat, resLon]);
-    }
-    recalcCheckoutDelivery(resLat, resLon);
-}
+                checkoutMap.on('moveend', function() {
+                    if (!mapWasDragged) return; 
+                    
+                    mapWasDragged = false; 
+                    if (centerMarkerEl) centerMarkerEl.classList.remove('is-dragging');
+                    if (bottomPanel) bottomPanel.classList.remove('hidden-panel'); 
+                    
+                    const mapSize = checkoutMap.getSize();
+                    const pointUnderMarker = L.point(mapSize.x / 2, mapSize.y * 0.25);
+                    const latlng = checkoutMap.containerPointToLatLng(pointUnderMarker);
+                    
+                    // 👉 ВМЕСТО ПЕРЕЗАПИСИ ГЛОБАЛЬНЫХ ПЕРЕМЕННЫХ, СОХРАНЯЕМ ВРЕМЕННО:
+                    mapModal.dataset.dragLat = latlng.lat;
+                    mapModal.dataset.dragLon = latlng.lng;
+                    
+                    reverseGeocode(latlng.lat, latlng.lng);
+                });
+                
+                setMapCenterToMarker(startLat, startLon);
+            } else {
+                setMapCenterToMarker(startLat, startLon);
+                checkoutResMarker.setLatLng([resLat, resLon]);
+            }
+            recalcCheckoutDelivery(resLat, resLon);
+        }
 
         // УМНАЯ ФУНКЦИЯ: Сдвигает карту так, чтобы GPS-точка оказалась ровно под маркером на 25% экрана
         function setMapCenterToMarker(lat, lon) {
