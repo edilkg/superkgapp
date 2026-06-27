@@ -2297,95 +2297,71 @@ function confirmAddressFromModal() {
 
 
 
-        function locateUser() {
-            // Легкая вибрация при клике
-            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-                window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
-            }
+       function locateUser() {
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
+    }
 
-            // УМНЫЙ ПОИСК КНОПКИ: Берем именно ту кнопку, на которую юзер реально нажал
-            let targetBtn = window.event ? window.event.currentTarget : null;
-            
-            // Если событие не перехватилось (на старых устройствах), берем широкую желтую кнопку
-            if (!targetBtn || !targetBtn.innerHTML) {
-                targetBtn = document.querySelector('.map-bottom-panel button[onclick="locateUser()"]');
-            }
+    const geoOverlay = document.getElementById('geo-modal-overlay');
+    const tgApp = window.Telegram?.WebApp;
 
-            let originalContent = '';
-            if (targetBtn) {
-                originalContent = targetBtn.innerHTML;
-                targetBtn.innerHTML = `
-                    <svg class="spin-svg" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto;">
-                        <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
-                        <path d="M21 3v5h-5"></path>
-                    </svg>
-                `;
-                targetBtn.style.pointerEvents = 'none';
-                targetBtn.style.opacity = '0.7';
-            }
+    // Включаем лоадер (если нужно)
+    const locateBtn = document.querySelector('.map-bottom-panel button[onclick="locateUser()"]');
+    if (locateBtn) locateBtn.style.opacity = '0.5';
 
-            // Безопасная функция разморозки кнопки
-            const restoreBtn = () => {
-                if (targetBtn) {
-                    targetBtn.innerHTML = originalContent;
-                    targetBtn.style.pointerEvents = 'auto';
-                    targetBtn.style.opacity = '1';
-                }
-            };
-
-            const geoOverlay = document.getElementById('geo-modal-overlay');
-            const tgApp = window.Telegram?.WebApp;
-
-            if (tgApp && tgApp.LocationManager) {
-                tgApp.LocationManager.init(() => {
-                    // Проверяем: если юзер уже запретил гео в боте ИЛИ GPS аппаратно выключен в шторке
-                    if ((tgApp.LocationManager.isAccessRequested && !tgApp.LocationManager.isAccessGranted) || tgApp.LocationManager.isLocationAvailable === false) {
-                        restoreBtn();
-                        if (typeof updateGeoModalDesign === 'function') updateGeoModalDesign(isAddressRestored);
-                        geoOverlay.style.display = 'flex';
-                    } else {
-                        // Запрашиваем гео (Телеграм сам вызовет системный попап "Разрешить", если еще не спрашивал)
+    // 1. Пытаемся получить гео через Telegram WebApp API
+    if (tgApp && tgApp.LocationManager) {
+        tgApp.LocationManager.init(() => {
+            // Если доступ уже есть — просто берем данные
+            if (tgApp.LocationManager.isAccessGranted && tgApp.LocationManager.isLocationAvailable) {
+                tgApp.LocationManager.getLocation((data) => {
+                    if (data && data.latitude) {
+                        clientLat = data.latitude;
+                        clientLon = data.longitude;
+                        if (typeof setMapCenterToMarker === 'function') setMapCenterToMarker(clientLat, clientLon);
+                        if (typeof reverseGeocode === 'function') reverseGeocode(clientLat, clientLon);
+                    }
+                    if (locateBtn) locateBtn.style.opacity = '1';
+                });
+            } else {
+                // Если доступа нет — вызываем СИСТЕМНЫЙ запрос (он и покажет окно как на картинке)
+                tgApp.LocationManager.requestAccess((granted) => {
+                    if (granted) {
                         tgApp.LocationManager.getLocation((data) => {
-                            restoreBtn();
                             if (data && data.latitude) {
                                 clientLat = data.latitude;
                                 clientLon = data.longitude;
-                                mapWasDragged = false;
                                 if (typeof setMapCenterToMarker === 'function') setMapCenterToMarker(clientLat, clientLon);
                                 if (typeof reverseGeocode === 'function') reverseGeocode(clientLat, clientLon);
-                            } else {
-                                // Если системный попап не сработал или юзер нажал "Запретить" прямо сейчас
-                                if (typeof updateGeoModalDesign === 'function') updateGeoModalDesign(isAddressRestored);
-                                geoOverlay.style.display = 'flex'; 
                             }
+                            if (locateBtn) locateBtn.style.opacity = '1';
                         });
+                    } else {
+                        // Юзер нажал "Не разрешать" или GPS выключен — показываем ТВОЕ окно
+                        if (locateBtn) locateBtn.style.opacity = '1';
+                        geoOverlay.style.display = 'flex';
                     }
                 });
-            } else {
-                // Резервный вариант для обычного браузера
-                if (!navigator.geolocation) {
-                    restoreBtn();
-                    return alert("Браузер не поддерживает GPS");
-                }
-                
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        restoreBtn();
-                        clientLat = position.coords.latitude;
-                        clientLon = position.coords.longitude;
-                        mapWasDragged = false;
-                        if (typeof setMapCenterToMarker === 'function') setMapCenterToMarker(clientLat, clientLon);
-                        if (typeof reverseGeocode === 'function') reverseGeocode(clientLat, clientLon);
-                    },
-                    (error) => {
-                        restoreBtn();
-                        if (typeof updateGeoModalDesign === 'function') updateGeoModalDesign(isAddressRestored);
-                        geoOverlay.style.display = 'flex'; 
-                    },
-                    { enableHighAccuracy: true, timeout: 10000 }
-                );
             }
-        }
+        });
+    } else {
+        // Резерв для обычного браузера: navigator.geolocation сам вызовет системное окно
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                if (locateBtn) locateBtn.style.opacity = '1';
+                clientLat = pos.coords.latitude;
+                clientLon = pos.coords.longitude;
+                if (typeof setMapCenterToMarker === 'function') setMapCenterToMarker(clientLat, clientLon);
+                if (typeof reverseGeocode === 'function') reverseGeocode(clientLat, clientLon);
+            },
+            (err) => {
+                if (locateBtn) locateBtn.style.opacity = '1';
+                geoOverlay.style.display = 'flex'; // Показываем свое окно только при отказе
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    }
+}
 
 
        
