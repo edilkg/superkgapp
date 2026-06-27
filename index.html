@@ -1118,57 +1118,7 @@
             return Math.round(baseFee);
         }
 
-        // --- ЗАЩИТА КНОПКИ НАЗАД (БЛОКИРОВКА СБРОСА АДРЕСА ПРИ ОТКРЫТОЙ КАРТЕ) ---
-if (window.Telegram && window.Telegram.WebApp) {
-    window.Telegram.WebApp.BackButton.onClick(() => {
-        // 1. Ищем слои карты и истории адресов
-        const mapOverlay = document.getElementById('map-overlay');
-        const mapModal = document.getElementById('map-modal');
-        const mapContainer = document.getElementById('map-container');
-        const addressHistory = document.getElementById('address-history-modal');
-
-        // Проверяем, открыта ли карта (видима ли она)
-        const isMapOpen = (mapOverlay && mapOverlay.style.display !== 'none' && mapOverlay.style.display !== '') || 
-                          (mapModal && mapModal.style.display !== 'none' && mapModal.style.display !== '') ||
-                          (mapContainer && mapContainer.style.display !== 'none' && mapContainer.style.display !== '');
-
-        // 🛑 ЕСЛИ ОТКРЫТА КАРТА: Прячем её и останавливаем код (чтобы не вылететь из корзины)
-        if (isMapOpen) {
-            if (mapOverlay) mapOverlay.style.display = 'none';
-            if (mapModal) mapModal.style.display = 'none';
-            if (mapContainer) mapContainer.style.display = 'none';
-            
-            // Если мы находимся в корзине (оформление заказа), оставляем кнопку Назад видимой
-            if (typeof currentScreen !== 'undefined' && currentScreen === 'cart') {
-                window.Telegram.WebApp.BackButton.show();
-            } else {
-                window.Telegram.WebApp.BackButton.hide();
-            }
-            return; // ⚠️ ПРЕРЫВАЕМ КОД! Адрес больше не сбросится.
-        }
-
-        // 🛑 ЕСЛИ ОТКРЫТА ИСТОРИЯ АДРЕСОВ: прячем только её
-        if (addressHistory && addressHistory.style.display !== 'none' && addressHistory.style.display !== '') {
-            addressHistory.style.display = 'none';
-            return; // Прерываем код
-        }
-
-        // 2. Если карты нет, делаем обычный переход назад по приложению
-        if (typeof currentScreen !== 'undefined') {
-            if (currentScreen === 'cart') {
-                if (typeof showScreen === 'function') showScreen('restaurant');
-                else window.history.back();
-            } else if (currentScreen === 'restaurant') {
-                if (typeof showScreen === 'function') showScreen('main');
-                else window.history.back();
-            } else {
-                window.history.back();
-            }
-        } else {
-            window.history.back();
-        }
-    });
-}
+        
 
         const tg = window.Telegram?.WebApp || null;
         if (tg) {
@@ -1971,8 +1921,11 @@ function filterMenu(resId, category, btn) {
             clientLat = data.lat;
             clientLon = data.lon;
             
-            // Удаляем старую запись, чтобы после редактирования сохранилась новая
-            deleteAddressFromModal(index); 
+            // 👉 Вместо глобальной переменной прячем индекс прямо в HTML карты
+            document.getElementById('modal-map').dataset.editIndex = index;
+            
+            // УДАЛЕНО: deleteAddressFromModal(index); 
+            // Теперь мы удаляем старый адрес только если юзер сохранит новый!
             
             document.getElementById('modal-my-addresses').classList.add('hidden');
             openMapModal();
@@ -1984,8 +1937,10 @@ function filterMenu(resId, category, btn) {
             // Очищаем текущие инпуты, чтобы открыть "чистую" карту
             document.getElementById('map-street').value = '';
             document.getElementById('map-kv').value = '';
-            // Строку с очисткой map-comment удалили, чтобы код не падал
             orderAddressData = { street: '', pod: '', kv: '', comment: '' };
+            
+            // 👉 Сбрасываем скрытый индекс, чтобы случайно не удалить чужой адрес
+            delete document.getElementById('modal-map').dataset.editIndex;
             
             openMapModal();
         }
@@ -2102,6 +2057,26 @@ function filterMenu(resId, category, btn) {
             orderAddressData.street = inputStreet;
             orderAddressData.kv = inputKv;
             orderAddressData.comment = ''; 
+
+            // 👉 ПРОВЕРЯЕМ, РЕДАКТИРУЕМ ЛИ МЫ СТАРЫЙ АДРЕС
+            const mapModal = document.getElementById('modal-map');
+            if (mapModal.dataset.editIndex !== undefined) {
+                let editIndex = parseInt(mapModal.dataset.editIndex);
+                let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+                
+                // Защита от выхода за пределы массива
+                if (editIndex < saved.length) {
+                    saved.splice(editIndex, 1);
+                    localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+                    
+                    // Синхронизация с облаком Телеграма при удалении старой версии
+                    const tgApp = window.Telegram?.WebApp;
+                    if (tgApp && tgApp.CloudStorage) {
+                        tgApp.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+                    }
+                }
+                delete mapModal.dataset.editIndex; // Сбрасываем после успешного использования
+            }
 
             // ИСПОЛЬЗУЕМ ЕДИНУЮ ФУНКЦИЮ ДЛЯ СОХРАНЕНИЯ ВЕЗДЕ (В Локал и в Облако)
             if (typeof saveAddressToCloudAndLocal === 'function') {
