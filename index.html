@@ -2952,6 +2952,8 @@ function copyPaymentNumber() {
             }
         });
 
+        // Обработка клика по желтой кнопке (строго обернутая функция)
+        btnConfirmGeo.addEventListener('click', () => {
             if(tgApp && tgApp.HapticFeedback) tgApp.HapticFeedback.impactOccurred('medium');
             
             if (tgApp && tgApp.LocationManager) {
@@ -2968,7 +2970,6 @@ function copyPaymentNumber() {
                             localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                             geoOverlay.style.display = 'none';
                             if(tgApp.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('success');
-                            // --- НОВОЕ: Сразу переводим точку в название улицы ---
                             reverseGeocode(clientLat, clientLon);
                         } else {
                             btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⚙️</span> Открыть настройки';
@@ -2984,7 +2985,6 @@ function copyPaymentNumber() {
                         clientLon = pos.coords.longitude;
                         localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                         geoOverlay.style.display = 'none';
-                        // --- НОВОЕ: Сразу переводим точку в название улицы ---
                         reverseGeocode(clientLat, clientLon);
                     },
                     (err) => {
@@ -2996,7 +2996,7 @@ function copyPaymentNumber() {
             }
         });
 
-       window.isAddressSelectedFromList = false; // Глобальный флаг защиты от двойного поиска
+        window.isAddressSelectedFromList = false; // Глобальный флаг защиты от двойного поиска
         let autocompleteTimeout = null;
 
         // ЕДИНАЯ ФУНКЦИЯ ПОИСКА (БЕЗ ЗАДЕРЖЕК И ЛАГОВ С ИСПРАВЛЕННЫМ ЦЕНТРИРОВАНИЕМ)
