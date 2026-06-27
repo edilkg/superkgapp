@@ -1118,6 +1118,58 @@
             return Math.round(baseFee);
         }
 
+        // --- ЗАЩИТА КНОПКИ НАЗАД (БЛОКИРОВКА СБРОСА АДРЕСА ПРИ ОТКРЫТОЙ КАРТЕ) ---
+if (window.Telegram && window.Telegram.WebApp) {
+    window.Telegram.WebApp.BackButton.onClick(() => {
+        // 1. Ищем слои карты и истории адресов
+        const mapOverlay = document.getElementById('map-overlay');
+        const mapModal = document.getElementById('map-modal');
+        const mapContainer = document.getElementById('map-container');
+        const addressHistory = document.getElementById('address-history-modal');
+
+        // Проверяем, открыта ли карта (видима ли она)
+        const isMapOpen = (mapOverlay && mapOverlay.style.display !== 'none' && mapOverlay.style.display !== '') || 
+                          (mapModal && mapModal.style.display !== 'none' && mapModal.style.display !== '') ||
+                          (mapContainer && mapContainer.style.display !== 'none' && mapContainer.style.display !== '');
+
+        // 🛑 ЕСЛИ ОТКРЫТА КАРТА: Прячем её и останавливаем код (чтобы не вылететь из корзины)
+        if (isMapOpen) {
+            if (mapOverlay) mapOverlay.style.display = 'none';
+            if (mapModal) mapModal.style.display = 'none';
+            if (mapContainer) mapContainer.style.display = 'none';
+            
+            // Если мы находимся в корзине (оформление заказа), оставляем кнопку Назад видимой
+            if (typeof currentScreen !== 'undefined' && currentScreen === 'cart') {
+                window.Telegram.WebApp.BackButton.show();
+            } else {
+                window.Telegram.WebApp.BackButton.hide();
+            }
+            return; // ⚠️ ПРЕРЫВАЕМ КОД! Адрес больше не сбросится.
+        }
+
+        // 🛑 ЕСЛИ ОТКРЫТА ИСТОРИЯ АДРЕСОВ: прячем только её
+        if (addressHistory && addressHistory.style.display !== 'none' && addressHistory.style.display !== '') {
+            addressHistory.style.display = 'none';
+            return; // Прерываем код
+        }
+
+        // 2. Если карты нет, делаем обычный переход назад по приложению
+        if (typeof currentScreen !== 'undefined') {
+            if (currentScreen === 'cart') {
+                if (typeof showScreen === 'function') showScreen('restaurant');
+                else window.history.back();
+            } else if (currentScreen === 'restaurant') {
+                if (typeof showScreen === 'function') showScreen('main');
+                else window.history.back();
+            } else {
+                window.history.back();
+            }
+        } else {
+            window.history.back();
+        }
+    });
+}
+
         const tg = window.Telegram?.WebApp || null;
         if (tg) {
             tg.expand();
@@ -2241,7 +2293,7 @@ function confirmAddressFromModal() {
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(checkoutMap);
         
         const resIcon = L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/3180/3180209.png', iconSize: [32, 32] });
-        checkoutResMarker = L.marker([resLat, resLon], {icon: resIcon}).addTo(checkoutMap).bindPopup("Ресторан");
+        checkoutResMarker = L.marker([resLat, resLon], {icon: resIcon}).addTo(checkoutMap).bindPopup("Это вы");
         
         const centerMarkerEl = document.querySelector('.center-marker-container');
         const bottomPanel = document.querySelector('.map-floating-controls');
@@ -3038,7 +3090,7 @@ function copyPaymentNumber() {
         document.addEventListener("visibilitychange", function() {
             if (document.visibilityState === 'visible') {
                 if (geoOverlay.style.display !== 'none') {
-                    btnConfirmGeo.innerText = "Проверяем, 3 секунды...";
+                    btnConfirmGeo.innerText = "Я включил GPS";
 
                     if (tgApp && tgApp.LocationManager) {
                         tgApp.LocationManager.getLocation((data) => {
