@@ -2116,7 +2116,20 @@ function filterMenu(resId, category, btn) {
 function confirmAddressFromModal() {
     let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
     if (saved.length > 0 && saved[tempSelectedAddressIndex]) {
+        // Сохраняем данные до того, как начнем менять массив
         const data = saved[tempSelectedAddressIndex];
+        
+        // 👉 НАШ НОВЫЙ БЛОК НАЧАЛО: Перемещаем адрес в конец списка
+        let chosenAddress = saved.splice(tempSelectedAddressIndex, 1)[0];
+        saved.push(chosenAddress);
+        localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+        
+        // Синхронизируем с облаком
+        const tgApp = window.Telegram?.WebApp;
+        if (tgApp && tgApp.CloudStorage) {
+            tgApp.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+        }
+        // 👉 НАШ НОВЫЙ БЛОК КОНЕЦ
         
         // Записываем адрес в глобальные переменные системы
         orderAddressData.street = data.street;
