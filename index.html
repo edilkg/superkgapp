@@ -1896,6 +1896,12 @@ function filterMenu(resId, category, btn) {
             saved.splice(index, 1);
             localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
             
+            // СИНХРОНИЗАЦИЯ С ОБЛАКОМ ТЕЛЕГРАМА
+            const tgApp = window.Telegram?.WebApp;
+            if (tgApp && tgApp.CloudStorage) {
+                tgApp.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+            }
+            
             if (tempSelectedAddressIndex >= saved.length) {
                 tempSelectedAddressIndex = Math.max(0, saved.length - 1);
             }
@@ -2033,59 +2039,42 @@ function filterMenu(resId, category, btn) {
 }
 
         function confirmMapAddress() {
-    const inputStreet = document.getElementById('map-street').value.trim();
-    const inputKv = document.getElementById('map-kv').value.trim();
+            const inputStreet = document.getElementById('map-street').value.trim();
+            const inputKv = document.getElementById('map-kv').value.trim();
 
-    if (!inputStreet || inputStreet === 'Определение адреса...' || inputStreet === 'Адрес не определён') {
-        alert("Пожалуйста, укажите корректный адрес.");
-        return;
-    }
+            if (!inputStreet || inputStreet === 'Определение адреса...' || inputStreet === 'Адрес не определён') {
+                alert("Пожалуйста, укажите корректный адрес.");
+                return;
+            }
 
-    orderAddressData.street = inputStreet;
-    orderAddressData.kv = inputKv;
-    orderAddressData.comment = ''; 
+            orderAddressData.street = inputStreet;
+            orderAddressData.kv = inputKv;
+            orderAddressData.comment = ''; 
 
-    // 👉 НОВОЕ: Запоминаем этот адрес как текущий активный, чтобы при перезагрузке он выводился сразу
-    localStorage.setItem('tamak_last_lat', clientLat);
-    localStorage.setItem('tamak_last_lon', clientLon);
-    localStorage.setItem('tamak_last_street', inputStreet);
-    localStorage.setItem('tamak_last_kv', inputKv);
+            // ИСПОЛЬЗУЕМ ЕДИНУЮ ФУНКЦИЮ ДЛЯ СОХРАНЕНИЯ ВЕЗДЕ (В Локал и в Облако)
+            if (typeof saveAddressToCloudAndLocal === 'function') {
+                saveAddressToCloudAndLocal(clientLat, clientLon, inputStreet, inputKv);
+            }
 
-    // Сохраняем в локальную память телефона для списка адресов
-    let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
-    let displayStr = inputStreet;
-    if (inputKv) displayStr += `, ${inputKv}`;
+            const isCartVisible = !document.getElementById('screen-cart-list').classList.contains('hidden');
 
-    const exists = saved.some(a => a.street === inputStreet && a.kv === inputKv);
-    if (!exists) {
-        saved.push({
-            text: displayStr,
-            street: inputStreet,
-            kv: inputKv,
-            lat: clientLat,
-            lon: clientLon
-        });
-        localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
-    }
+            if (isCartVisible) {
+                updateCheckoutSummaryUI();
+                updateReceipt();
+            } else {
+                const cityDisplay = document.getElementById('current-city-display');
+                let displayStr = inputStreet;
+                if (inputKv) displayStr += `, ${inputKv}`;
+                if (cityDisplay) cityDisplay.innerText = displayStr;
+                renderRestaurants();
+            }
 
-    const isCartVisible = !document.getElementById('screen-cart-list').classList.contains('hidden');
+            document.getElementById('modal-map').classList.add('hidden');
 
-    // Синхронно обновляем экраны
-    if (isCartVisible) {
-        updateCheckoutSummaryUI();
-        updateReceipt();
-    } else {
-        const cityDisplay = document.getElementById('current-city-display');
-        if (cityDisplay) cityDisplay.innerText = displayStr;
-        renderRestaurants();
-    }
-
-    document.getElementById('modal-map').classList.add('hidden');
-
-    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-    }
-}
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+            }
+        }
 
 function confirmAddressFromModal() {
     let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
@@ -2395,6 +2384,13 @@ function confirmAddressFromModal() {
             let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
             saved.splice(index, 1);
             localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+            
+            // СИНХРОНИЗАЦИЯ С ОБЛАКОМ ТЕЛЕГРАМА
+            const tgApp = window.Telegram?.WebApp;
+            if (tgApp && tgApp.CloudStorage) {
+                tgApp.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+            }
+            
             renderSavedAddressesUI();
         }
 
@@ -2810,17 +2806,20 @@ function copyPaymentNumber() {
             
             const isDuplicate = saved.some(addr => addr.street === street && addr.kv === kv);
             if (!isDuplicate) {
-                saved.push({ text: street, street: street, kv: kv, lat: lat, lon: lon });
+                let displayStr = street;
+                if (kv) displayStr += `, ${kv}`; // Добавляем номер дома/квартиры
+                saved.push({ text: displayStr, street: street, kv: kv, lat: lat, lon: lon });
             }
 
-            // Запись локально (чтобы моментально работали твои старые функции)
+            // Запись локально
             localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
             localStorage.setItem('tamak_last_lat', lat);
             localStorage.setItem('tamak_last_lon', lon);
             localStorage.setItem('tamak_last_street', street);
             localStorage.setItem('tamak_last_kv', kv);
 
-            // СИНХРОНИЗАЦИЯ: Отправляем бэкап в бессмертное Облако Telegram
+            // СИНХРОНИЗАЦИЯ С ОБЛАКОМ ТЕЛЕГРАМА
+            const tgApp = window.Telegram?.WebApp;
             if (tgApp && tgApp.CloudStorage) {
                 tgApp.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
                 tgApp.CloudStorage.setItem('tamak_last_lat', lat.toString());
