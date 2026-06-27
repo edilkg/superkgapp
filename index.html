@@ -2297,71 +2297,121 @@ function confirmAddressFromModal() {
 
 
 
-       function locateUser() {
-    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-        window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
-    }
-
-    const geoOverlay = document.getElementById('geo-modal-overlay');
-    const tgApp = window.Telegram?.WebApp;
-
-    // Включаем лоадер (если нужно)
-    const locateBtn = document.querySelector('.map-bottom-panel button[onclick="locateUser()"]');
-    if (locateBtn) locateBtn.style.opacity = '0.5';
-
-    // 1. Пытаемся получить гео через Telegram WebApp API
-    if (tgApp && tgApp.LocationManager) {
-        tgApp.LocationManager.init(() => {
-            // Если доступ уже есть — просто берем данные
-            if (tgApp.LocationManager.isAccessGranted && tgApp.LocationManager.isLocationAvailable) {
-                tgApp.LocationManager.getLocation((data) => {
-                    if (data && data.latitude) {
-                        clientLat = data.latitude;
-                        clientLon = data.longitude;
-                        if (typeof setMapCenterToMarker === 'function') setMapCenterToMarker(clientLat, clientLon);
-                        if (typeof reverseGeocode === 'function') reverseGeocode(clientLat, clientLon);
-                    }
-                    if (locateBtn) locateBtn.style.opacity = '1';
-                });
-            } else {
-                // Если доступа нет — вызываем СИСТЕМНЫЙ запрос (он и покажет окно как на картинке)
-                tgApp.LocationManager.requestAccess((granted) => {
-                    if (granted) {
-                        tgApp.LocationManager.getLocation((data) => {
-                            if (data && data.latitude) {
-                                clientLat = data.latitude;
-                                clientLon = data.longitude;
-                                if (typeof setMapCenterToMarker === 'function') setMapCenterToMarker(clientLat, clientLon);
-                                if (typeof reverseGeocode === 'function') reverseGeocode(clientLat, clientLon);
-                            }
-                            if (locateBtn) locateBtn.style.opacity = '1';
-                        });
-                    } else {
-                        // Юзер нажал "Не разрешать" или GPS выключен — показываем ТВОЕ окно
-                        if (locateBtn) locateBtn.style.opacity = '1';
-                        geoOverlay.style.display = 'flex';
-                    }
-                });
+        function locateUser() {
+            // Легкая вибрация при клике
+            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+                window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
             }
-        });
-    } else {
-        // Резерв для обычного браузера: navigator.geolocation сам вызовет системное окно
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                if (locateBtn) locateBtn.style.opacity = '1';
-                clientLat = pos.coords.latitude;
-                clientLon = pos.coords.longitude;
-                if (typeof setMapCenterToMarker === 'function') setMapCenterToMarker(clientLat, clientLon);
-                if (typeof reverseGeocode === 'function') reverseGeocode(clientLat, clientLon);
-            },
-            (err) => {
-                if (locateBtn) locateBtn.style.opacity = '1';
-                geoOverlay.style.display = 'flex'; // Показываем свое окно только при отказе
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
-    }
-}
+
+            // Ищем все кнопки геолокации, чтобы правильно повесить лоадер (на карте их 2)
+            const locateBtns = document.querySelectorAll('[onclick="locateUser()"]');
+            const originalContents = [];
+
+            locateBtns.forEach((btn, index) => {
+                originalContents[index] = btn.innerHTML;
+                btn.innerHTML = `
+                    <svg class="spin-svg" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 24px; height: 24px; margin: 0 auto; display: block;">
+                        <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
+                        <path d="M21 3v5h-5"></path>
+                    </svg>
+                `;
+                btn.style.pointerEvents = 'none';
+                btn.style.opacity = '0.7';
+            });
+
+            // Crash-proof: Безопасная функция разморозки кнопок
+            const restoreBtn = () => {
+                locateBtns.forEach((btn, index) => {
+                    btn.innerHTML = originalContents[index];
+                    btn.style.pointerEvents = 'auto';
+                    btn.style.opacity = '1';
+                });
+            };
+
+            const geoOverlay = document.getElementById('geo-modal-overlay');
+            const tgApp = window.Telegram?.WebApp;
+
+            if (tgApp && tgApp.LocationManager) {
+                // ИСПРАВЛЕНИЕ 1: Метод init() в API Telegram не принимает функцию внутри себя!
+                // Вызываем его просто как команду, а логику пишем ниже.
+                tgApp.LocationManager.init();
+                
+                // Проверяем доступы
+                if ((tgApp.LocationManager.isAccessRequested && !tgApp.LocationManager.isAccessGranted) || tgApp.LocationManager.isLocationAvailable === false) {
+                    restoreBtn();
+                    if (typeof updateGeoModalDesign === 'function') updateGeoModalDesign(typeof isAddressRestored !== 'undefined' ? isAddressRestored : false);
+                    if (geoOverlay) geoOverlay.style.display = 'flex'; // Вызываем твое окно-разрешение
+                } else {
+                    tgApp.LocationManager.getLocation((data) => {
+                        restoreBtn();
+                        if (data && data.latitude) {
+                            clientLat = data.latitude;
+                            clientLon = data.longitude;
+                            if (typeof mapWasDragged !== 'undefined') mapWasDragged = false;
+                            
+                            // ИСПРАВЛЕНИЕ 2: Делаем плавный зум вблизи (масштаб 18) прямо к домам
+                            if (typeof checkoutMap !== 'undefined' && checkoutMap) {
+                                const mapSize = checkoutMap.getSize();
+                                if (mapSize.x !== 0 && mapSize.y !== 0) {
+                                    const targetPoint = checkoutMap.project([clientLat, clientLon], 18);
+                                    targetPoint.y += (mapSize.y * 0.25); 
+                                    const centerLatLng = checkoutMap.unproject(targetPoint, 18);
+                                    // Используем flyTo для красивой анимации полета
+                                    checkoutMap.flyTo(centerLatLng, 18, {animate: true, duration: 1});
+                                } else {
+                                    checkoutMap.setView([clientLat, clientLon], 18);
+                                }
+                            } else if (typeof setMapCenterToMarker === 'function') {
+                                setMapCenterToMarker(clientLat, clientLon);
+                            }
+                            
+                            if (typeof reverseGeocode === 'function') reverseGeocode(clientLat, clientLon);
+                        } else {
+                            if (typeof updateGeoModalDesign === 'function') updateGeoModalDesign(typeof isAddressRestored !== 'undefined' ? isAddressRestored : false);
+                            if (geoOverlay) geoOverlay.style.display = 'flex'; 
+                        }
+                    });
+                }
+            } else {
+                // Резервный вариант для обычного браузера (вне Телеграма)
+                if (!navigator.geolocation) {
+                    restoreBtn();
+                    return alert("Браузер не поддерживает GPS"); 
+                }
+                
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        restoreBtn();
+                        clientLat = position.coords.latitude;
+                        clientLon = position.coords.longitude;
+                        if (typeof mapWasDragged !== 'undefined') mapWasDragged = false;
+                        
+                        // Плавный зум вблизи (масштаб 18)
+                        if (typeof checkoutMap !== 'undefined' && checkoutMap) {
+                            const mapSize = checkoutMap.getSize();
+                            if (mapSize.x !== 0 && mapSize.y !== 0) {
+                                const targetPoint = checkoutMap.project([clientLat, clientLon], 18);
+                                targetPoint.y += (mapSize.y * 0.25); 
+                                const centerLatLng = checkoutMap.unproject(targetPoint, 18);
+                                checkoutMap.flyTo(centerLatLng, 18, {animate: true, duration: 1});
+                            } else {
+                                checkoutMap.setView([clientLat, clientLon], 18);
+                            }
+                        } else if (typeof setMapCenterToMarker === 'function') {
+                            setMapCenterToMarker(clientLat, clientLon);
+                        }
+
+                        if (typeof reverseGeocode === 'function') reverseGeocode(clientLat, clientLon);
+                    },
+                    (error) => {
+                        restoreBtn();
+                        if (typeof updateGeoModalDesign === 'function') updateGeoModalDesign(typeof isAddressRestored !== 'undefined' ? isAddressRestored : false);
+                        if (geoOverlay) geoOverlay.style.display = 'flex'; 
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            }
+        }
 
 
        
