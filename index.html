@@ -2789,7 +2789,7 @@ function copyPaymentNumber() {
         // Подключаем API Телеграма
         const tgApp = window.Telegram?.WebApp;
 
-        // 👉 1. ПРОВЕРЯЕМ, ЕСТЬ ЛИ УЖЕ СОХРАНЕННЫЙ АДРЕС
+        // 👉 1. ПРОВЕРЯЕМ, ЕСТЬ ЛИ УЖЕ СОХРАНЕННЫЙ АДРЕС В ПАМЯТИ
         const savedLat = localStorage.getItem('tamak_last_lat');
         const savedLon = localStorage.getItem('tamak_last_lon');
         const savedStreet = localStorage.getItem('tamak_last_street');
@@ -2813,8 +2813,9 @@ function copyPaymentNumber() {
             isAddressRestored = true;
         }
 
+        // 👉 1.5. ВОССТАНАВЛИВАЕМ ФОНОВЫЙ ИНТЕРФЕЙС
+        // Если адрес есть, рисуем его на заднем фоне. Так интерфейс не будет пустым, если всплывет модалка.
         if (isAddressRestored) {
-            // 👉 2А. ЕСЛИ АДРЕС ЕСТЬ: Выводим его и не мучаем юзера проверками
             let finalDisplayString = orderAddressData.street;
             if (orderAddressData.kv) finalDisplayString += `, ${orderAddressData.kv}`;
 
@@ -2825,37 +2826,47 @@ function copyPaymentNumber() {
             
             renderRestaurants();
             if (typeof updateCheckoutSummaryUI === 'function') updateCheckoutSummaryUI();
-        } else {
-            // 👉 2Б. ЕСЛИ АДРЕСА НЕТ: Строгая проверка Telegram (Гео в боте + Гео в шторке)
-            if (tgApp && tgApp.LocationManager) {
-                tgApp.LocationManager.init(() => {
-                    // ПРОВЕРЯЕМ: нет доступа в боте ИЛИ выключен GPS в телефоне
-                    if (!tgApp.LocationManager.isAccessGranted || !tgApp.LocationManager.isLocationEnabled) {
-                        geoOverlay.style.display = 'flex';
-                    } else {
-                        tgApp.LocationManager.getLocation((data) => {
-                            if (data && data.latitude) {
-                                clientLat = data.latitude;
-                                clientLon = data.longitude;
-                                localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                                reverseGeocode(clientLat, clientLon);
-                            } else {
-                                // Защита: если данные пустые (GPS выключен в шторке) - выводим модалку
-                                geoOverlay.style.display = 'flex';
-                            }
-                        });
-                    }
-                });
-            } else {
-                // Резервный вариант для браузера
-                if (!localStorage.getItem('user_geo')) {
+        }
+
+        // 👉 2. СТРОГАЯ ПРОВЕРКА ГЕОЛОКАЦИИ НА СТАРТЕ (ВОССТАНОВЛЕНО ПО ТВОЕМУ ТРЕБОВАНИЮ)
+        // Теперь окно будет всплывать ВСЕГДА, если GPS выключен в шторке (даже при наличии адреса)
+        if (tgApp && tgApp.LocationManager) {
+            tgApp.LocationManager.init(() => {
+                // ПРОВЕРЯЕМ: нет доступа в боте ИЛИ выключен GPS в шторке телефона
+                if (!tgApp.LocationManager.isAccessGranted || !tgApp.LocationManager.isLocationEnabled) {
                     geoOverlay.style.display = 'flex';
                 } else {
-                    let sg = JSON.parse(localStorage.getItem('user_geo'));
-                    clientLat = sg.lat;
-                    clientLon = sg.lon;
-                    reverseGeocode(clientLat, clientLon);
+                    tgApp.LocationManager.getLocation((data) => {
+                        if (data && data.latitude) {
+                            clientLat = data.latitude;
+                            clientLon = data.longitude;
+                            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                            reverseGeocode(clientLat, clientLon);
+                        } else {
+                            // Защита: если координаты пустые (например, GPS отключили во время загрузки)
+                            geoOverlay.style.display = 'flex';
+                        }
+                    });
                 }
+            });
+        } else {
+            // Резервный вариант для обычного браузера
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        clientLat = position.coords.latitude;
+                        clientLon = position.coords.longitude;
+                        localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                        reverseGeocode(clientLat, clientLon);
+                    },
+                    (error) => {
+                        // Если GPS выключен или доступ запрещен в браузере - вызываем твое окно!
+                        geoOverlay.style.display = 'flex';
+                    },
+                    { enableHighAccuracy: true, timeout: 5000 }
+                );
+            } else {
+                geoOverlay.style.display = 'flex';
             }
         }
 
