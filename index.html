@@ -2115,6 +2115,7 @@ function filterMenu(resId, category, btn) {
 
 function confirmAddressFromModal() {
     let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
+    
     if (saved.length > 0 && saved[tempSelectedAddressIndex]) {
         // Сохраняем данные до того, как начнем менять массив
         const data = saved[tempSelectedAddressIndex];
@@ -2124,7 +2125,7 @@ function confirmAddressFromModal() {
         saved.push(chosenAddress);
         localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
         
-        // Синхронизируем с облаком
+        // Синхронизируем с облаком Telegram
         const tgApp = window.Telegram?.WebApp;
         if (tgApp && tgApp.CloudStorage) {
             tgApp.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
@@ -2132,22 +2133,24 @@ function confirmAddressFromModal() {
         // 👉 НАШ НОВЫЙ БЛОК КОНЕЦ
         
         // Записываем адрес в глобальные переменные системы
-        orderAddressData.street = data.street;
+        orderAddressData.street = data.street || '';
         orderAddressData.pod = data.pod || '';
         orderAddressData.kv = data.kv || '';
         orderAddressData.comment = '';
         clientLat = data.lat;
         clientLon = data.lon;
 
-        // 👉 НОВОЕ: Жестко фиксируем этот адрес как активный для перезагрузок
+        // 👉 РЕШЕНИЕ ПРОБЛЕМЫ: Жестко фиксируем этот адрес как активный для перезагрузок
         localStorage.setItem('tamak_last_lat', clientLat);
         localStorage.setItem('tamak_last_lon', clientLon);
-        localStorage.setItem('tamak_last_street', data.street);
+        localStorage.setItem('tamak_last_street', data.street || '');
         localStorage.setItem('tamak_last_kv', data.kv || '');
         
         // 1. Обновляем адрес в верхней шапке главного меню
         const cityDisplay = document.getElementById('current-city-display');
-        if (cityDisplay) cityDisplay.innerText = data.text || data.street;
+        if (cityDisplay) {
+            cityDisplay.innerText = data.text || data.street || '';
+        }
         
         // 2. ЖЕЛЕЗНО обновляем адрес и на странице оформления заказа (в корзине)
         if (typeof updateCheckoutSummaryUI === 'function') {
@@ -2167,12 +2170,16 @@ function confirmAddressFromModal() {
     }
     
     // Закрываем окно списка адресов
-    document.getElementById('modal-my-addresses').classList.add('hidden');
+    const modal = document.getElementById('modal-my-addresses');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
     
+    // Вызываем тактильный отклик Telegram (вибрация успеха)
     if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
         window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
     }
-}   
+}
 
 
         async function geocodeAddressFromInput() {
