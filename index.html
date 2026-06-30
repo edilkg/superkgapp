@@ -2357,43 +2357,48 @@ function confirmAddressFromModal() {
 
 
         function locateUser() {
-            // Включаем визуальный индикатор загрузки на кнопке или в строке адреса
+            haptic('selection'); // Наш глобальный хелпер вибрации
+            
             const inputStreet = document.getElementById('map-street');
-            if (inputStreet) inputStreet.value = "🎯 Обновляем спутники GPS...";
+            if (inputStreet) inputStreet.value = "🎯 Спутники GPS ловят точку...";
+
+            // ЖЕСТКИЙ СБРОС: Говорим коду, что сейчас юзер принудительно ищет себя,
+            // и дефолтные координаты ресторанов (Советская 132) использовать ЗАПРЕЩЕНО.
+            window.isAddressSelectedFromList = false;
+            if (typeof mapWasDragged !== 'undefined') mapWasDragged = false;
 
             if (tg && tg.LocationManager) {
-                // ИСПРАВЛЕНИЕ: Обязательно инициализируем менеджер перед каждым точечным запросом
                 tg.LocationManager.init();
 
-                // ИСПРАВЛЕНИЕ: Передаем параметры { enableHighAccuracy: true } для принудительного опроса GPS чипа
+                // Запрашиваем точные координаты у Телеграм
                 tg.LocationManager.getLocation((data) => {
                     if (data && data.latitude) {
                         clientLat = data.latitude;
                         clientLon = data.longitude;
                         
-                        // Безопасно сохраняем самую свежую точку
+                        // Сохраняем в кэш реальную точку смартфона
                         localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                         
-                        // Мгновенно двигаем карту и ПЕРЕУСТАНАВЛИВАЕМ маркер в реальную точку
+                        // Двигаем карту и СИЛОВОЙ перенос маркера на Иманбай молдо 8
                         if (checkoutMap) {
                             checkoutMap.invalidateSize();
                             setMapCenterToMarker(clientLat, clientLon);
                         }
                         
-                        // Запускаем точный перевод координат в текст
+                        // Переводим точку в буквы
                         reverseGeocode(clientLat, clientLon);
                     } else {
-                        // Если Telegram отдал пустые данные, мгновенно пробуем браузерный fallback
-                        fallbackToBrowserGeolocation();
+                        // Если менеджер Телеграма на телефоне завис, шлем запрос через браузер смартфона
+                        forceBrowserGeolocation();
                     }
-                }, { enableHighAccuracy: true }); // Жёсткий запрос высокой точности для Telegram API
+                }, { enableHighAccuracy: true });
             } else {
-                fallbackToBrowserGeolocation();
+                forceBrowserGeolocation();
             }
         }
 
-        // Вспомогательная функция-резерв (fallback), если Telegram LocationManager дал сбой
-        function fallbackToBrowserGeolocation() {
+        // Внутренний силовой fallback для точного обхода блокировок кэша
+        function forceBrowserGeolocation() {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
@@ -2408,11 +2413,11 @@ function confirmAddressFromModal() {
                         reverseGeocode(clientLat, clientLon);
                     },
                     (error) => {
-                        console.error("Ошибка браузерного GPS:", error);
+                        console.error("Критический сбой GPS устройства:", error);
                         const inputStreet = document.getElementById('map-street');
-                        if (inputStreet) inputStreet.value = "Не удалось определить GPS. Передвиньте карту вручную";
+                        if (inputStreet) inputStreet.value = "GPS недоступен. Сдвиньте карту пальцем";
                     },
-                    { enableHighAccuracy: true, timeout: 6000 }
+                    { enableHighAccuracy: true, timeout: 7000 }
                 );
             }
         }
