@@ -1121,6 +1121,19 @@
         
 
         const tg = window.Telegram?.WebApp || null;
+        
+        // --- ГЛОБАЛЬНЫЙ ХЕЛПЕР ДЛЯ ВИБРАЦИИ (HAPTIC) ---
+function haptic(type = 'light') {
+    if (!tg || !tg.HapticFeedback) return;
+    if (['light', 'medium', 'heavy'].includes(type)) {
+        tg.HapticFeedback.impactOccurred(type);
+    } else if (['success', 'warning', 'error'].includes(type)) {
+        tg.HapticFeedback.notificationOccurred(type);
+    } else if (type === 'selection') {
+        tg.HapticFeedback.selectionChanged();
+    }
+}
+
         if (tg) {
             tg.expand();
             
@@ -1284,7 +1297,7 @@
 }
 
         function onNavClick(type) {
-            if(tg) tg.HapticFeedback.impactOccurred('light');
+            haptic('light');
             if (type === 'main') showScreen('main');
             if (type === 'cart') { if(totalSum === 0) return alert("Корзина пуста"); openCartList(); }
             if (type === 'profile') openProfileModal();
@@ -1579,7 +1592,7 @@ function filterMenu(resId, category, btn) {
 }
 
         function updateCart(itemId, delta) {
-            if(tg) tg.HapticFeedback.impactOccurred('light'); 
+            haptic('light'); 
             const item = database[currentRestaurantId].items.find(i => i.id === itemId);
             if(!cartItems[itemId]) cartItems[itemId] = { count: 0, item: item, pricePerUnit: item.price, resId: currentRestaurantId };
             cartItems[itemId].count += delta; 
@@ -1771,12 +1784,6 @@ function filterMenu(resId, category, btn) {
             document.getElementById('modal-address').classList.add('hidden');
         }
 
-        function closeAddressModalIfOverlay(event) {
-            // Закрытие при клике мимо белого окна
-            if(event.target.id === 'modal-address') {
-                closeAddressModal();
-            }
-        }
 
 
         function openProfileModal() {
@@ -1843,11 +1850,6 @@ function filterMenu(resId, category, btn) {
     }
 }
 
-        function closeMyAddressesIfOverlay(event) {
-            if(event.target.id === 'modal-my-addresses') {
-                document.getElementById('modal-my-addresses').classList.add('hidden');
-            }
-        }
 
         function renderMyAddressesModal() {
     let saved = JSON.parse(localStorage.getItem('tamak_saved_addresses') || '[]');
@@ -1899,9 +1901,8 @@ function filterMenu(resId, category, btn) {
             localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
             
             // СИНХРОНИЗАЦИЯ С ОБЛАКОМ ТЕЛЕГРАМА
-            const tgApp = window.Telegram?.WebApp;
-            if (tgApp && tgApp.CloudStorage) {
-                tgApp.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+            if (tg && tg.CloudStorage) {
+                tg.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
             }
             
             if (tempSelectedAddressIndex >= saved.length) {
@@ -2080,10 +2081,8 @@ function filterMenu(resId, category, btn) {
                 if (editIndex < saved.length) {
                     saved.splice(editIndex, 1);
                     localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
-                    
-                    const tgApp = window.Telegram?.WebApp;
-                    if (tgApp && tgApp.CloudStorage) {
-                        tgApp.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+                    if (tg && tg.CloudStorage) {
+                        tg.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
                     }
                 }
                 delete mapModal.dataset.editIndex; 
@@ -2126,9 +2125,8 @@ function confirmAddressFromModal() {
         localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
         
         // Синхронизируем с облаком Telegram
-        const tgApp = window.Telegram?.WebApp;
-        if (tgApp && tgApp.CloudStorage) {
-            tgApp.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+        if (tg && tg.CloudStorage) {
+            tg.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
         }
         // 👉 НАШ НОВЫЙ БЛОК КОНЕЦ
         
@@ -2390,20 +2388,18 @@ function confirmAddressFromModal() {
             };
 
             const geoOverlay = document.getElementById('geo-modal-overlay');
-            const tgApp = window.Telegram?.WebApp;
-
-            if (tgApp && tgApp.LocationManager) {
+            if (tg && tg.LocationManager) {
                 // ИСПРАВЛЕНИЕ 1: Метод init() в API Telegram не принимает функцию внутри себя!
                 // Вызываем его просто как команду, а логику пишем ниже.
-                tgApp.LocationManager.init();
+                tg.LocationManager.init();
                 
                 // Проверяем доступы
-                if ((tgApp.LocationManager.isAccessRequested && !tgApp.LocationManager.isAccessGranted) || tgApp.LocationManager.isLocationAvailable === false) {
+                if ((tg.LocationManager.isAccessRequested && !tg.LocationManager.isAccessGranted) || tg.LocationManager.isLocationAvailable === false) {
                     restoreBtn();
                     if (typeof updateGeoModalDesign === 'function') updateGeoModalDesign(typeof isAddressRestored !== 'undefined' ? isAddressRestored : false);
                     if (geoOverlay) geoOverlay.style.display = 'flex'; // Вызываем твое окно-разрешение
                 } else {
-                    tgApp.LocationManager.getLocation((data) => {
+                    tg.LocationManager.getLocation((data) => {
                         restoreBtn();
                         if (data && data.latitude) {
                             clientLat = data.latitude;
@@ -2483,9 +2479,8 @@ function confirmAddressFromModal() {
             localStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
             
             // СИНХРОНИЗАЦИЯ С ОБЛАКОМ ТЕЛЕГРАМА
-            const tgApp = window.Telegram?.WebApp;
-            if (tgApp && tgApp.CloudStorage) {
-                tgApp.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+            if (tg && tg.CloudStorage) {
+                tg.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
             }
             
             renderSavedAddressesUI();
@@ -2567,11 +2562,11 @@ function confirmAddressFromModal() {
             if (doorDeliveryFee === 0) {
                 doorDeliveryFee = 50;
                 btn.classList.add('active');
-                if(tg) tg.HapticFeedback.impactOccurred('light');
+                haptic('light');
             } else {
                 doorDeliveryFee = 0;
                 btn.classList.remove('active');
-                if(tg) tg.HapticFeedback.selectionChanged();
+                haptic('selection');
             }
             updateReceipt(); // Сразу обновляем чек
         }
@@ -2632,7 +2627,7 @@ function confirmAddressFromModal() {
         items: Object.values(cartItems).filter(item => item.resId === cartActiveTabResId)
     };
 
-    if(tg) tg.HapticFeedback.notificationOccurred('success');
+    haptic('success');
     
     try {
         const response = await fetch('https://tamak-backend.onrender.com/web-data', {
@@ -2771,11 +2766,19 @@ function closeOtherQRs() {
     document.getElementById('modal-other-qrs').classList.add('hidden');
 }
 
-function closeOtherQRsIfOverlay(event) {
-    if(event.target.id === 'modal-other-qrs') {
-        closeOtherQRs();
+// --- УМНОЕ ЗАКРЫТИЕ ВСЕХ МОДАЛЬНЫХ ОКОН ---
+document.addEventListener('click', function(event) {
+    // Если кликнули ровно по темному фону
+    if (event.target.classList.contains('modal-overlay') || event.target.classList.contains('pm-overlay')) {
+        event.target.classList.add('hidden');
     }
-}
+});
+
+// Безопасные заглушки, чтобы не менять старый HTML-код и избежать ошибок в консоли
+window.closeAddressModalIfOverlay = function() {};
+window.closeMyAddressesIfOverlay = function() {};
+window.closeProductModalIfOverlay = function() {};
+window.closeOtherQRsIfOverlay = function() {};
 
 function copyPaymentNumber() {
     if(tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
@@ -2865,17 +2868,12 @@ function copyPaymentNumber() {
             document.getElementById('modal-product').classList.add('hidden');
         }
 
-        function closeProductModalIfOverlay(event) {
-            if(event.target.classList.contains('pm-overlay')) closeProductModal();
-        }
        // ==========================================
         // НАТИВНАЯ ГЕОЛОКАЦИЯ TELEGRAM (ПОЛНАЯ ИНТЕГРАЦИЯ CLOUDSTORAGE)
         // ==========================================
         const geoOverlay = document.getElementById('geo-modal-overlay');
         const btnConfirmGeo = document.getElementById('btn-geo-confirm');
         const btnSkipGeo = document.getElementById('btn-geo-skip');
-        
-        const tgApp = window.Telegram?.WebApp;
         let isAddressRestored = false;
 
         // 👉 1. УМНОЕ ПЕРЕКЛЮЧЕНИЕ ТЕКСТА ОКНА
@@ -2911,13 +2909,12 @@ function copyPaymentNumber() {
             localStorage.setItem('tamak_last_kv', kv);
 
             // СИНХРОНИЗАЦИЯ С ОБЛАКОМ ТЕЛЕГРАМА
-            const tgApp = window.Telegram?.WebApp;
-            if (tgApp && tgApp.CloudStorage) {
-                tgApp.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
-                tgApp.CloudStorage.setItem('tamak_last_lat', lat.toString());
-                tgApp.CloudStorage.setItem('tamak_last_lon', lon.toString());
-                tgApp.CloudStorage.setItem('tamak_last_street', street);
-                tgApp.CloudStorage.setItem('tamak_last_kv', kv);
+            if (tg && tg.CloudStorage) {
+                tg.CloudStorage.setItem('tamak_saved_addresses', JSON.stringify(saved));
+                tg.CloudStorage.setItem('tamak_last_lat', lat.toString());
+                tg.CloudStorage.setItem('tamak_last_lon', lon.toString());
+                tg.CloudStorage.setItem('tamak_last_street', street);
+                tg.CloudStorage.setItem('tamak_last_kv', kv);
             }
         }
 
@@ -2950,13 +2947,13 @@ function copyPaymentNumber() {
             }
 
             // Проверка настроек GPS на старте
-            if (tgApp && tgApp.LocationManager) {
-                tgApp.LocationManager.init(() => {
-                    if ((tgApp.LocationManager.isAccessRequested && !tgApp.LocationManager.isAccessGranted) || tgApp.LocationManager.isLocationAvailable === false) {
+            if (tg && tg.LocationManager) {
+                tg.LocationManager.init(() => {
+                    if ((tg.LocationManager.isAccessRequested && !tg.LocationManager.isAccessGranted) || tg.LocationManager.isLocationAvailable === false) {
                         updateGeoModalDesign(isAddressRestored);
                         geoOverlay.style.display = 'flex';
                     } else {
-                        tgApp.LocationManager.getLocation((data) => {
+                        tg.LocationManager.getLocation((data) => {
                             if (data && data.latitude && !isAddressRestored) {
                                 clientLat = data.latitude;
                                 clientLon = data.longitude;
@@ -2992,8 +2989,8 @@ function copyPaymentNumber() {
         }
 
         // 👉 5. СТАРТ: АБСОЛЮТНЫЙ ЗАПРОС К ОБЛАКУ ТЕЛЕГРАМА ПРИ КАЖДОМ ВХОДЕ
-        if (tgApp && tgApp.CloudStorage) {
-            tgApp.CloudStorage.getItems(['tamak_saved_addresses', 'tamak_last_lat', 'tamak_last_lon', 'tamak_last_street', 'tamak_last_kv'], (err, values) => {
+        if (tg && tg.CloudStorage) {
+            tg.CloudStorage.getItems(['tamak_saved_addresses', 'tamak_last_lat', 'tamak_last_lon', 'tamak_last_street', 'tamak_last_kv'], (err, values) => {
                 if (!err && values && values['tamak_last_street']) {
                     // Синхронизируем облако в локальную память устройства
                     localStorage.setItem('tamak_saved_addresses', values['tamak_saved_addresses'] || '[]');
@@ -3042,17 +3039,17 @@ function copyPaymentNumber() {
 
         // 6. Обработка клика по желтой кнопке внутри окна
         btnConfirmGeo.addEventListener('click', () => {
-            if(tgApp && tgApp.HapticFeedback) tgApp.HapticFeedback.impactOccurred('medium');
+            if(tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
             
-            if (tgApp && tgApp.LocationManager) {
-                if (tgApp.LocationManager.isAccessRequested && !tgApp.LocationManager.isAccessGranted) {
-                    tgApp.LocationManager.openSettings(); 
+            if (tg && tg.LocationManager) {
+                if (tg.LocationManager.isAccessRequested && !tg.LocationManager.isAccessGranted) {
+                    tg.LocationManager.openSettings(); 
                     btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">🔄</span> Я включил, повторить';
                 } else {
-                    tgApp.LocationManager.getLocation((data) => {
+                    tg.LocationManager.getLocation((data) => {
                         if (data && data.latitude) {
                             geoOverlay.style.display = 'none';
-                            if(tgApp.HapticFeedback) tgApp.HapticFeedback.notificationOccurred('success');
+                            if(tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                             
                             if (!isAddressRestored) {
                                 clientLat = data.latitude;
@@ -3099,8 +3096,8 @@ function copyPaymentNumber() {
                 if (geoOverlay.style.display !== 'none') {
                     btnConfirmGeo.innerText = "Я включил GPS";
 
-                    if (tgApp && tgApp.LocationManager) {
-                        tgApp.LocationManager.getLocation((data) => {
+                    if (tg && tg.LocationManager) {
+                        tg.LocationManager.getLocation((data) => {
                             if (data && data.latitude) {
                                 geoOverlay.style.display = 'none';
                                 if (!isAddressRestored) {
@@ -3154,11 +3151,11 @@ function copyPaymentNumber() {
                     return;
                 }
 
-                // 1. МГНОВЕННЫЙ ОТКЛИК: Сразу показываем пользователю, что поиск пошел
+                // МГНОВЕННЫЙ ОТКЛИК: Сразу показываем пользователю, что поиск пошел
                 suggestionsContainer.innerHTML = '<div class="suggestion-item" style="justify-content: center; color: #888; font-size: 13px;">⏳ Ищем адреса...</div>';
                 suggestionsContainer.style.display = 'block';
 
-                // 2. Ускорили срабатывание (с 500мс до 250мс)
+                // ЗАЩИТА ОТ БАНА API: Увеличен таймаут до 1000мс (1 секунда)
                 autocompleteTimeout = setTimeout(async function() {
                     try {
                         let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(globalCity + ', ' + query)}&countrycodes=kg&accept-language=ru&limit=5`;
@@ -3193,7 +3190,6 @@ function copyPaymentNumber() {
                                 item.addEventListener('mousedown', function(e) {
                                     e.preventDefault();
                                     
-                                    // 3. БЛОКИРУЕМ ЛОЖНЫЙ ЗАПУСК onchange
                                     window.isAddressSelectedFromList = true;
                                     
                                     clientLat = lat;
@@ -3205,17 +3201,15 @@ function copyPaymentNumber() {
                                     
                                     inputStreet.blur(); // Скрываем клавиатуру СНАЧАЛА
                                     
-                                    // 4. ЖДЕМ СКРЫТИЯ КЛАВИАТУРЫ (400мс) И ТОЛЬКО ПОТОМ ДВИГАЕМ КАРТУ
                                     setTimeout(() => {
-                                        if (checkoutMap) checkoutMap.invalidateSize(); // Заставляем карту пересчитать свои новые (полные) размеры
+                                        if (checkoutMap) checkoutMap.invalidateSize(); 
                                         setMapCenterToMarker(clientLat, clientLon);
 
-                                        if (cartActiveTabResId && database[cartActiveTabResId]) {
+                                        if (cartActiveTabResId && typeof database !== 'undefined' && database[cartActiveTabResId]) {
                                             recalcCheckoutDelivery(database[cartActiveTabResId].lat, database[cartActiveTabResId].lon);
                                         }
                                     }, 400);
                                     
-                                    // Сбрасываем защитный флаг через секунду
                                     setTimeout(() => { window.isAddressSelectedFromList = false; }, 1000);
                                 });
                                 suggestionsContainer.appendChild(item);
@@ -3227,7 +3221,7 @@ function copyPaymentNumber() {
                         console.error("Ошибка поиска:", err);
                         suggestionsContainer.style.display = 'none';
                     }
-                }, 250);
+                }, 1000);
             });
 
             // Закрытие списка при клике мимо
