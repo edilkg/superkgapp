@@ -1135,7 +1135,12 @@ function haptic(type = 'light') {
 }
 
         if (tg) {
-            tg.expand();
+            tg.expand(); 
+
+// Отключаем закрытие приложения свайпом вниз (Нативный метод Telegram)
+if (tg.disableVerticalSwipes) {
+    tg.disableVerticalSwipes();
+}
             
             // ПЕРЕХВАТ НАЖАТИЯ "НАЗАД" ОТ TELEGRAM
             if (tg.BackButton) {
