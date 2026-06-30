@@ -2357,115 +2357,62 @@ function confirmAddressFromModal() {
 
 
         function locateUser() {
-            // Легкая вибрация при клике
-            if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-                window.Telegram.WebApp.HapticFeedback.impactOccurred('medium');
-            }
+            // Включаем визуальный индикатор загрузки на кнопке или в строке адреса
+            const inputStreet = document.getElementById('map-street');
+            if (inputStreet) inputStreet.value = "🎯 Обновляем спутники GPS...";
 
-            // Ищем все кнопки геолокации, чтобы правильно повесить лоадер (на карте их 2)
-            const locateBtns = document.querySelectorAll('[onclick="locateUser()"]');
-            const originalContents = [];
-
-            locateBtns.forEach((btn, index) => {
-                originalContents[index] = btn.innerHTML;
-                btn.innerHTML = `
-                    <svg class="spin-svg" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 24px; height: 24px; margin: 0 auto; display: block;">
-                        <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
-                        <path d="M21 3v5h-5"></path>
-                    </svg>
-                `;
-                btn.style.pointerEvents = 'none';
-                btn.style.opacity = '0.7';
-            });
-
-            // Crash-proof: Безопасная функция разморозки кнопок
-            const restoreBtn = () => {
-                locateBtns.forEach((btn, index) => {
-                    btn.innerHTML = originalContents[index];
-                    btn.style.pointerEvents = 'auto';
-                    btn.style.opacity = '1';
-                });
-            };
-
-            const geoOverlay = document.getElementById('geo-modal-overlay');
             if (tg && tg.LocationManager) {
-                // ИСПРАВЛЕНИЕ 1: Метод init() в API Telegram не принимает функцию внутри себя!
-                // Вызываем его просто как команду, а логику пишем ниже.
+                // ИСПРАВЛЕНИЕ: Обязательно инициализируем менеджер перед каждым точечным запросом
                 tg.LocationManager.init();
-                
-                // Проверяем доступы
-                if ((tg.LocationManager.isAccessRequested && !tg.LocationManager.isAccessGranted) || tg.LocationManager.isLocationAvailable === false) {
-                    restoreBtn();
-                    if (typeof updateGeoModalDesign === 'function') updateGeoModalDesign(typeof isAddressRestored !== 'undefined' ? isAddressRestored : false);
-                    if (geoOverlay) geoOverlay.style.display = 'flex'; // Вызываем твое окно-разрешение
-                } else {
-                    tg.LocationManager.getLocation((data) => {
-                        restoreBtn();
-                        if (data && data.latitude) {
-                            clientLat = data.latitude;
-                            clientLon = data.longitude;
-                            if (typeof mapWasDragged !== 'undefined') mapWasDragged = false;
-                            
-                            // ИСПРАВЛЕНИЕ 2: Делаем плавный зум вблизи (масштаб 18) прямо к домам
-                            if (typeof checkoutMap !== 'undefined' && checkoutMap) {
-                                const mapSize = checkoutMap.getSize();
-                                if (mapSize.x !== 0 && mapSize.y !== 0) {
-                                    const targetPoint = checkoutMap.project([clientLat, clientLon], 18);
-                                    targetPoint.y += (mapSize.y * 0.25); 
-                                    const centerLatLng = checkoutMap.unproject(targetPoint, 18);
-                                    // Используем flyTo для красивой анимации полета
-                                    checkoutMap.flyTo(centerLatLng, 18, {animate: true, duration: 1});
-                                } else {
-                                    checkoutMap.setView([clientLat, clientLon], 18);
-                                }
-                            } else if (typeof setMapCenterToMarker === 'function') {
-                                setMapCenterToMarker(clientLat, clientLon);
-                            }
-                            
-                            if (typeof reverseGeocode === 'function') reverseGeocode(clientLat, clientLon);
-                        } else {
-                            if (typeof updateGeoModalDesign === 'function') updateGeoModalDesign(typeof isAddressRestored !== 'undefined' ? isAddressRestored : false);
-                            if (geoOverlay) geoOverlay.style.display = 'flex'; 
-                        }
-                    });
-                }
-            } else {
-                // Резервный вариант для обычного браузера (вне Телеграма)
-                if (!navigator.geolocation) {
-                    restoreBtn();
-                    return alert("Браузер не поддерживает GPS"); 
-                }
-                
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        restoreBtn();
-                        clientLat = position.coords.latitude;
-                        clientLon = position.coords.longitude;
-                        if (typeof mapWasDragged !== 'undefined') mapWasDragged = false;
+
+                // ИСПРАВЛЕНИЕ: Передаем параметры { enableHighAccuracy: true } для принудительного опроса GPS чипа
+                tg.LocationManager.getLocation((data) => {
+                    if (data && data.latitude) {
+                        clientLat = data.latitude;
+                        clientLon = data.longitude;
                         
-                        // Плавный зум вблизи (масштаб 18)
-                        if (typeof checkoutMap !== 'undefined' && checkoutMap) {
-                            const mapSize = checkoutMap.getSize();
-                            if (mapSize.x !== 0 && mapSize.y !== 0) {
-                                const targetPoint = checkoutMap.project([clientLat, clientLon], 18);
-                                targetPoint.y += (mapSize.y * 0.25); 
-                                const centerLatLng = checkoutMap.unproject(targetPoint, 18);
-                                checkoutMap.flyTo(centerLatLng, 18, {animate: true, duration: 1});
-                            } else {
-                                checkoutMap.setView([clientLat, clientLon], 18);
-                            }
-                        } else if (typeof setMapCenterToMarker === 'function') {
+                        // Безопасно сохраняем самую свежую точку
+                        localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                        
+                        // Мгновенно двигаем карту и ПЕРЕУСТАНАВЛИВАЕМ маркер в реальную точку
+                        if (checkoutMap) {
+                            checkoutMap.invalidateSize();
                             setMapCenterToMarker(clientLat, clientLon);
                         }
+                        
+                        // Запускаем точный перевод координат в текст
+                        reverseGeocode(clientLat, clientLon);
+                    } else {
+                        // Если Telegram отдал пустые данные, мгновенно пробуем браузерный fallback
+                        fallbackToBrowserGeolocation();
+                    }
+                }, { enableHighAccuracy: true }); // Жёсткий запрос высокой точности для Telegram API
+            } else {
+                fallbackToBrowserGeolocation();
+            }
+        }
 
-                        if (typeof reverseGeocode === 'function') reverseGeocode(clientLat, clientLon);
+        // Вспомогательная функция-резерв (fallback), если Telegram LocationManager дал сбой
+        function fallbackToBrowserGeolocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        clientLat = position.coords.latitude;
+                        clientLon = position.coords.longitude;
+                        localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                        
+                        if (checkoutMap) {
+                            checkoutMap.invalidateSize();
+                            setMapCenterToMarker(clientLat, clientLon);
+                        }
+                        reverseGeocode(clientLat, clientLon);
                     },
                     (error) => {
-                        restoreBtn();
-                        if (typeof updateGeoModalDesign === 'function') updateGeoModalDesign(typeof isAddressRestored !== 'undefined' ? isAddressRestored : false);
-                        if (geoOverlay) geoOverlay.style.display = 'flex'; 
+                        console.error("Ошибка браузерного GPS:", error);
+                        const inputStreet = document.getElementById('map-street');
+                        if (inputStreet) inputStreet.value = "Не удалось определить GPS. Передвиньте карту вручную";
                     },
-                    { enableHighAccuracy: true, timeout: 10000 }
+                    { enableHighAccuracy: true, timeout: 6000 }
                 );
             }
         }
@@ -2786,7 +2733,7 @@ function copyPaymentNumber() {
     // Безопасное копирование с проверкой на null
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(MY_PAYMENT_NUMBER).then(() => {
-            if (tg && tg.showAlert) tg.showAlert("Готочо✅ " + MY_PAYMENT_NUMBER);
+            if (tg && tg.showAlert) tg.showAlert("Готово✅ " + MY_PAYMENT_NUMBER);
             else alert("Скопировано " + MY_PAYMENT_NUMBER);
         }).catch(err => console.error("Ошибка копирования:", err));
     } else {
@@ -2798,8 +2745,8 @@ function copyPaymentNumber() {
         document.execCommand("copy");
         document.body.removeChild(tempInput);
         
-        if (tg && tg.showAlert) tg.showAlert("Готочо✅ " + MY_PAYMENT_NUMBER);
-        else alert("Готочо✅ " + MY_PAYMENT_NUMBER);
+        if (tg && tg.showAlert) tg.showAlert("Готово✅ " + MY_PAYMENT_NUMBER);
+        else alert("Готово✅ " + MY_PAYMENT_NUMBER);
     }
 }
         // ==========================================
