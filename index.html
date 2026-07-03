@@ -1206,7 +1206,7 @@ if (tg.disableVerticalSwipes) {
                 address: 'ул. Советская, 67в', 
                 hours: '10:00 - 23:00', 
                 img: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/max%20big%20logo.jpg', 
-                tags: ['burger', 'shawarma'], // <--- Теги для фильтра
+                tags: ['burgers', 'shawarma'], // <--- Теги для фильтра
                 items: [] 
             },
             '101': { 
@@ -1222,10 +1222,10 @@ if (tg.disableVerticalSwipes) {
             '102': { 
                 lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', 
                 title: 'Лагманкана', 
-                logo: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', 
+                logo: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/lagman%20mini%20logo.png', 
                 address: 'Центр', 
                 hours: '09:00 - 23:00', 
-                img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', 
+                img: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/lagmanlogo.jpg', 
                 tags: [],
                 items: [] 
             },
@@ -1242,10 +1242,10 @@ if (tg.disableVerticalSwipes) {
             '104': { 
                 lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', 
                 title: 'Бай манты', 
-                logo: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', 
+                logo: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/baimantu%20minilogo.jpeg', 
                 address: 'Центр', 
                 hours: '09:00 - 23:00', 
-                img: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=300', 
+                img: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/baimantu%20biglogo.jpeg', 
                 tags: [],
                 items: [] 
             }
@@ -1408,7 +1408,7 @@ function renderRestaurants(searchQuery = '') {
             // Если мы уже узнали координаты юзера, считаем цену
             if (clientLat && clientLon) {
                 const straightDist = getDistance(res.lat, res.lon, clientLat, clientLon);
-                const MAX_DISTANCE_KM = 25; 
+                const MAX_DISTANCE_KM = 20; 
                 
                 if (straightDist > MAX_DISTANCE_KM) {
                     deliveryText = `<div class="res-desc" style="color: #d32f2f; font-weight: 600;">🚫 Слишком далеко (${straightDist.toFixed(1)} км)</div>`;
@@ -1984,7 +1984,7 @@ function filterMenu(resId, category, btn) {
 
                 if (calcLat && calcLon) {
                     const distFromCenter = getDistance(center.lat, center.lon, calcLat, calcLon);
-                    const GLOBAL_MAX_DIST = 25; 
+                    const GLOBAL_MAX_DIST = 20; 
 
                     if (distFromCenter > GLOBAL_MAX_DIST) {
                         if (submitButton) {
@@ -2017,7 +2017,7 @@ function filterMenu(resId, category, btn) {
             }
 
             const straightDist = getDistance(resLat, resLon, calcLat, calcLon);
-            const MAX_DISTANCE_KM = 25; 
+            const MAX_DISTANCE_KM = 20; 
 
             if (straightDist > MAX_DISTANCE_KM) {
                 currentDeliveryFee = 0; 
