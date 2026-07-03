@@ -1408,7 +1408,7 @@ function renderRestaurants(searchQuery = '') {
             // Если мы уже узнали координаты юзера, считаем цену
             if (clientLat && clientLon) {
                 const straightDist = getDistance(res.lat, res.lon, clientLat, clientLon);
-                const MAX_DISTANCE_KM = DELIVERY_ZONE_MAX_DISTANCE_KM;
+                const MAX_DISTANCE_KM = 25; 
                 
                 if (straightDist > MAX_DISTANCE_KM) {
                     deliveryText = `<div class="res-desc" style="color: #d32f2f; font-weight: 600;">🚫 Слишком далеко (${straightDist.toFixed(1)} км)</div>`;
@@ -2017,7 +2017,7 @@ function filterMenu(resId, category, btn) {
             }
 
             const straightDist = getDistance(resLat, resLon, calcLat, calcLon);
-            const MAX_DISTANCE_KM = DELIVERY_ZONE_MAX_DISTANCE_KM;
+            const MAX_DISTANCE_KM = 25; 
 
             if (straightDist > MAX_DISTANCE_KM) {
                 currentDeliveryFee = 0; 
