@@ -38,20 +38,18 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 Markup.inlineKeyboard(buttons)
             ).catch(() => {});
 
-            // 👉 ОТПРАВКА В РЕСТОРАН (ИСПРАВЛЕННЫЙ ФОРМАТ КНОПОК)
+            // 👉 ОТПРАВКА В РЕСТОРАН
             if (order.restaurant) {
-    const { data: restData, error: restErr } = await supabase.from('restaurants').select('id, name, is_approved').eq('name', order.restaurant).maybeSingle();
-    
-    if (restErr) {
-        console.error("❌ Ошибка запроса к БД при поиске ресторана:", restErr);
-    } else if (!restData) {
-        console.log(`[АХТУНГ] ❌ Ресторан с именем "${order.restaurant}" ВООБЩЕ не найден в таблице restaurants! Проверь название.`);
-    } else if (!restData.is_approved) {
-        console.log(`[АХТУНГ] ❌ Ресторан "${order.restaurant}" найден, но у него is_approved = false! Бот ему ничего не отправит.`);
-    } else {
-        // Если всё чётко — отправляем
-        let itemsArr = [];
-                if (restData) {
+                const { data: restData, error: restErr } = await supabase.from('restaurants').select('id, name, is_approved').eq('name', order.restaurant).maybeSingle();
+                
+                if (restErr) {
+                    console.error("❌ Ошибка запроса к БД при поиске ресторана:", restErr);
+                } else if (!restData) {
+                    console.log(`[АХТУНГ] ❌ Ресторан с именем "${order.restaurant}" ВООБЩЕ не найден в таблице restaurants! Проверь название.`);
+                } else if (!restData.is_approved) {
+                    console.log(`[АХТУНГ] ❌ Ресторан "${order.restaurant}" найден, но у него is_approved = false! Бот ему ничего не отправит.`);
+                } else {
+                    // Если всё чётко — отправляем
                     let itemsArr = [];
                     try { itemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]'); } catch(e) {}
                     
@@ -69,7 +67,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                             [Markup.button.callback('❌ Отклонить', `rest_decline_${orderId}`)]
                         ])
                     }).catch(e => console.error("Ошибка отправки в ресторан:", e.message));
-                }
+                } // <--- ВОТ ЭТА ЗАКРЫВАЮЩАЯ СКОБКА ПОТЕРЯЛАСЬ!
             }
 
             // ОТПРАВКА КУРЬЕРАМ
