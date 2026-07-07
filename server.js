@@ -36,9 +36,12 @@ const adminActions = setupAdminBot(bot, restBot, courierBot, supabase, ADMIN_GRO
 // ==========================================
 // ПРИЕМ ЗАКАЗОВ С САЙТА
 // ==========================================
+// ==========================================
+// ПРИЕМ ЗАКАЗОВ С САЙТА
+// ==========================================
 app.post('/web-data', async (req, res) => {
     try {
-        const { type, user, phone, address, restaurantName, totalPrice, comment, isDoorDelivery, cutlery, items, dest_lat, dest_lon } = req.body;
+        const { type, user, phone, address, restaurantName, totalPrice, comment, items, dest_lat, dest_lon } = req.body;
         if (type !== 'food') return res.status(400).json({ error: 'Тип не еда' });
 
         // 👉 БРОНЕЖИЛЕТ ОТ СПАМА (МАКСИМУМ 2 ЗАКАЗА НА СЕРВЕРЕ)
@@ -54,15 +57,12 @@ app.post('/web-data', async (req, res) => {
             }
         }
 
-        // Собираем детали доставки курьеру
+        // 👉 ИСПРАВЛЕНИЕ: Берем готовый склеенный комментарий с фронтенда
         let extraDetails = [];
-        if (isDoorDelivery) extraDetails.push('🚪 До двери: Да');
-        if (cutlery > 0) extraDetails.push(`🍴 Приборы: ${cutlery} шт`);
-        if (comment) extraDetails.push(`📍 Ориентир: ${comment}`);
+        if (comment) extraDetails.push(comment);
 
-        // 🗺 ОСТАВЛЯЕМ ТОЛЬКО ССЫЛКУ НА 2ГИС (Цифры координат убрали!)
+        // 🗺 ОСТАВЛЯЕМ ТОЛЬКО ССЫЛКУ НА 2ГИС
         if (dest_lat && dest_lon) {
-            // В ссылке 2ГИС сначала идет lon (долгота), затем lat (широта)
             extraDetails.push(`🗺 2ГИС: https://2gis.kg/geo/${dest_lon},${dest_lat}`);
         }
 
@@ -74,7 +74,7 @@ app.post('/web-data', async (req, res) => {
             address: address,
             restaurant: restaurantName,
             total_price: totalPrice,
-            comment: extraDetails.join(' | '), // <-- Ссылка склеится в комментарий красиво через палочку
+            comment: extraDetails.join(' | '), 
             items: items,
             status: 'waiting_payment'
         }]).select();

@@ -2551,6 +2551,7 @@ function confirmAddressFromModal() {
     const resComment = document.getElementById('res-comment').value; 
 
     // --- 🟢 ПРОСТАЯ И БЕЗОПАСНАЯ ЗАМОРОЗКА ---
+    // Ищем кнопку по правильному ID из твоего HTML
     const payBtn = document.getElementById('pay-btn');
     let originalBtnText = 'Я оплатил заказ';
 
@@ -2567,23 +2568,6 @@ function confirmAddressFromModal() {
         fullAddress += ` (${orderAddressData.kv})`;
     }
     
-    // 👉 ИСПРАВЛЕНИЕ 1: Склеиваем комментарий строго по требованиям БД
-    let finalCommentParts = [];
-    if (doorDeliveryFee > 0) finalCommentParts.push("🚪 Доставка до двери");
-    if (cutleryCount > 0) finalCommentParts.push(`🍴 Приборы: ${cutleryCount} шт.`);
-    if (orderAddressData.comment) finalCommentParts.push(`📍 Ориентир: ${orderAddressData.comment}`);
-    if (resComment) finalCommentParts.push(`💬 Кухне: ${resComment}`);
-    const gluedComment = finalCommentParts.join(' | ');
-
-    // 👉 ИСПРАВЛЕНИЕ 2: Очищаем массив блюд до простого формата (название, количество, цена)
-    const cleanItems = Object.values(cartItems)
-        .filter(c => c.resId === cartActiveTabResId)
-        .map(c => ({
-            name: c.item.name,
-            count: c.count,
-            price: c.pricePerUnit
-        }));
-
     const orderData = {
         type: 'food', 
         user: tg?.initDataUnsafe?.user || { id: 111, first_name: "Тест Юзер" }, 
@@ -2593,8 +2577,11 @@ function confirmAddressFromModal() {
         dest_lon: clientLon, 
         restaurantName: database[cartActiveTabResId]?.title || "Ресторан",
         totalPrice: totalSum + (currentDeliveryFee > 0 ? currentDeliveryFee + doorDeliveryFee : 0),
-        comment: gluedComment, // Отправляем единой строкой
-        items: cleanItems      // Отправляем чистый массив
+        comment: orderAddressData.comment, 
+        resComment: resComment, 
+        isDoorDelivery: doorDeliveryFee > 0 ? true : false, 
+        cutlery: cutleryCount,
+        items: Object.values(cartItems).filter(item => item.resId === cartActiveTabResId)
     };
 
     haptic('success');
@@ -2620,10 +2607,12 @@ function confirmAddressFromModal() {
             for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
             recalcTotal();
 
+            // Переход на страницу статуса заказа
             openOrderStatus(result.orderId);
         } else {
             alert("Ошибка при заказе: " + (result.error || "Неизвестная ошибка"));
             
+            // Если сервер выдал ошибку - размораживаем кнопку
             if (payBtn) {
                 payBtn.innerText = originalBtnText;
                 payBtn.style.pointerEvents = 'auto';
@@ -2633,6 +2622,7 @@ function confirmAddressFromModal() {
     } catch (e) { 
         alert("Ошибка сети: " + e.message); 
         
+        // Если ошибка сети - размораживаем кнопку
         if (payBtn) {
             payBtn.innerText = originalBtnText;
             payBtn.style.pointerEvents = 'auto';
