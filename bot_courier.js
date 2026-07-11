@@ -197,3 +197,4 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             try { await ctx.answerCbQuery("❌ Ошибка", {show_alert: true}); } catch(e){}
         }
     });
+    };
