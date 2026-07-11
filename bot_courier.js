@@ -13,14 +13,21 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             const { data: courier } = await supabase.from('couriers').select('*').eq('id', id).maybeSingle();
 
             if (!courier) {
-                await supabase.from('couriers').insert([{ id, name: ctx.from.first_name || 'Курьер', status: 'waiting_approval', balance: 0 }]);
+                // Регистрируем с пометкой, что нужно спросить телефон
+                await supabase.from('couriers').insert([{ id, name: ctx.from.first_name || 'Курьер', status: 'offline', step: 'ask_phone', balance: 0 }]);
                 
-                // Принудительно скрываем старые кнопки на этапе модерации
-                ctx.reply("Привет! Заявка отправлена админу. Жди одобрения.", Markup.removeKeyboard());
-                
-                return bot.telegram.sendMessage(ADMIN_GROUP_ID, 
-                    `🛵 НОВАЯ ЗАЯВКА (КУРЬЕР)\nИмя: ${ctx.from.first_name || 'Не указано'}\nID: ${id}`,
-                    Markup.inlineKeyboard([[Markup.button.callback('✅ ОДОБРИТЬ КУРЬЕРА', `approve_courier_${id}`)]])
+                return ctx.reply("Привет! Чтобы стать курьером, отправь свой номер телефона, нажав на кнопку ниже:", 
+                    Markup.keyboard([
+                        [Markup.button.contactRequest('📱 Отправить мой номер')]
+                    ]).resize()
+                );
+            }
+
+            if (courier.step === 'ask_phone') {
+                return ctx.reply("Пожалуйста, отправь свой номер телефона, нажав на кнопку ниже:", 
+                    Markup.keyboard([
+                        [Markup.button.contactRequest('📱 Отправить мой номер')]
+                    ]).resize()
                 );
             }
 
@@ -36,6 +43,68 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             );
         } catch (e) { 
             console.error("Ошибка при старте курьера:", e); 
+        }
+    });
+
+    // ==========================================
+    // 0.1 ПОЛУЧЕНИЕ НОМЕРА ТЕЛЕФОНА (КНОПКА КОНТАКТА)
+    // ==========================================
+    courierBot.on('contact', async (ctx) => {
+        try {
+            const id = ctx.from.id;
+            const { data: courier } = await supabase.from('couriers').select('step').eq('id', id).maybeSingle();
+
+            if (!courier || courier.step !== 'ask_phone') return;
+
+            const phone = ctx.message.contact.phone_number;
+
+            await supabase.from('couriers').update({ phone: phone, step: 'completed', status: 'waiting_approval' }).eq('id', id);
+
+            await ctx.reply("✅ Спасибо! Заявка отправлена админу. Жди одобрения.", Markup.removeKeyboard());
+
+            // ПУШ АДМИНУ
+            return bot.telegram.sendMessage(ADMIN_GROUP_ID, 
+                `🛵 НОВАЯ ЗАЯВКА (КУРЬЕР)\nИмя: ${ctx.from.first_name || 'Не указано'}\nТелефон: ${phone}\nID: ${id}`,
+                Markup.inlineKeyboard([[Markup.button.callback('✅ ОДОБРИТЬ КУРЬЕРА', `approve_courier_${id}`)]])
+            );
+        } catch (e) {
+            console.error("Ошибка при получении контакта курьера:", e);
+        }
+    });
+
+    // ==========================================
+    // 0.2 ОБРАБОТКА ТЕКСТА (ЕСЛИ ВВЕЛ НОМЕР ВРУЧНУЮ ИЛИ НАЖАЛ БАЛАНС)
+    // ==========================================
+    courierBot.on('text', async (ctx) => {
+        try {
+            const id = ctx.from.id;
+            const text = ctx.message.text;
+
+            if (text.startsWith('/')) return;
+
+            const { data: courier } = await supabase.from('couriers').select('*').eq('id', id).maybeSingle();
+            if (!courier) return;
+
+            // Если бот ждет номер телефона
+            if (courier.step === 'ask_phone') {
+                await supabase.from('couriers').update({ phone: text, step: 'completed', status: 'waiting_approval' }).eq('id', id);
+
+                await ctx.reply("✅ Спасибо! Заявка отправлена админу. Жди одобрения.", Markup.removeKeyboard());
+
+                // ПУШ АДМИНУ
+                return bot.telegram.sendMessage(ADMIN_GROUP_ID, 
+                    `🛵 НОВАЯ ЗАЯВКА (КУРЬЕР)\nИмя: ${ctx.from.first_name || 'Не указано'}\nТелефон: ${text}\nID: ${id}`,
+                    Markup.inlineKeyboard([[Markup.button.callback('✅ ОДОБРИТЬ КУРЬЕРА', `approve_courier_${id}`)]])
+                );
+            }
+
+            // Обработка кнопки "💳 Баланс"
+            if (text === '💳 Баланс') {
+                if (courier.status === 'waiting_approval') return;
+                return ctx.reply(`💳 Ваш текущий баланс: ${courier.balance || 0} сом\n(Комиссия 10% списывается автоматически с каждого доставленного заказа)`);
+            }
+        } catch (e) {
+            console.error("Ошибка при обработке текста курьером:", e);
         }
     });
 
@@ -181,7 +250,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 
                 // Отправляем чек-уведомление курьеру
                 try {
-                    await courierBot.telegram.sendMessage(courierId, `💸 Заказ успешно доставлен!\nСписана комиссия агрегатора: ${commission} сом (10% от стоимости доставки).\n💳 Ваш текущий баланс: ${newBalance} сом.`);
+                    await courierBot.telegram.sendMessage(courierId, `💸 Спасибо за доставку!\nКомиссия за заказ: ${commission} сом (10%).\n💳Остаток Баланса: ${newBalance} сом.`);
                 } catch(e) {}
             }
 
