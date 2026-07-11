@@ -7,23 +7,36 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
     // ==========================================
     courierBot.start(async (ctx) => {
         try {
-            const id = ctx.from.id;
+            const id = ctx.from?.id;
+            if (!id) return;
+
             const { data: courier } = await supabase.from('couriers').select('*').eq('id', id).maybeSingle();
 
             if (!courier) {
-                await supabase.from('couriers').insert([{ id, name: ctx.from.first_name, status: 'waiting_approval', balance: 0 }]);
-                ctx.reply("Привет! Заявка отправлена админу. Жди одобрения.");
+                await supabase.from('couriers').insert([{ id, name: ctx.from.first_name || 'Курьер', status: 'waiting_approval', balance: 0 }]);
+                
+                // Принудительно скрываем старые кнопки на этапе модерации
+                ctx.reply("Привет! Заявка отправлена админу. Жди одобрения.", Markup.removeKeyboard());
                 
                 return bot.telegram.sendMessage(ADMIN_GROUP_ID, 
-                    `🛵 НОВАЯ ЗАЯВКА (КУРЬЕР)\nИмя: ${ctx.from.first_name}\nID: ${id}`,
+                    `🛵 НОВАЯ ЗАЯВКА (КУРЬЕР)\nИмя: ${ctx.from.first_name || 'Не указано'}\nID: ${id}`,
                     Markup.inlineKeyboard([[Markup.button.callback('✅ ОДОБРИТЬ КУРЬЕРА', `approve_courier_${id}`)]])
                 );
             }
 
-            if (courier.status === 'waiting_approval') return ctx.reply("⏳ Твой аккаунт на проверке.");
+            if (courier.status === 'waiting_approval') {
+                return ctx.reply("⏳ Твой аккаунт на проверке.", Markup.removeKeyboard());
+            }
 
-            ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\n\nИмя: ${courier.name}\n💰 Баланс: ${courier.balance || 0} сом\nСтатус: На линии ✅`);
-        } catch (e) { console.error(e); }
+            // Перезаписываем старые кнопки, оставляя только "Баланс"
+            ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\n\nИмя: ${courier.name || 'Курьер'}\n💰 Баланс: ${courier.balance || 0} сом\nСтатус: На линии ✅`, 
+                Markup.keyboard([
+                    ['💳 Баланс']
+                ]).resize()
+            );
+        } catch (e) { 
+            console.error("Ошибка при старте курьера:", e); 
+        }
     });
 
     // ==========================================
@@ -34,7 +47,16 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
         const courierId = ctx.from.id;
 
         try {
-            // 👉 ОБНОВЛЕНО: Достаем телефон, ID и имя клиента из базы
+            // 👉 ЗАЩИТА БАЛАНСА: Проверяем баланс курьера ПЕРЕД взятием заказа
+            const { data: courierCheck } = await supabase.from('couriers').select('balance').eq('id', courierId).maybeSingle();
+            
+            if (!courierCheck) return ctx.answerCbQuery("❌ Ошибка: курьер не найден", { show_alert: true });
+            
+            if ((courierCheck.balance || 0) <= 0) {
+                return ctx.answerCbQuery("❌ Ваш баланс 0 или ниже! Пополните счет через администратора, чтобы брать новые заказы.", { show_alert: true });
+            }
+
+            // 👉 Достаем заказ из базы
             const { data: orderCheck, error: checkErr } = await supabase.from('orders').select('courier_id, restaurant, phone, client_id, client_name').eq('id', orderId).maybeSingle();
             
             if (checkErr || !orderCheck) return ctx.answerCbQuery("❌ Заказ не найден", { show_alert: true });
@@ -59,21 +81,18 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 }
             }
 
-            // 👉 ОБНОВЛЕНО: Формируем текст для курьера с номером клиента
+            // 👉 Формируем текст для курьера
             const clientPhone = orderCheck.phone || 'Не указан';
             const clientName = orderCheck.client_name || 'Гость';
 
             const originalMsg = ctx.callbackQuery.message.text;
-const appendText = `\n\n✅ ВЫ ПРИНЯЛИ ЗАКАЗ!\nОтправляйтесь в ресторан.\n\n👤 Клиент: ${clientName}\n📞 Телефон клиента: ${clientPhone}\n\nКак только заберете еду, нажмите кнопку ниже:`;
-// Простая проверка, чтобы не склеивать undefined
-const newText = (originalMsg ? originalMsg : "Заказ") + appendText;
+            const appendText = `\n\n✅ ВЫ ПРИНЯЛИ ЗАКАЗ!\nОтправляйтесь в ресторан.\n\n👤 Клиент: ${clientName}\n📞 Телефон клиента: ${clientPhone}\n\nКак только заберете еду, нажмите кнопку ниже:`;
+            const newText = (originalMsg ? originalMsg : "Заказ") + appendText;
 
-            // Создаем кнопки
             const buttons = [
                 [Markup.button.callback('📦 Я взял заказ (Еду к клиенту)', `courier_picked_up_${orderId}`)]
             ];
             
-            // Если у клиента есть Telegram ID, добавляем кнопку связи
             if (orderCheck.client_id && orderCheck.client_id != 111) {
                 buttons.push([Markup.button.url('💬 Написать клиенту', `tg://user?id=${orderCheck.client_id}`)]);
             }
@@ -127,15 +146,46 @@ const newText = (originalMsg ? originalMsg : "Заказ") + appendText;
     });
 
     // ==========================================
-    // 3. КУРЬЕР ДОСТАВИЛ ЗАКАЗ (ВКЛЮЧАЕТ СТАТУС 4)
+    // 3. КУРЬЕР ДОСТАВИЛ ЗАКАЗ (СТАТУС 4 + СПИСАНИЕ КОМИССИИ)
     // ==========================================
     courierBot.action(/courier_delivered_(.+)/, async (ctx) => {
         const orderId = ctx.match[1];
+        const courierId = ctx.from.id; 
 
         try {
             await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId);
 
-            const { data: order } = await supabase.from('orders').select('client_id').eq('id', orderId).maybeSingle();
+            // Достаем заказ, чтобы посчитать комиссию
+            const { data: order } = await supabase.from('orders').select('client_id, items, total_price').eq('id', orderId).maybeSingle();
+            
+            // 💸 РАСЧЕТ КОМИССИИ (10% ОТ СТОИМОСТИ ДОСТАВКИ)
+            let foodPrice = 0;
+            try { 
+                const itemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]');
+                itemsArr.forEach(i => {
+                    const price = Number(i.price || (i.item ? i.item.price : 0)) || 0;
+                    const count = Number(i.count) || 0;
+                    foodPrice += price * count;
+                });
+            } catch(e) {}
+            
+            // Вычисляем чистую цену доставки и берем от нее 10%
+            const deliveryPrice = Math.max(0, (order.total_price || 0) - foodPrice);
+            const commission = Math.round(deliveryPrice * 0.10); 
+
+            // Списываем комиссию с баланса курьера
+            const { data: cData } = await supabase.from('couriers').select('balance').eq('id', courierId).maybeSingle();
+            if (cData) {
+                const newBalance = (cData.balance || 0) - commission;
+                await supabase.from('couriers').update({ balance: newBalance }).eq('id', courierId);
+                
+                // Отправляем чек-уведомление курьеру
+                try {
+                    await courierBot.telegram.sendMessage(courierId, `💸 Заказ успешно доставлен!\nСписана комиссия агрегатора: ${commission} сом (10% от стоимости доставки).\n💳 Ваш текущий баланс: ${newBalance} сом.`);
+                } catch(e) {}
+            }
+
+            // Уведомляем клиента
             if (order && order.client_id && order.client_id != 111) {
                 try { await bot.telegram.sendMessage(order.client_id, `🎉 Заказ успешно доставлен!\nПриятного аппетита 🍔😋`); } catch(e){}
             }
@@ -147,5 +197,3 @@ const newText = (originalMsg ? originalMsg : "Заказ") + appendText;
             try { await ctx.answerCbQuery("❌ Ошибка", {show_alert: true}); } catch(e){}
         }
     });
-
-};

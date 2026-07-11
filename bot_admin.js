@@ -177,6 +177,37 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
 
     return {
         sendOrderToAdmin: async (orderData) => {
+            // ==========================================
+    // 4. КОМАНДА ДЛЯ ПОПОЛНЕНИЯ БАЛАНСА КУРЬЕРА
+    // Формат в чате: /pay ID_курьера Сумма
+    // ==========================================
+    adminBot.command('pay', async (ctx) => {
+        // Проверяем, что команду пишут именно в админской группе
+        if (ctx.chat.id.toString() !== ADMIN_GROUP_ID.toString()) return;
+        
+        const args = ctx.message.text.split(' ');
+        if (args.length !== 3) {
+            return ctx.reply("❌ Неверный формат!\nИспользуйте: /pay [ID_курьера] [Сумма]\nПример: /pay 123456789 500");
+        }
+        
+        const courierId = args[1];
+        const amount = parseInt(args[2]);
+        
+        if (isNaN(amount)) return ctx.reply("❌ Сумма должна быть числом!");
+
+        const { data: c } = await supabase.from('couriers').select('balance').eq('id', courierId).maybeSingle();
+        if (!c) return ctx.reply("❌ Курьер с таким ID не найден в базе данных.");
+
+        const newBalance = (c.balance || 0) + amount;
+        await supabase.from('couriers').update({ balance: newBalance }).eq('id', courierId);
+        
+        await ctx.reply(`✅ Баланс курьера ${courierId} успешно пополнен на ${amount} сом.\n💳 Текущий баланс: ${newBalance} сом.`);
+        
+        // Отправляем радостное уведомление самому курьеру
+        try { 
+            await courierBot.telegram.sendMessage(courierId, `💰 Ваш баланс пополнен администратором на ${amount} сом!\n💳 Текущий баланс: ${newBalance} сом.\n\nУдачных доставок! 🛵`); 
+        } catch(e) {}
+    });
             try {
                 const itemsArr = Array.isArray(orderData.items) ? orderData.items : (JSON.parse(orderData.items || '[]'));
                 const itemsText = itemsArr.map(i => {
