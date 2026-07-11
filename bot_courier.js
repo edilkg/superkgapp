@@ -36,7 +36,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             }
 
             // Перезаписываем старые кнопки, оставляя только "Профиль"
-            ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\nИмя: ${courier.name || 'Курьер'}\nТелефон: ${courier.phone || 'Не указан'}\nБаланс: ${courier.balance || 0} сом\n\nДля пополнения напишите админу: @foodkg_admin`, 
+            ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\nИмя: ${courier.name || 'Курьер'}\nТелефон: ${courier.phone || 'Не указан'}\nБаланс: ${courier.balance || 0} сом\n\nДля пополнения баланса напишите админу: @foodkg_admin`, 
                 Markup.keyboard([
                     ['👤 Профиль']
                 ]).resize()
@@ -101,7 +101,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             // Обработка кнопки "👤 Профиль"
             if (text === '👤 Профиль') {
                 if (courier.status === 'waiting_approval') return;
-                return ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\nИмя: ${courier.name || 'Курьер'}\nТелефон: ${courier.phone || 'Не указан'}\nБаланс: ${courier.balance || 0} сом\n\nДля пополнения напишите админу: @foodkg_admin`);
+                return ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\nИмя: ${courier.name || 'Курьер'}\nТелефон: ${courier.phone || 'Не указан'}\nБаланс: ${courier.balance || 0} сом\n\nДля пополнения баланса напишите админу: @foodkg_admin`);
             }
         } catch (e) {
             console.error("Ошибка при обработке текста курьером:", e);

@@ -72,7 +72,6 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 }
             }
 
-            // ОТПРАВКА КУРЬЕРАМ
             // ==========================================
             // ОТПРАВКА КУРЬЕРАМ (ТОЛЬКО ЦЕНА ЗА ДОСТАВКУ)
             // ==========================================
@@ -175,39 +174,88 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
         try { await courierBot.telegram.sendMessage(id, `💰 Ваш баланс пополнен на ${amount} сом!\nТекущий баланс: ${newBalance} сом.`); } catch(e){}
     });
 
-    return {
-        sendOrderToAdmin: async (orderData) => {
-            // ==========================================
-    // 4. КОМАНДА ДЛЯ ПОПОЛНЕНИЯ БАЛАНСА КУРЬЕРА
-    // Формат в чате: /pay ID_курьера Сумма
+    // ==========================================
+    // 4. УМНАЯ КОМАНДА ДЛЯ ПОПОЛНЕНИЯ БАЛАНСА КУРЬЕРА
+    // Формат: /pay [Имя, Телефон или ID] [Сумма]
     // ==========================================
     adminBot.command('pay', async (ctx) => {
         // Проверяем, что команду пишут именно в админской группе
         if (ctx.chat.id.toString() !== ADMIN_GROUP_ID.toString()) return;
         
-        const args = ctx.message.text.split(' ');
-        if (args.length !== 3) {
-            return ctx.reply("❌ Неверный формат!\nИспользуйте: /pay [ID_курьера] [Сумма]\nПример: /pay 123456789 500");
+        const text = ctx.message.text.trim();
+        const args = text.split(/\s+/);
+        
+        if (args.length < 3) {
+            return ctx.reply("❌ Неверный формат!\nИспользуйте: /pay [Имя, Телефон или ID] [Сумма]\nПримеры:\n/pay 0500402002 500\n/pay Азамат 200");
         }
         
-        const courierId = args[1];
-        const amount = parseInt(args[2]);
-        
-        if (isNaN(amount)) return ctx.reply("❌ Сумма должна быть числом!");
+        const amount = parseInt(args.pop()); // Забираем самое последнее слово как сумму
+        if (isNaN(amount) || amount <= 0) return ctx.reply("❌ Сумма должна быть числом больше нуля!");
 
-        const { data: c } = await supabase.from('couriers').select('balance').eq('id', courierId).maybeSingle();
-        if (!c) return ctx.reply("❌ Курьер с таким ID не найден в базе данных.");
+        const identifier = args.slice(1).join(' '); // Все, что было между /pay и суммой
+        const cleanSearchPhone = identifier.replace(/[\s\+\-\(\)]/g, ''); // Очищаем от плюсов и пробелов для точного поиска
 
-        const newBalance = (c.balance || 0) + amount;
-        await supabase.from('couriers').update({ balance: newBalance }).eq('id', courierId);
-        
-        await ctx.reply(`✅ Баланс курьера ${courierId} успешно пополнен на ${amount} сом.\n💳 Текущий баланс: ${newBalance} сом.`);
-        
-        // Отправляем радостное уведомление самому курьеру
-        try { 
-            await courierBot.telegram.sendMessage(courierId, `💰 Ваш баланс пополнен администратором на ${amount} сом!\n💳 Текущий баланс: ${newBalance} сом.\n\nУдачных доставок! 🛵`); 
-        } catch(e) {}
+        try {
+            // Скачиваем список курьеров (это безопасно и быстро для поиска по разным параметрам)
+            const { data: couriers, error } = await supabase.from('couriers').select('id, name, phone, balance');
+            if (error || !couriers) return ctx.reply("❌ Ошибка при поиске курьеров в базе.");
+
+            // Ищем совпадения
+            const matched = couriers.filter(c => {
+                const idStr = String(c.id);
+                const nameStr = (c.name || '').toLowerCase();
+                const phoneStr = (c.phone || '').replace(/[\s\+\-\(\)]/g, '');
+                const searchStr = identifier.toLowerCase();
+
+                // Считается совпадением, если:
+                // 1) Точно совпал ID
+                // 2) Имя содержит введенный текст
+                // 3) Номер телефона содержит введенные цифры (минимум 5 цифр для защиты от случайных совпадений)
+                return idStr === searchStr || 
+                       nameStr.includes(searchStr) || 
+                       (cleanSearchPhone.length >= 5 && phoneStr.includes(cleanSearchPhone));
+            });
+
+            // Логика ответов
+            if (matched.length === 0) {
+                return ctx.reply(`❌ Курьер "${identifier}" не найден.\nПроверьте правильность написания имени или номера.`);
+            }
+
+            if (matched.length > 1) {
+                let msg = `⚠️ Найдено несколько курьеров по запросу "${identifier}". Уточните, кому именно пополнить:\n\n`;
+                matched.forEach(c => {
+                    msg += `👤 ${c.name} | 📞 ${c.phone || 'Нет номера'} | ID: <code>${c.id}</code>\n`;
+                });
+                msg += `\nПожалуйста, скопируйте нужный ID или номер и повторите команду.`;
+                return ctx.reply(msg, { parse_mode: 'HTML' });
+            }
+
+            // Если найден ровно 1 курьер — пополняем!
+            const c = matched[0];
+            const newBalance = (c.balance || 0) + amount;
+            
+            await supabase.from('couriers').update({ balance: newBalance }).eq('id', c.id);
+            
+            await ctx.reply(`✅ Баланс успешно пополнен!\n👤 Курьер: ${c.name}\n📞 Телефон: ${c.phone || 'Нет'}\n💰 Зачислено: ${amount} сом\n💳 Текущий баланс: ${newBalance} сом.`);
+            
+            // Отправляем радостное уведомление самому курьеру
+            try { 
+                await courierBot.telegram.sendMessage(c.id, `💰 Ваш баланс пополнен администратором на ${amount} сом!\n💳 Текущий баланс: ${newBalance} сом.\n\nУдачных доставок! 🛵`); 
+            } catch(e) {
+                console.error("Не удалось отправить сообщение курьеру", e);
+            }
+
+        } catch (err) {
+            console.error("Ошибка при пополнении:", err);
+            ctx.reply("❌ Произошла системная ошибка базы данных.");
+        }
     });
+
+    // ==========================================
+    // 5. ОТПРАВКА ЗАКАЗА НА МОДЕРАЦИЮ АДМИНУ
+    // ==========================================
+    return {
+        sendOrderToAdmin: async (orderData) => {
             try {
                 const itemsArr = Array.isArray(orderData.items) ? orderData.items : (JSON.parse(orderData.items || '[]'));
                 const itemsText = itemsArr.map(i => {
