@@ -32,7 +32,6 @@ setupCourierBot(courierBot, bot, restBot, supabase, ADMIN_GROUP_ID);
 setupRestaurantBot(restBot, courierBot, bot, supabase, ADMIN_GROUP_ID);
 
 const adminActions = setupAdminBot(bot, restBot, courierBot, supabase, ADMIN_GROUP_ID);
-
 // ==========================================
 // ПРИЕМ ЗАКАЗОВ С САЙТА
 // ==========================================
@@ -41,7 +40,8 @@ const adminActions = setupAdminBot(bot, restBot, courierBot, supabase, ADMIN_GRO
 // ==========================================
 app.post('/web-data', async (req, res) => {
     try {
-        const { type, user, phone, address, restaurantName, totalPrice, comment, items, dest_lat, dest_lon } = req.body;
+        // 👉 ИЗМЕНЕНИЕ 1: Достаем resComment, isDoorDelivery, cutlery из запроса
+        const { type, user, phone, address, restaurantName, totalPrice, comment, resComment, isDoorDelivery, cutlery, items, dest_lat, dest_lon } = req.body;
         if (type !== 'food') return res.status(400).json({ error: 'Тип не еда' });
 
         // 👉 БРОНЕЖИЛЕТ ОТ СПАМА (МАКСИМУМ 2 ЗАКАЗА НА СЕРВЕРЕ)
@@ -57,11 +57,14 @@ app.post('/web-data', async (req, res) => {
             }
         }
 
-        // 👉 ИСПРАВЛЕНИЕ: Берем готовый склеенный комментарий с фронтенда
+        // 👉 ИЗМЕНЕНИЕ 2: Склеиваем ВСЕ детали заказа в красивую строку
         let extraDetails = [];
-        if (comment) extraDetails.push(comment);
+        if (isDoorDelivery) extraDetails.push("🚪 Доставка до двери");
+        if (cutlery > 0) extraDetails.push(`🍴 Приборы: ${cutlery}`);
+        if (comment) extraDetails.push(`📍 Ориентир: ${comment}`);
+        if (resComment) extraDetails.push(`💬 Кухне: ${resComment}`);
 
-        // 🗺 ОСТАВЛЯЕМ ТОЛЬКО ССЫЛКУ НА 2ГИС
+        // 🗺 ДОБАВЛЯЕМ ССЫЛКУ НА 2ГИС (В самый конец)
         if (dest_lat && dest_lon) {
             extraDetails.push(`🗺 2ГИС: https://2gis.kg/geo/${dest_lon},${dest_lat}`);
         }
