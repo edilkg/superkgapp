@@ -1198,7 +1198,7 @@ if (tg.disableVerticalSwipes) {
         };
 
         const database = {
-            // Твой реальный ресторан из базы (Дракон Суши)
+            // Твой реальный ресторан из базы 
             '5521273499': { 
                 lat: 42.6482, lon: 77.0855, city: 'Чолпон-Ата', 
                 title: 'MAX BURGER', 
@@ -2906,22 +2906,20 @@ function copyPaymentNumber() {
             // Проверка настроек GPS на старте
             if (tg && tg.LocationManager) {
                 tg.LocationManager.init(() => {
-                    if ((tg.LocationManager.isAccessRequested && !tg.LocationManager.isAccessGranted) || tg.LocationManager.isLocationAvailable === false) {
-                        updateGeoModalDesign(isAddressRestored);
-                        geoOverlay.style.display = 'flex';
-                    } else {
-                        tg.LocationManager.getLocation((data) => {
-                            if (data && data.latitude && !isAddressRestored) {
-                                clientLat = data.latitude;
-                                clientLon = data.longitude;
-                                localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                                autoSaveFirstAddress(clientLat, clientLon);
-                            } else if (!data || !data.latitude) {
-                                updateGeoModalDesign(isAddressRestored);
-                                geoOverlay.style.display = 'flex';
-                            }
-                        });
-                    }
+                    // Агрессивный запрос: самая надежная проверка в Telegram
+                    tg.LocationManager.getLocation((data) => {
+                        if (!data || !data.latitude) {
+                            // Если пользователь отказал, или GPS выключен — показываем окно
+                            updateGeoModalDesign(isAddressRestored);
+                            geoOverlay.style.display = 'flex';
+                        } else if (!isAddressRestored) {
+                            // Успешно получили координаты
+                            clientLat = data.latitude;
+                            clientLon = data.longitude;
+                            localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                            autoSaveFirstAddress(clientLat, clientLon);
+                        }
+                    });
                 });
             } else if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
@@ -2999,10 +2997,12 @@ function copyPaymentNumber() {
             if(tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
             
             if (tg && tg.LocationManager) {
+                // Если юзер уже наглухо запретил гео, просим открыть настройки ТГ
                 if (tg.LocationManager.isAccessRequested && !tg.LocationManager.isAccessGranted) {
                     tg.LocationManager.openSettings(); 
                     btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">🔄</span> Я включил, повторить';
                 } else {
+                    btnConfirmGeo.innerHTML = '<span style="font-size: 20px;">⏳</span> Проверяем...';
                     tg.LocationManager.getLocation((data) => {
                         if (data && data.latitude) {
                             geoOverlay.style.display = 'none';
