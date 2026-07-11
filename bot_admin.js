@@ -73,9 +73,27 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             }
 
             // ОТПРАВКА КУРЬЕРАМ
+            // ==========================================
+            // ОТПРАВКА КУРЬЕРАМ (ТОЛЬКО ЦЕНА ЗА ДОСТАВКУ)
+            // ==========================================
             const { data: couriers } = await supabase.from('couriers').select('id').eq('status', 'active');
             if (couriers && couriers.length > 0) {
-                let msgCourier = `🔥 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n🏢 Ресторан: ${order.restaurant || 'Не указан'}\n📍 Куда: ${order.address}\n💬 Детали: ${order.comment || 'Нет'}\n💰 Оплата: ${order.total_price} сом\n\nКто заберет?`;
+                let itemsArr = [];
+                try { itemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]'); } catch(e) {}
+                
+                // Считаем чистую стоимость еды в заказе
+                let foodPrice = 0;
+                itemsArr.forEach(i => {
+                    const price = Number(i.price || (i.item ? i.item.price : 0)) || 0;
+                    const count = Number(i.count) || 0;
+                    foodPrice += price * count;
+                });
+
+                // Вычитаем еду из общей суммы, чтобы получить чистую стоимость доставки
+                const deliveryPrice = Math.max(0, (order.total_price || 0) - foodPrice);
+
+                let msgCourier = `🔥 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n🏢 Ресторан: ${order.restaurant || 'Не указан'}\n📍 Куда: ${order.address}\n💬 Детали: ${order.comment || 'Нет'}\n💰 Доставка: ${deliveryPrice} сом\n\nКто заберет?`;
+                
                 for (const courier of couriers) {
                     try {
                         await courierBot.telegram.sendMessage(courier.id, msgCourier, Markup.inlineKeyboard([
