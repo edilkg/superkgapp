@@ -101,7 +101,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             // Обработка кнопки "💳 Баланс"
             if (text === '💳 Баланс') {
                 if (courier.status === 'waiting_approval') return;
-                return ctx.reply(`💳 Ваш текущий баланс: ${courier.balance || 0} сом\n(Комиссия 10% списывается автоматически с каждого доставленного заказа)`);
+                return ctx.reply(`💳 Ваш текущий баланс: ${courier.balance || 0} сом\n\nДля пополнения напишите админу: @foodkg_admin`);
             }
         } catch (e) {
             console.error("Ошибка при обработке текста курьером:", e);
