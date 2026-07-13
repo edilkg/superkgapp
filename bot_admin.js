@@ -151,7 +151,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
         const id = ctx.match[1];
         await supabase.from('couriers').update({ status: 'active' }).eq('id', id);
         await ctx.editMessageText(`✅ Курьер ${id} одобрен!`, 
-            Markup.inlineKeyboard([[Markup.button.callback('➕ Пополнить баланс (500с)', `add_balance_${id}_500`)]])
+            Markup.inlineKeyboard([[Markup.button.callback('➕ Пополнить баланс (100)', `add_balance_${id}_100`)]])
         ).catch(() => {});
         try { await courierBot.telegram.sendMessage(id, "🎉 Твоя заявка одобрена! Напиши /start, чтобы увидеть кабинет."); } catch(e){}
     });
