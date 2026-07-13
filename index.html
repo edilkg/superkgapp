@@ -2529,107 +2529,124 @@ function confirmAddressFromModal() {
         }
 
         async function createOrder() {
-    // 👉 ЗАЩИТА: Финальная проверка перед отправкой на сервер
-    let activeOrders = JSON.parse(localStorage.getItem('tamak_active_order_ids') || '[]');
-    if (activeOrders.length >= 2) {
-        return alert("⚠️ Лимит: максимум 2 заказа одновременно!");
-    }
-
-    if (!orderAddressData.street && currentDeliveryFee > 0) return alert("Пожалуйста, выберите адрес на карте!");
-    
-    const clientPhone = document.getElementById('client-phone').value;
-    if (!clientPhone) return alert("Пожалуйста, укажите ваш номер телефона для курьера!");
-
-    localStorage.setItem('tamak_client_phone', clientPhone);
-
-    if (clientLat && clientLon) {
-        localStorage.setItem('tamak_last_lat', clientLat);
-        localStorage.setItem('tamak_last_lon', clientLon);
-        localStorage.setItem('tamak_last_street', orderAddressData.street || '');
-    }
-
-    const resComment = document.getElementById('res-comment').value; 
-
-    // --- 🟢 ПРОСТАЯ И БЕЗОПАСНАЯ ЗАМОРОЗКА ---
-    // Ищем кнопку по правильному ID из твоего HTML
-    const payBtn = document.getElementById('pay-btn');
-    let originalBtnText = 'Я оплатил заказ';
-
-    if (payBtn) {
-        originalBtnText = payBtn.innerText;
-        payBtn.innerText = '⏳ Обработка...';
-        payBtn.style.pointerEvents = 'none';
-        payBtn.style.opacity = '0.7';
-    }
-    // --- 🟢 КОНЕЦ ЗАМОРОЗКИ ---
-
-    let fullAddress = orderAddressData.street;
-    if(orderAddressData.kv) {
-        fullAddress += ` (${orderAddressData.kv})`;
-    }
-    
-    const orderData = {
-        type: 'food', 
-        user: tg?.initDataUnsafe?.user || { id: 111, first_name: "Тест Юзер" }, 
-        phone: clientPhone, 
-        address: fullAddress, 
-        dest_lat: clientLat, 
-        dest_lon: clientLon, 
-        restaurantName: database[cartActiveTabResId]?.title || "Ресторан",
-        totalPrice: totalSum + (currentDeliveryFee > 0 ? currentDeliveryFee + doorDeliveryFee : 0),
-        comment: orderAddressData.comment, 
-        resComment: resComment, 
-        isDoorDelivery: doorDeliveryFee > 0 ? true : false, 
-        cutlery: cutleryCount,
-        items: Object.values(cartItems).filter(item => item.resId === cartActiveTabResId)
-    };
-
-    haptic('success');
-    
-    try {
-        const response = await fetch('https://tamak-backend.onrender.com/web-data', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(orderData)
-        });
-        
-        const result = await response.json(); 
-
-        if (response.ok) {
+            // 👉 ЗАЩИТА: Финальная проверка перед отправкой на сервер
             let activeOrders = JSON.parse(localStorage.getItem('tamak_active_order_ids') || '[]');
-            if (!activeOrders.includes(result.orderId)) {
-                activeOrders.push(result.orderId);
+            if (activeOrders.length >= 2) {
+                return alert("⚠️ Лимит: максимум 2 заказа одновременно!");
             }
-            localStorage.setItem('tamak_active_order_ids', JSON.stringify(activeOrders));
-            
-            checkActiveOrder();
 
-            for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
-            recalcTotal();
-
-            // Переход на страницу статуса заказа
-            openOrderStatus(result.orderId);
-        } else {
-            alert("Ошибка при заказе: " + (result.error || "Неизвестная ошибка"));
+            if (!orderAddressData.street && currentDeliveryFee > 0) return alert("Пожалуйста, выберите адрес на карте!");
             
-            // Если сервер выдал ошибку - размораживаем кнопку
+            const clientPhone = document.getElementById('client-phone').value;
+            if (!clientPhone) return alert("Пожалуйста, укажите ваш номер телефона для курьера!");
+
+            localStorage.setItem('tamak_client_phone', clientPhone);
+
+            if (clientLat && clientLon) {
+                localStorage.setItem('tamak_last_lat', clientLat);
+                localStorage.setItem('tamak_last_lon', clientLon);
+                localStorage.setItem('tamak_last_street', orderAddressData.street || '');
+            }
+
+            const resComment = document.getElementById('res-comment').value; 
+
+            // --- 🟢 ПРОСТАЯ И БЕЗОПАСНАЯ ЗАМОРОЗКА ---
+            const payBtn = document.getElementById('pay-btn');
+            let originalBtnText = 'Я оплатил заказ';
+
             if (payBtn) {
-                payBtn.innerText = originalBtnText;
-                payBtn.style.pointerEvents = 'auto';
-                payBtn.style.opacity = '1';
+                originalBtnText = payBtn.innerText;
+                payBtn.innerText = '⏳ Обработка...';
+                payBtn.style.pointerEvents = 'none';
+                payBtn.style.opacity = '0.7';
+            }
+            // --- 🟢 КОНЕЦ ЗАМОРОЗКИ ---
+
+            let fullAddress = orderAddressData.street;
+            if(orderAddressData.kv) {
+                fullAddress += ` (${orderAddressData.kv})`;
+            }
+            
+            // Склеиваем комментарий
+            let finalCommentParts = [];
+            if (doorDeliveryFee > 0) finalCommentParts.push("🚪 Доставка до двери");
+            if (cutleryCount > 0) finalCommentParts.push(`🍴 Приборы: ${cutleryCount} шт.`);
+            if (orderAddressData.comment) finalCommentParts.push(`📍 Ориентир: ${orderAddressData.comment}`);
+            if (resComment) finalCommentParts.push(`💬 Кухне: ${resComment}`);
+            const gluedComment = finalCommentParts.join(' | ');
+
+            // Очищаем массив блюд
+            const cleanItems = Object.values(cartItems)
+                .filter(c => c.resId === cartActiveTabResId)
+                .map(c => ({
+                    name: c.item.name,
+                    count: c.count,
+                    price: c.pricePerUnit
+                }));
+
+            const orderData = {
+                type: 'food', 
+                user: tg?.initDataUnsafe?.user || { id: 111, first_name: "Тест Юзер" }, 
+                phone: clientPhone, 
+                address: fullAddress, 
+                dest_lat: clientLat, 
+                dest_lon: clientLon, 
+                restaurantName: database[cartActiveTabResId]?.title || "Ресторан",
+                totalPrice: totalSum + (currentDeliveryFee > 0 ? currentDeliveryFee + doorDeliveryFee : 0),
+                comment: gluedComment, 
+                items: cleanItems      
+            };
+
+            haptic('success');
+            
+            try {
+                const response = await fetch('https://tamak-backend.onrender.com/web-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(orderData)
+                });
+                
+                const result = await response.json(); 
+
+                if (response.ok) {
+                    let activeOrders = JSON.parse(localStorage.getItem('tamak_active_order_ids') || '[]');
+                    if (!activeOrders.includes(result.orderId)) {
+                        activeOrders.push(result.orderId);
+                    }
+                    localStorage.setItem('tamak_active_order_ids', JSON.stringify(activeOrders));
+                    
+                    checkActiveOrder();
+
+                    for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
+                    recalcTotal();
+
+                    // 👉 ИСПРАВЛЕНИЕ: Размораживаем кнопку при УСПЕШНОМ заказе, чтобы она была готова к следующему разу!
+                    if (payBtn) {
+                        payBtn.innerText = originalBtnText;
+                        payBtn.style.pointerEvents = 'auto';
+                        payBtn.style.opacity = '1';
+                    }
+
+                    openOrderStatus(result.orderId);
+                } else {
+                    alert("Ошибка при заказе: " + (result.error || "Неизвестная ошибка"));
+                    
+                    if (payBtn) {
+                        payBtn.innerText = originalBtnText;
+                        payBtn.style.pointerEvents = 'auto';
+                        payBtn.style.opacity = '1';
+                    }
+                }
+            } catch (e) { 
+                alert("Ошибка сети: " + e.message); 
+                
+                if (payBtn) {
+                    payBtn.innerText = originalBtnText;
+                    payBtn.style.pointerEvents = 'auto';
+                    payBtn.style.opacity = '1';
+                }
             }
         }
-    } catch (e) { 
-        alert("Ошибка сети: " + e.message); 
-        
-        // Если ошибка сети - размораживаем кнопку
-        if (payBtn) {
-            payBtn.innerText = originalBtnText;
-            payBtn.style.pointerEvents = 'auto';
-            payBtn.style.opacity = '1';
-        }
-    }
-}
 // ==========================================
         // ЛОГИКА ЭКРАНА ОПЛАТЫ
         // ==========================================
