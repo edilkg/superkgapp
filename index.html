@@ -2367,11 +2367,11 @@ function confirmAddressFromModal() {
             const inputStreet = document.getElementById('map-street');
             if (inputStreet) inputStreet.value = "🎯 Спутники GPS ловят точку...";
 
-            // ЖЕСТКИЙ СБРОС: Говорим коду, что юзер принудительно ищет себя
+            // ЖЕСТКИЙ СБРОС: Говорим коду, что сейчас юзер принудительно ищет себя
             window.isAddressSelectedFromList = false;
             if (typeof mapWasDragged !== 'undefined') mapWasDragged = false;
 
-            // --- 🟢 1. АНИМАЦИЯ: Ищем кнопку, меняем иконку и запускаем вращение ---
+            // --- 🟢 1. СТАРТ АНИМАЦИИ КРУЧЕНИЯ ИКОНКИ ---
             const btn = document.querySelector('[onclick="locateUser()"]') || document.getElementById('map-geo-btn');
             let iconSpan = null;
             let oldHTML = '';
@@ -2379,16 +2379,16 @@ function confirmAddressFromModal() {
             if (btn) {
                 iconSpan = btn.querySelector('span') || btn;
                 oldHTML = iconSpan.innerHTML;
-                iconSpan.innerHTML = '🔄'; // Ставим крутящуюся иконку
+                iconSpan.innerHTML = '🔄'; // Меняем прицел на стрелочки
                 
-                // Создаем стиль вращения, если его еще нет (оптимизация)
+                // Добавляем ультра-легкий CSS класс для анимации вращения
                 if (!document.getElementById('geo-spin-css')) {
                     document.head.insertAdjacentHTML('beforeend', `<style id="geo-spin-css">@keyframes geoSpin { 100% { transform: rotate(360deg); } } .geo-spin-anim { display: inline-block; animation: geoSpin 1s linear infinite !important; }</style>`);
                 }
                 iconSpan.classList.add('geo-spin-anim');
             }
 
-            // Хелпер для остановки анимации
+            // Вспомогательный хелпер для гарантированной остановки крутилки
             const stopAnim = () => {
                 if (iconSpan) {
                     iconSpan.innerHTML = oldHTML;
@@ -2396,23 +2396,33 @@ function confirmAddressFromModal() {
                 }
             };
 
-            // Хелпер успешного нахождения точки
+            // Вспомогательный хелпер при успешном получении координат
             const onSuccess = (lat, lon) => {
                 clientLat = lat;
                 clientLon = lon;
+                
+                // Сохраняем в локальный кэш реальную точку смартфона
                 localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                 
+                // СИЛОВОЙ И ПЛАВНЫЙ ПЕРЕНОС: используем твою родную функцию центрирования
                 if (typeof checkoutMap !== 'undefined' && checkoutMap) {
                     checkoutMap.invalidateSize();
-                    // 👉 2. ПЛАВНЫЙ ПОДЛЕТ: Заменяем резкий прыжок на красивую анимацию flyTo
-                    checkoutMap.flyTo([lat, lon], 17, { animate: true, duration: 1.5 });
+                    if (typeof setMapCenterToMarker === 'function') {
+                        setMapCenterToMarker(clientLat, clientLon);
+                    } else {
+                        checkoutMap.setView([clientLat, clientLon], 17);
+                    }
                 }
                 
-                if (typeof reverseGeocode === 'function') reverseGeocode(lat, lon);
-                stopAnim(); // Выключаем крутилку
+                // Переводим точку в буквы (узнаем улицу)
+                if (typeof reverseGeocode === 'function') {
+                    reverseGeocode(clientLat, clientLon);
+                }
+                
+                stopAnim(); // Выключаем анимацию загрузки
             };
 
-            // --- 🟢 3. ЗАПРОС ЛОКАЦИИ ---
+            // --- 🟢 2. ЗАПРОС ГЕОПОЗИЦИИ (Telegram -> Браузер) ---
             if (tg && tg.LocationManager) {
                 tg.LocationManager.init(() => {
                     tg.LocationManager.getLocation((data) => {
@@ -2424,14 +2434,14 @@ function confirmAddressFromModal() {
                         }
                     });
                 });
-            } else if (navigator.geolocation) { // Фолбэк на обычный браузер
+            } else if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     (pos) => onSuccess(pos.coords.latitude, pos.coords.longitude),
                     () => { 
                         stopAnim(); 
                         if (typeof forceBrowserGeolocation === 'function') forceBrowserGeolocation(); 
                     },
-                    { enableHighAccuracy: true, timeout: 5000 }
+                    { enableHighAccuracy: true, timeout: 6000 }
                 );
             } else {
                 stopAnim();
