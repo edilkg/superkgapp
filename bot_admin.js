@@ -32,9 +32,8 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 Markup.inlineKeyboard(buttons)
             ).catch(() => {});
 
-            // 👉 ОТПРАВКА В РЕСТОРАН (С СИСТЕМОЙ ОПОВЕЩЕНИЯ АДМИНА)
+            // 👉 ОТПРАВКА В РЕСТОРАН (С ВЫВОДОМ ПРИБОРОВ И КОММЕНТАРИЯ КУХНЕ)
             if (order.restaurant) {
-                // Используем ilike вместо eq для игнорирования регистра букв (MAX BURGER == Max Burger)
                 const { data: restData, error: restErr } = await supabase.from('restaurants').select('id, name, is_approved').ilike('name', order.restaurant).maybeSingle();
                 
                 if (restErr) {
@@ -56,7 +55,23 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                     const clientName = (order.client_name || 'Гость').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                     const clientPhone = order.phone || 'Не указан';
                     
-                    let msgRest = `🍔 НОВЫЙ ЗАКАЗ <b>#${String(orderId).slice(0,5)}</b>\n\n👤 Клиент: <b>${clientName}</b>\n📞 Телефон: ${clientPhone}\n\n🛒 Заказ:\n${itemsText}\n\n💰 Сумма: ${order.total_price} сом`;
+                    // 👉 ИСПРАВЛЕНИЕ: Фильтруем общую строку комментариев Supabase, вытаскивая ТОЛЬКО Приборы и Комментарий кухне
+                    let restDetails = 'Нет';
+                    if (order.comment) {
+                        const parts = order.comment.split(' | ');
+                        const filteredParts = parts.filter(p => p.includes('🍴 Приборы') || p.includes('💬 Кухне'));
+                        if (filteredParts.length > 0) {
+                            restDetails = filteredParts.join(' | ');
+                        }
+                    }
+                    
+                    // 👉 НОВЫЙ ШАБЛОН СООБЩЕНИЯ ДЛЯ РЕСТОРАНА
+                    let msgRest = `🍔 НОВЫЙ ЗАКАЗ <b>#${String(orderId).slice(0,5)}</b>\n\n` +
+                                  `👤 Клиент: <b>${clientName}</b>\n` +
+                                  `📞 Телефон: ${clientPhone}\n` +
+                                  `💬 Детали: <b>${restDetails}</b>\n\n` +
+                                  `🛒 Заказ:\n${itemsText}\n\n` +
+                                  `💰 Сумма: ${order.total_price} сом`;
                     
                     await restBot.telegram.sendMessage(restData.id, msgRest, {
                         parse_mode: 'HTML',
@@ -65,9 +80,8 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                             [Markup.button.callback('❌ Отклонить', `rest_decline_${orderId}`)]
                         ])
                     }).catch(async (e) => {
-                        // ЕСЛИ ВЫДАСТ ОШИБКУ (НАПРИМЕР ФЕЙК ID 101), АДМИН СРАЗУ УЗНАЕТ!
                         console.error("Ошибка отправки в ресторан:", e.message);
-                        await ctx.reply(`❌ Ошибка отправки заказа в ресторан "${order.restaurant}".\nПричина: ${e.message}\n(Возможно это фейковый ID типа 101 или бот заблокирован)`);
+                        await ctx.reply(`❌ Ошибка отправки заказа в ресторан "${order.restaurant}".\nПричина: ${e.message}`);
                     });
                 }
             }
@@ -134,7 +148,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             const cid = order.client_id;
             if (cid && String(cid) !== '111' && String(cid) !== 'null' && String(cid) !== 'undefined') {
                 buttons.push([Markup.button.url("💬 Написать клиенту", `tg://user?id=${cid}`)]);
-                try { await adminBot.telegram.sendMessage(cid, `❌ Ваш заказ отменен. Оплата не поступила.`); } catch(e){}
+                try { await adminBot.telegram.sendMessage(cid, `❌ Ваш заказ отменен. Оплата не поступила. Попробуйте снова. поддержка @foodkg_admin`); } catch(e){}
             }
 
             await ctx.editMessageText(`❌ Заказ #${String(orderId).slice(0,5)} ОТКЛОНЕН (Денег нет)`, Markup.inlineKeyboard(buttons)).catch(() => {});
