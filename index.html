@@ -2388,7 +2388,7 @@ function confirmAddressFromModal() {
                 iconSpan.classList.add('geo-spin-anim');
             }
 
-            // Вспомогательный хелпер для гарантированной остановки крутилки
+            // Хелпер для гарантированной остановки крутилки
             const stopAnim = () => {
                 if (iconSpan) {
                     iconSpan.innerHTML = oldHTML;
@@ -2396,33 +2396,42 @@ function confirmAddressFromModal() {
                 }
             };
 
-            // Вспомогательный хелпер при успешном получении координат
+            // Хелпер успешного нахождения координат
             const onSuccess = (lat, lon) => {
                 clientLat = lat;
                 clientLon = lon;
-                
-                // Сохраняем в локальный кэш реальную точку смартфона
                 localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                 
-                // СИЛОВОЙ И ПЛАВНЫЙ ПЕРЕНОС: используем твою родную функцию центрирования
                 if (typeof checkoutMap !== 'undefined' && checkoutMap) {
                     checkoutMap.invalidateSize();
-                    if (typeof setMapCenterToMarker === 'function') {
-                        setMapCenterToMarker(clientLat, clientLon);
-                    } else {
-                        checkoutMap.setView([clientLat, clientLon], 17);
-                    }
+                    
+                    // 👉 ИСПРАВЛЕНИЕ: Отказываемся от багованной setMapCenterToMarker.
+                    // Делаем правильный математический сдвиг прямо здесь для плавной анимации!
+                    const targetZoom = 17;
+                    const targetPoint = checkoutMap.project([lat, lon], targetZoom);
+                    
+                    // Смещаем центр карты так, чтобы точка юзера оказалась под крестиком (25% от верха экрана)
+                    const mapSize = checkoutMap.getSize();
+                    const yOffset = mapSize.y * 0.25; 
+                    
+                    // Центр экрана (50%) должен быть физически ниже крестика
+                    targetPoint.y += yOffset;
+                    
+                    const newCenter = checkoutMap.unproject(targetPoint, targetZoom);
+                    
+                    // Запускаем красивый кинематографичный подлет без конфликтов
+                    checkoutMap.flyTo(newCenter, targetZoom, { animate: true, duration: 1.5 });
                 }
                 
                 // Переводим точку в буквы (узнаем улицу)
                 if (typeof reverseGeocode === 'function') {
-                    reverseGeocode(clientLat, clientLon);
+                    reverseGeocode(lat, lon);
                 }
                 
                 stopAnim(); // Выключаем анимацию загрузки
             };
 
-            // --- 🟢 2. ЗАПРОС ГЕОПОЗИЦИИ (Telegram -> Браузер) ---
+            // --- 🟢 2. ЗАПРОС ГЕОПОЗИЦИИ ---
             if (tg && tg.LocationManager) {
                 tg.LocationManager.init(() => {
                     tg.LocationManager.getLocation((data) => {
