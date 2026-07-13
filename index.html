@@ -2362,43 +2362,80 @@ function confirmAddressFromModal() {
 
 
         function locateUser() {
-            haptic('selection'); // Наш глобальный хелпер вибрации
+            if (typeof haptic === 'function') haptic('selection'); // Наш глобальный хелпер вибрации
             
             const inputStreet = document.getElementById('map-street');
             if (inputStreet) inputStreet.value = "🎯 Спутники GPS ловят точку...";
 
-            // ЖЕСТКИЙ СБРОС: Говорим коду, что сейчас юзер принудительно ищет себя,
-            // и дефолтные координаты ресторанов (Советская 132) использовать ЗАПРЕЩЕНО.
+            // ЖЕСТКИЙ СБРОС: Говорим коду, что юзер принудительно ищет себя
             window.isAddressSelectedFromList = false;
             if (typeof mapWasDragged !== 'undefined') mapWasDragged = false;
 
-            if (tg && tg.LocationManager) {
-                tg.LocationManager.init();
+            // --- 🟢 1. АНИМАЦИЯ: Ищем кнопку, меняем иконку и запускаем вращение ---
+            const btn = document.querySelector('[onclick="locateUser()"]') || document.getElementById('map-geo-btn');
+            let iconSpan = null;
+            let oldHTML = '';
+            
+            if (btn) {
+                iconSpan = btn.querySelector('span') || btn;
+                oldHTML = iconSpan.innerHTML;
+                iconSpan.innerHTML = '🔄'; // Ставим крутящуюся иконку
+                
+                // Создаем стиль вращения, если его еще нет (оптимизация)
+                if (!document.getElementById('geo-spin-css')) {
+                    document.head.insertAdjacentHTML('beforeend', `<style id="geo-spin-css">@keyframes geoSpin { 100% { transform: rotate(360deg); } } .geo-spin-anim { display: inline-block; animation: geoSpin 1s linear infinite !important; }</style>`);
+                }
+                iconSpan.classList.add('geo-spin-anim');
+            }
 
-                // Запрашиваем точные координаты у Телеграм
-                tg.LocationManager.getLocation((data) => {
-                    if (data && data.latitude) {
-                        clientLat = data.latitude;
-                        clientLon = data.longitude;
-                        
-                        // Сохраняем в кэш реальную точку смартфона
-                        localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
-                        
-                        // Двигаем карту и СИЛОВОЙ перенос маркера на Иманбай молдо 8
-                        if (checkoutMap) {
-                            checkoutMap.invalidateSize();
-                            setMapCenterToMarker(clientLat, clientLon);
+            // Хелпер для остановки анимации
+            const stopAnim = () => {
+                if (iconSpan) {
+                    iconSpan.innerHTML = oldHTML;
+                    iconSpan.classList.remove('geo-spin-anim');
+                }
+            };
+
+            // Хелпер успешного нахождения точки
+            const onSuccess = (lat, lon) => {
+                clientLat = lat;
+                clientLon = lon;
+                localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
+                
+                if (typeof checkoutMap !== 'undefined' && checkoutMap) {
+                    checkoutMap.invalidateSize();
+                    // 👉 2. ПЛАВНЫЙ ПОДЛЕТ: Заменяем резкий прыжок на красивую анимацию flyTo
+                    checkoutMap.flyTo([lat, lon], 17, { animate: true, duration: 1.5 });
+                }
+                
+                if (typeof reverseGeocode === 'function') reverseGeocode(lat, lon);
+                stopAnim(); // Выключаем крутилку
+            };
+
+            // --- 🟢 3. ЗАПРОС ЛОКАЦИИ ---
+            if (tg && tg.LocationManager) {
+                tg.LocationManager.init(() => {
+                    tg.LocationManager.getLocation((data) => {
+                        if (data && data.latitude) {
+                            onSuccess(data.latitude, data.longitude);
+                        } else {
+                            stopAnim();
+                            if (typeof forceBrowserGeolocation === 'function') forceBrowserGeolocation();
                         }
-                        
-                        // Переводим точку в буквы
-                        reverseGeocode(clientLat, clientLon);
-                    } else {
-                        // Если менеджер Телеграма на телефоне завис, шлем запрос через браузер смартфона
-                        forceBrowserGeolocation();
-                    }
-                }, { enableHighAccuracy: true });
+                    });
+                });
+            } else if (navigator.geolocation) { // Фолбэк на обычный браузер
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => onSuccess(pos.coords.latitude, pos.coords.longitude),
+                    () => { 
+                        stopAnim(); 
+                        if (typeof forceBrowserGeolocation === 'function') forceBrowserGeolocation(); 
+                    },
+                    { enableHighAccuracy: true, timeout: 5000 }
+                );
             } else {
-                forceBrowserGeolocation();
+                stopAnim();
+                if (typeof forceBrowserGeolocation === 'function') forceBrowserGeolocation();
             }
         }
 
