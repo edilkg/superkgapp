@@ -89,7 +89,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             if (courier.step === 'ask_phone') {
                 await supabase.from('couriers').update({ phone: text, step: 'completed', status: 'waiting_approval' }).eq('id', id);
 
-                await ctx.reply("✅ Спасибо! Заявка отправлена админу. Жди одобрения.", Markup.removeKeyboard());
+                await ctx.reply("✅ Спасибо! Заявка отправлена админу. Ждите одобрения.", Markup.removeKeyboard());
 
                 // ПУШ АДМИНУ
                 return bot.telegram.sendMessage(ADMIN_GROUP_ID, 
@@ -172,7 +172,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             // 👉 1. ОБНОВЛЯЕМ СООБЩЕНИЕ В ГРУППЕ (УБИРАЕМ КНОПКУ ДЛЯ ВСЕХ)
             const groupMsg = ctx.callbackQuery.message.text;
             await ctx.editMessageText(
-                groupMsg + `\n\n✅ ЗАКАЗ ВЗЯЛИ`,
+                groupMsg + `\n\n✅ ЗАКАЗ КТО-ТО ВЗЯЛ`,
                 { parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } } // Пустой массив удаляет кнопки!
             ).catch(() => {});
             
@@ -297,7 +297,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 
                 // Отправляем чек-уведомление курьеру
                 try {
-                    await courierBot.telegram.sendMessage(courierId, `💸 Спасибо за доставку!\nКомиссия за заказ: ${commission} сом (10%).\n💳Остаток Баланса: ${newBalance} сом.`);
+                    await courierBot.telegram.sendMessage(courierId, `💸Комиссия за заказ: ${commission} сом (10%).\n\n💳Остаток Баланса: ${newBalance} сом.`);
                 } catch(e) {}
             }
 
