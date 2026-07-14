@@ -111,8 +111,11 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
     // ==========================================
     // 1. КУРЬЕР БЕРЕТ ЗАКАЗ ИЗ ОБЩЕЙ ГРУППЫ (ЕДЕТ В РЕСТОРАН)
     // ==========================================
+    // ==========================================
+    // 1. КУРЬЕР БЕРЕТ ЗАКАЗ ИЗ ОБЩЕЙ ГРУППЫ (ЕДЕТ В РЕСТОРАН)
+    // ==========================================
     courierBot.action(/courier_take_(.+)/, async (ctx) => {
-        const orderId = ctx.match[1].trim(); // 👉 ДОБАВИЛИ .trim() ДЛЯ ИСКЛЮЧЕНИЯ ЛИШНИХ СИМВОЛОВ
+        const orderId = ctx.match[1].trim(); 
         const courierId = ctx.from.id;
 
         try {
@@ -126,7 +129,6 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             }
 
             // 👉 БРОНЕБОЙНОЕ ИСПРАВЛЕНИЕ: Меняем выборку полей на селект всех колонок '*'
-            // Теперь из-за несовпадения названий колонок в БД запрос никогда не упадет!
             const { data: orderCheck, error: checkErr } = await supabase
                 .from('orders')
                 .select('*') 
@@ -172,11 +174,23 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             // 👉 1. ОБНОВЛЯЕМ СООБЩЕНИЕ В ГРУППЕ (УБИРАЕМ КНОПКУ ДЛЯ ВСЕХ)
             const groupMsg = ctx.callbackQuery.message.text;
             await ctx.editMessageText(
-                groupMsg + `\n\n✅ ЗАКАЗ КТО-ТО ВЗЯЛ`,
-                { parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } } // Пустой массив удаляет кнопки!
+                groupMsg + `\n\n✅ ЗАКАЗ ВЗЯЛ: ${cName}`,
+                { parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } } 
             ).catch(() => {});
             
             await ctx.answerCbQuery("✅ Вы назначены на заказ! Подробности отправлены в ЛС.");
+
+            // =======================================================
+            // 💸 ХИТРЫЙ ПАРСИНГ: ДОСТАЕМ СУММУ ИЗ ТЕКСТА ОБЩЕЙ ГРУППЫ
+            // =======================================================
+            const groupMsgText = ctx.callbackQuery.message.text || '';
+            let deliveryPriceText = 'Неизвестно';
+            
+            const priceMatch = groupMsgText.match(/💰 Доставка:\s*(\d+)\s*сом/);
+            if (priceMatch && priceMatch[1]) {
+                deliveryPriceText = priceMatch[1]; 
+            }
+            // =======================================================
 
             // 👉 2. ОТПРАВЛЯЕМ ПОДРОБНЫЕ ДЕТАЛИ В ЛИЧКУ КУРЬЕРУ
             const clientPhone = orderCheck.phone || 'Не указан';
@@ -184,26 +198,16 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             const address = orderCheck.address || 'Не указан';
             const comment = orderCheck.comment || 'Нет комментариев';
             
-            // 🗺 Умная проверка: сработает и под lat/lon, и под latitude/longitude
+            // 🗺 Умная проверка координат
             const lat = orderCheck.lat || orderCheck.latitude;
             const lon = orderCheck.lon || orderCheck.longitude;
-            const groupMsgText = ctx.callbackQuery.message.text || '';
-            let deliveryPriceText = 'Неизвестно';
-            
-            // Ищем регулярным выражением строку "Доставка: 150 сом"
-            const priceMatch = groupMsgText.match(/💰 Доставка:\s*(\d+)\s*сом/);
-            if (priceMatch && priceMatch[1]) {
-                deliveryPriceText = priceMatch[1]; // Забираем только цифру (например, 150)
-            }
-            // =======================================================
-
-            // 👉 2. ОТПРАВЛЯЕМ ПОДРОБНЫЕ ДЕТАЛИ В ЛИЧКУ КУРЬЕРУ
-            const clientPhone = orderCheck.phone || 'Не указан';
 
             let privateText = `📦 <b>Детали заказа #${String(orderId).slice(0,5)}</b>\n\n` +
+                              `✅ <b>ВЫ ПРИНЯЛИ ЗАКАЗ!</b>\n` +
+                              `💰 <b>Оплата за доставку:</b> <u>${deliveryPriceText} сом</u>\n\n` +
                               `📍 Отправляйтесь в ресторан: <b>${orderCheck.restaurant || 'Не указан'}</b>\n\n` +
                               `👤 <b>Клиент:</b> ${clientName}\n` +
-                              `📞 <b>Тел. клиента:</b> <code>${clientPhone}</code>\n` +
+                              `📞 <b>Телефон клиента:</b> <code>${clientPhone}</code>\n` +
                               `📍 <b>Адрес доставки:</b> <u>${address}</u>\n` +
                               `💬 <b>Комментарий:</b> <i>${comment}</i>\n`;
 
@@ -211,7 +215,6 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 [Markup.button.callback('📦 Я взял заказ (Еду к клиенту)', `courier_picked_up_${orderId}`)]
             ];
             
-            // Если координаты определились — прикрепляем 2GIS навигацию
             if (lat && lon) {
                 const gisUrl = `https://2gis.kg/geo/${lon},${lat}`;
                 privateText += `\n🗺 <b>Карта:</b> <a href="${gisUrl}">Открыть точку в 2GIS</a>\n`;
