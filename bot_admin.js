@@ -89,7 +89,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
            // ==========================================
             // ОТПРАВКА КУРЬЕРАМ В ОБЩУЮ ГРУППУ
             // ==========================================
-            const COURIER_GROUP_ID = '-1001234567890'; // 👈 ВСТАВЬ СЮДА СВОЙ РЕАЛЬНЫЙ ID ГРУППЫ КУРЬЕРОВ
+            const COURIER_GROUP_ID = '-1004348705428'; // 👈 ВСТАВЬ СЮДА СВОЙ РЕАЛЬНЫЙ ID ГРУППЫ КУРЬЕРОВ
             
             let itemsArr = [];
             try { itemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]'); } catch(e) {}
