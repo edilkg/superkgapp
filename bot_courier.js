@@ -187,12 +187,23 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             // 🗺 Умная проверка: сработает и под lat/lon, и под latitude/longitude
             const lat = orderCheck.lat || orderCheck.latitude;
             const lon = orderCheck.lon || orderCheck.longitude;
+            const groupMsgText = ctx.callbackQuery.message.text || '';
+            let deliveryPriceText = 'Неизвестно';
+            
+            // Ищем регулярным выражением строку "Доставка: 150 сом"
+            const priceMatch = groupMsgText.match(/💰 Доставка:\s*(\d+)\s*сом/);
+            if (priceMatch && priceMatch[1]) {
+                deliveryPriceText = priceMatch[1]; // Забираем только цифру (например, 150)
+            }
+            // =======================================================
+
+            // 👉 2. ОТПРАВЛЯЕМ ПОДРОБНЫЕ ДЕТАЛИ В ЛИЧКУ КУРЬЕРУ
+            const clientPhone = orderCheck.phone || 'Не указан';
 
             let privateText = `📦 <b>Детали заказа #${String(orderId).slice(0,5)}</b>\n\n` +
-                              `✅ <b>ВЫ ПРИНЯЛИ ЗАКАЗ!</b>\n` +
                               `📍 Отправляйтесь в ресторан: <b>${orderCheck.restaurant || 'Не указан'}</b>\n\n` +
                               `👤 <b>Клиент:</b> ${clientName}\n` +
-                              `📞 <b>Телефон клиента:</b> <code>${clientPhone}</code>\n` +
+                              `📞 <b>Тел. клиента:</b> <code>${clientPhone}</code>\n` +
                               `📍 <b>Адрес доставки:</b> <u>${address}</u>\n` +
                               `💬 <b>Комментарий:</b> <i>${comment}</i>\n`;
 
@@ -297,7 +308,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 
                 // Отправляем чек-уведомление курьеру
                 try {
-                    await courierBot.telegram.sendMessage(courierId, `💸Комиссия за заказ: ${commission} сом (10%).\n\n💳Остаток Баланса: ${newBalance} сом.`);
+                    await courierBot.telegram.sendMessage(courierId, `\nДоход 💸Комиссия за заказ: ${commission} сом (10%).\n💳Остаток Баланса: ${newBalance} сом.`);
                 } catch(e) {}
             }
 
