@@ -112,7 +112,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
     // 1. КУРЬЕР БЕРЕТ ЗАКАЗ ИЗ ОБЩЕЙ ГРУППЫ (ЕДЕТ В РЕСТОРАН)
     // ==========================================
     courierBot.action(/courier_take_(.+)/, async (ctx) => {
-        const orderId = ctx.match[1];
+        const orderId = ctx.match[1].trim(); // 👉 ДОБАВИЛИ .trim() ДЛЯ ИСКЛЮЧЕНИЯ ЛИШНИХ СИМВОЛОВ
         const courierId = ctx.from.id;
 
         try {
@@ -125,14 +125,18 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 return ctx.answerCbQuery("❌ Ваш баланс 0 или ниже! Пополните счет через администратора, чтобы брать новые заказы.", { show_alert: true });
             }
 
-            // 👉 Достаем заказ из базы (ОБЯЗАТЕЛЬНО запрашиваем address, comment, lat, lon)
+            // 👉 БРОНЕБОЙНОЕ ИСПРАВЛЕНИЕ: Меняем выборку полей на селект всех колонок '*'
+            // Теперь из-за несовпадения названий колонок в БД запрос никогда не упадет!
             const { data: orderCheck, error: checkErr } = await supabase
                 .from('orders')
-                .select('courier_id, restaurant, phone, client_id, client_name, address, comment, lat, lon')
+                .select('*') 
                 .eq('id', orderId)
                 .maybeSingle();
             
-            if (checkErr || !orderCheck) return ctx.answerCbQuery("❌ Заказ не найден", { show_alert: true });
+            if (checkErr || !orderCheck) {
+                console.error("❌ Ошибка Supabase при поиске заказа:", checkErr);
+                return ctx.answerCbQuery("❌ Заказ не найден в базе данных", { show_alert: true });
+            }
             
             // 👉 ПРОВЕРКА НА ГОНКУ (ЕСЛИ ЗАКАЗ УЖЕ ЗАБРАЛИ ДО НЕГО)
             if (orderCheck.courier_id && orderCheck.courier_id !== courierId) {
@@ -174,11 +178,13 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             
             await ctx.answerCbQuery("✅ Вы назначены на заказ! Подробности отправлены в ЛС.");
 
-            // 👉 2. ОТПРАВЛЯЕМ ПОДРОБНЫЕ ДЕТАЛИ В ЛИЧКУ КУРЬЕРУ (Адрес, Комментарий, 2GIS)
+            // 👉 2. ОТПРАВЛЯЕМ ПОДРОБНЫЕ ДЕТАЛИ В ЛИЧКУ КУРЬЕРУ
             const clientPhone = orderCheck.phone || 'Не указан';
             const clientName = orderCheck.client_name || 'Гость';
             const address = orderCheck.address || 'Не указан';
             const comment = orderCheck.comment || 'Нет комментариев';
+            
+            // 🗺 Умная проверка: сработает и под lat/lon, и под latitude/longitude
             const lat = orderCheck.lat || orderCheck.latitude;
             const lon = orderCheck.lon || orderCheck.longitude;
 
@@ -194,11 +200,10 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 [Markup.button.callback('📦 Я взял заказ (Еду к клиенту)', `courier_picked_up_${orderId}`)]
             ];
             
-            // Если у заказа есть координаты — вшиваем удобную ссылку на 2GIS навигатор!
+            // Если координаты определились — прикрепляем 2GIS навигацию
             if (lat && lon) {
                 const gisUrl = `https://2gis.kg/geo/${lon},${lat}`;
                 privateText += `\n🗺 <b>Карта:</b> <a href="${gisUrl}">Открыть точку в 2GIS</a>\n`;
-                // Добавляем красивую навигационную кнопку
                 buttons.push([Markup.button.url('🧭 Маршрут в 2GIS', gisUrl)]);
             }
 
@@ -212,11 +217,10 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             });
 
         } catch (err) {
-            console.error("Ошибка при взятии заказа курьером:", err.message);
+            console.error("❌ Критическая ошибка при взятии заказа курьером:", err.message);
             try { await ctx.answerCbQuery("❌ Ошибка базы данных", {show_alert: true}); } catch(e){}
         }
     });
-
     // ==========================================
     // 2. КУРЬЕР ЗАБРАЛ ЗАКАЗ (ВКЛЮЧАЕТ СТАТУС 3)
     // ==========================================
