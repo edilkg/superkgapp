@@ -172,7 +172,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             // 👉 1. ОБНОВЛЯЕМ СООБЩЕНИЕ В ГРУППЕ (УБИРАЕМ КНОПКУ ДЛЯ ВСЕХ)
             const groupMsg = ctx.callbackQuery.message.text;
             await ctx.editMessageText(
-                groupMsg + `\n\n✅ ЗАКАЗ ВЗЯЛ: ${cName}`,
+                groupMsg + `\n\n✅ ЗАКАЗ ВЗЯЛИ`,
                 { parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } } // Пустой массив удаляет кнопки!
             ).catch(() => {});
             
