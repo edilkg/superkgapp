@@ -86,10 +86,10 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 }
             }
 
-            // ==========================================
+           // ==========================================
             // ОТПРАВКА КУРЬЕРАМ В ОБЩУЮ ГРУППУ
             // ==========================================
-            const COURIER_GROUP_ID = '-1004348705428'; // 👈 ВСТАВЬ СЮДА ID СВОЕЙ ГРУППЫ КУРЬЕРОВ
+            const COURIER_GROUP_ID = '-1001234567890'; // 👈 ВСТАВЬ СЮДА СВОЙ РЕАЛЬНЫЙ ID ГРУППЫ КУРЬЕРОВ
             
             let itemsArr = [];
             try { itemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]'); } catch(e) {}
@@ -105,20 +105,25 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             // Вычитаем еду из общей суммы, чтобы получить чистую стоимость доставки
             const deliveryPrice = Math.max(0, (order.total_price || 0) - foodPrice);
 
-            // ... тут расчеты цены доставки ...
-            
-            let msgCourier = `🔥 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n🏢 Ресторан: ${order.restaurant || 'Не указан'}\n📍 Куда: ${order.address}\n💬 Детали: ${order.comment || 'Нет'}\n💰 Доставка: ${deliveryPrice} сом\n\nКто заберет?`;
+            // 👉 ЧИСТЫЙ И КРАСИВЫЙ ШАБЛОН: Только Ресторан и Сумма доставки
+            let msgCourier = `🔥 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n` +
+                             `🏢 Ресторан: <b>${order.restaurant || 'Не указан'}</b>\n` +
+                             `💰 Доставка: <b>${deliveryPrice} сом</b>\n\n` +
+                             `Кто заберет?`;
             
             try {
                 // Шлем ровно ОДНО сообщение в группу со всеми курьерами
-                await courierBot.telegram.sendMessage(COURIER_GROUP_ID, msgCourier, Markup.inlineKeyboard([
-                    [Markup.button.callback('🙋‍♂️ Я возьму', `courier_take_${orderId}`)]
-                ]));
+                await courierBot.telegram.sendMessage(COURIER_GROUP_ID, msgCourier, {
+                    parse_mode: 'HTML',
+                    ...Markup.inlineKeyboard([
+                        [Markup.button.callback('🙋‍♂️ Я возьму', `courier_take_${orderId}`)]
+                    ])
+                });
             } catch (e) {
                 console.error("❌ Ошибка отправки заказа в общую группу курьеров:", e);
             }
 
-        } catch (err) { // 👈 ВОТ ЭТОТ ГЛАВНЫЙ CATCH
+        } catch (err) { // 👈 Вот этот catch и закрывающие скобки ниже мы вернули на место!
             console.error("[АДМИН] Ошибка при одобрении заказа:", err);
             try { await ctx.answerCbQuery("❌ Произошла ошибка на сервере", { show_alert: true }); } catch(e){}
         }

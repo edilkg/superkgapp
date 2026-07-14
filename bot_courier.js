@@ -125,8 +125,12 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 return ctx.answerCbQuery("❌ Ваш баланс 0 или ниже! Пополните счет через администратора, чтобы брать новые заказы.", { show_alert: true });
             }
 
-            // 👉 Достаем заказ из базы
-            const { data: orderCheck, error: checkErr } = await supabase.from('orders').select('courier_id, restaurant, phone, client_id, client_name').eq('id', orderId).maybeSingle();
+            // 👉 Достаем заказ из базы (ОБЯЗАТЕЛЬНО запрашиваем address, comment, lat, lon)
+            const { data: orderCheck, error: checkErr } = await supabase
+                .from('orders')
+                .select('courier_id, restaurant, phone, client_id, client_name, address, comment, lat, lon')
+                .eq('id', orderId)
+                .maybeSingle();
             
             if (checkErr || !orderCheck) return ctx.answerCbQuery("❌ Заказ не найден", { show_alert: true });
             
@@ -165,26 +169,47 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             const groupMsg = ctx.callbackQuery.message.text;
             await ctx.editMessageText(
                 groupMsg + `\n\n✅ ЗАКАЗ ВЗЯЛ: ${cName}`,
-                { reply_markup: { inline_keyboard: [] } } // Пустой массив удаляет кнопки!
+                { parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } } // Пустой массив удаляет кнопки!
             ).catch(() => {});
             
-            await ctx.answerCbQuery("✅ Вы назначены на заказ! Подробности в личке.");
+            await ctx.answerCbQuery("✅ Вы назначены на заказ! Подробности отправлены в ЛС.");
 
-            // 👉 2. ОТПРАВЛЯЕМ СЕКРЕТНЫЕ ДАННЫЕ В ЛИЧКУ КУРЬЕРУ (чтобы не светить номера в группе)
+            // 👉 2. ОТПРАВЛЯЕМ ПОДРОБНЫЕ ДЕТАЛИ В ЛИЧКУ КУРЬЕРУ (Адрес, Комментарий, 2GIS)
             const clientPhone = orderCheck.phone || 'Не указан';
             const clientName = orderCheck.client_name || 'Гость';
+            const address = orderCheck.address || 'Не указан';
+            const comment = orderCheck.comment || 'Нет комментариев';
+            const lat = orderCheck.lat || orderCheck.latitude;
+            const lon = orderCheck.lon || orderCheck.longitude;
 
-            const privateText = `📦 Детали заказа #${String(orderId).slice(0,5)}\n\n✅ ВЫ ПРИНЯЛИ ЗАКАЗ!\nОтправляйтесь в ресторан.\n\n👤 Клиент: ${clientName}\n📞 Телефон клиента: ${clientPhone}\n\nКак только заберете еду, нажмите кнопку ниже:`;
+            let privateText = `📦 <b>Детали заказа #${String(orderId).slice(0,5)}</b>\n\n` +
+                              `✅ <b>ВЫ ПРИНЯЛИ ЗАКАЗ!</b>\n` +
+                              `📍 Отправляйтесь в ресторан: <b>${orderCheck.restaurant || 'Не указан'}</b>\n\n` +
+                              `👤 <b>Клиент:</b> ${clientName}\n` +
+                              `📞 <b>Телефон клиента:</b> <code>${clientPhone}</code>\n` +
+                              `📍 <b>Адрес доставки:</b> <u>${address}</u>\n` +
+                              `💬 <b>Комментарий:</b> <i>${comment}</i>\n`;
 
             const buttons = [
                 [Markup.button.callback('📦 Я взял заказ (Еду к клиенту)', `courier_picked_up_${orderId}`)]
             ];
             
+            // Если у заказа есть координаты — вшиваем удобную ссылку на 2GIS навигатор!
+            if (lat && lon) {
+                const gisUrl = `https://2gis.kg/geo/${lon},${lat}`;
+                privateText += `\n🗺 <b>Карта:</b> <a href="${gisUrl}">Открыть точку в 2GIS</a>\n`;
+                // Добавляем красивую навигационную кнопку
+                buttons.push([Markup.button.url('🧭 Маршрут в 2GIS', gisUrl)]);
+            }
+
             if (orderCheck.client_id && orderCheck.client_id != 111) {
                 buttons.push([Markup.button.url('💬 Написать клиенту', `tg://user?id=${orderCheck.client_id}`)]);
             }
 
-            await courierBot.telegram.sendMessage(courierId, privateText, Markup.inlineKeyboard(buttons));
+            await courierBot.telegram.sendMessage(courierId, privateText, {
+                parse_mode: 'HTML',
+                ...Markup.inlineKeyboard(buttons)
+            });
 
         } catch (err) {
             console.error("Ошибка при взятии заказа курьером:", err.message);
