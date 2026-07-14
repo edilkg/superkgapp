@@ -105,6 +105,8 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             // Вычитаем еду из общей суммы, чтобы получить чистую стоимость доставки
             const deliveryPrice = Math.max(0, (order.total_price || 0) - foodPrice);
 
+            // ... тут расчеты цены доставки ...
+            
             let msgCourier = `🔥 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n🏢 Ресторан: ${order.restaurant || 'Не указан'}\n📍 Куда: ${order.address}\n💬 Детали: ${order.comment || 'Нет'}\n💰 Доставка: ${deliveryPrice} сом\n\nКто заберет?`;
             
             try {
@@ -115,6 +117,12 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             } catch (e) {
                 console.error("❌ Ошибка отправки заказа в общую группу курьеров:", e);
             }
+
+        } catch (err) { // 👈 ВОТ ЭТОТ ГЛАВНЫЙ CATCH
+            console.error("[АДМИН] Ошибка при одобрении заказа:", err);
+            try { await ctx.answerCbQuery("❌ Произошла ошибка на сервере", { show_alert: true }); } catch(e){}
+        }
+    });
 
     // ==========================================
     // 2. КНОПКА: ОТКЛОНИТЬ ОПЛАТУ
