@@ -2370,7 +2370,7 @@ function confirmAddressFromModal() {
     const locateBtns = document.querySelectorAll('[onclick="locateUser()"]');
     const originalContents = [];
 
-    // Crash-proof: Добавляем CSS для вращения прямо из JS, чтобы не лезть в файлы стилей
+    // Crash-proof: Добавляем CSS для вращения прямо из JS
     if (!document.getElementById('geo-spin-style')) {
         const style = document.createElement('style');
         style.id = 'geo-spin-style';
@@ -2390,7 +2390,6 @@ function confirmAddressFromModal() {
         btn.style.opacity = '0.7';
     });
 
-    // Безопасная функция разморозки кнопок (вызовем, когда координаты придут)
     const restoreBtn = () => {
         locateBtns.forEach((btn, index) => {
             btn.innerHTML = originalContents[index];
@@ -2405,18 +2404,38 @@ function confirmAddressFromModal() {
     const inputStreet = document.getElementById('map-street');
     if (inputStreet) inputStreet.value = "🎯 Спутники GPS ловят точку...";
 
-    // ЖЕСТКИЙ СБРОС: Говорим коду, что сейчас юзер принудительно ищет себя,
-    // и дефолтные координаты ресторанов (Советская 132) использовать ЗАПРЕЩЕНО.
+    // ЖЕСТКИЙ СБРОС: Говорим коду, что сейчас юзер принудительно ищет себя
     window.isAddressSelectedFromList = false;
     if (typeof mapWasDragged !== 'undefined') mapWasDragged = false;
+
+    // Вспомогательная функция для плавного кинематографичного полета
+    const flyToLocation = (lat, lon) => {
+        if (typeof checkoutMap !== 'undefined' && checkoutMap) {
+            checkoutMap.invalidateSize();
+            const mapSize = checkoutMap.getSize();
+            
+            if (mapSize.x !== 0 && mapSize.y !== 0) {
+                // Сдвигаем точку на 25% вниз, чтобы она встала ровно под крестик интерфейса
+                const targetPoint = checkoutMap.project([lat, lon], 18);
+                targetPoint.y += (mapSize.y * 0.25);
+                const centerLatLng = checkoutMap.unproject(targetPoint, 18);
+                
+                // Тот самый плавный подлет камеры!
+                checkoutMap.flyTo(centerLatLng, 18, { animate: true, duration: 1.5 });
+            } else {
+                checkoutMap.setView([lat, lon], 18);
+            }
+        } else if (typeof setMapCenterToMarker === 'function') {
+            setMapCenterToMarker(lat, lon); // Резервный старый метод
+        }
+    };
 
     if (tg && tg.LocationManager) {
         tg.LocationManager.init();
 
         // Запрашиваем точные координаты у Телеграм
         tg.LocationManager.getLocation((data) => {
-            // Как только пришел ответ от спутника — выключаем крутилку
-            restoreBtn();
+            restoreBtn(); // Выключаем крутилку лоадера
 
             if (data && data.latitude) {
                 clientLat = data.latitude;
@@ -2425,22 +2444,17 @@ function confirmAddressFromModal() {
                 // Сохраняем в кэш реальную точку смартфона
                 localStorage.setItem('user_geo', JSON.stringify({lat: clientLat, lon: clientLon}));
                 
-                // Двигаем карту и СИЛОВОЙ перенос маркера на точку юзера
-                if (checkoutMap) {
-                    checkoutMap.invalidateSize();
-                    setMapCenterToMarker(clientLat, clientLon);
-                }
+                // Запускаем красивый полет камеры к пользователю
+                flyToLocation(clientLat, clientLon);
                 
                 // Переводим точку в буквы
-                reverseGeocode(clientLat, clientLon);
+                if (typeof reverseGeocode === 'function') reverseGeocode(clientLat, clientLon);
             } else {
-                // Если менеджер Телеграма на телефоне завис, шлем запрос через браузер смартфона
                 forceBrowserGeolocation();
             }
         }, { enableHighAccuracy: true });
     } else {
-        // Выключаем анимацию перед фолбеком, чтобы кнопка не зависла
-        restoreBtn(); 
+        restoreBtn();
         forceBrowserGeolocation();
     }
 }
