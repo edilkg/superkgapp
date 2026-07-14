@@ -109,7 +109,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
     });
 
     // ==========================================
-    // 1. КУРЬЕР БЕРЕТ ЗАКАЗ (ЕДЕТ В РЕСТОРАН)
+    // 1. КУРЬЕР БЕРЕТ ЗАКАЗ ИЗ ОБЩЕЙ ГРУППЫ (ЕДЕТ В РЕСТОРАН)
     // ==========================================
     courierBot.action(/courier_take_(.+)/, async (ctx) => {
         const orderId = ctx.match[1];
@@ -129,8 +129,19 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             const { data: orderCheck, error: checkErr } = await supabase.from('orders').select('courier_id, restaurant, phone, client_id, client_name').eq('id', orderId).maybeSingle();
             
             if (checkErr || !orderCheck) return ctx.answerCbQuery("❌ Заказ не найден", { show_alert: true });
-            if (orderCheck.courier_id && orderCheck.courier_id !== courierId) return ctx.answerCbQuery("❌ Этот заказ уже взял другой курьер", { show_alert: true });
+            
+            // 👉 ПРОВЕРКА НА ГОНКУ (ЕСЛИ ЗАКАЗ УЖЕ ЗАБРАЛИ ДО НЕГО)
+            if (orderCheck.courier_id && orderCheck.courier_id !== courierId) {
+                await ctx.answerCbQuery("❌ Опоздали! Этот заказ уже взял другой курьер", { show_alert: true });
+                // Силовой сброс кнопки в группе, чтобы больше никто не кликал
+                await ctx.editMessageText(
+                    ctx.callbackQuery.message.text + `\n\n❌ ЗАБРАЛ ДРУГОЙ КУРЬЕР`,
+                    { reply_markup: { inline_keyboard: [] } }
+                ).catch(() => {});
+                return;
+            }
 
+            // ЕСЛИ ЗАКАЗ СВОБОДЕН — Назначаем в базе на текущего курьера
             await supabase.from('orders').update({ courier_id: courierId }).eq('id', orderId);
 
             const { data: courierData } = await supabase.from('couriers').select('name, phone').eq('id', courierId).maybeSingle();
@@ -141,8 +152,8 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
 
             const notifyMessage = `🛵 Курьер выехал в ресторан за заказом <b>#${String(orderId).slice(0,5)}</b>\n\n👤 Курьер: <b>${cName}</b>\n📞 Телефон: ${cPhone}\n💬 Telegram: ${cProfile}`;
 
+            // Уведомляем админа и ресторан
             try { await bot.telegram.sendMessage(ADMIN_GROUP_ID, notifyMessage, { parse_mode: 'HTML' }); } catch(e) {}
-
             if (orderCheck.restaurant) {
                 const { data: restData } = await supabase.from('restaurants').select('id').eq('name', orderCheck.restaurant).maybeSingle();
                 if (restData) {
@@ -150,13 +161,20 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 }
             }
 
-            // 👉 Формируем текст для курьера
+            // 👉 1. ОБНОВЛЯЕМ СООБЩЕНИЕ В ГРУППЕ (УБИРАЕМ КНОПКУ ДЛЯ ВСЕХ)
+            const groupMsg = ctx.callbackQuery.message.text;
+            await ctx.editMessageText(
+                groupMsg + `\n\n✅ ЗАКАЗ ВЗЯЛ: ${cName}`,
+                { reply_markup: { inline_keyboard: [] } } // Пустой массив удаляет кнопки!
+            ).catch(() => {});
+            
+            await ctx.answerCbQuery("✅ Вы назначены на заказ! Подробности в личке.");
+
+            // 👉 2. ОТПРАВЛЯЕМ СЕКРЕТНЫЕ ДАННЫЕ В ЛИЧКУ КУРЬЕРУ (чтобы не светить номера в группе)
             const clientPhone = orderCheck.phone || 'Не указан';
             const clientName = orderCheck.client_name || 'Гость';
 
-            const originalMsg = ctx.callbackQuery.message.text;
-            const appendText = `\n\n✅ ВЫ ПРИНЯЛИ ЗАКАЗ!\nОтправляйтесь в ресторан.\n\n👤 Клиент: ${clientName}\n📞 Телефон клиента: ${clientPhone}\n\nКак только заберете еду, нажмите кнопку ниже:`;
-            const newText = (originalMsg ? originalMsg : "Заказ") + appendText;
+            const privateText = `📦 Детали заказа #${String(orderId).slice(0,5)}\n\n✅ ВЫ ПРИНЯЛИ ЗАКАЗ!\nОтправляйтесь в ресторан.\n\n👤 Клиент: ${clientName}\n📞 Телефон клиента: ${clientPhone}\n\nКак только заберете еду, нажмите кнопку ниже:`;
 
             const buttons = [
                 [Markup.button.callback('📦 Я взял заказ (Еду к клиенту)', `courier_picked_up_${orderId}`)]
@@ -166,8 +184,8 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 buttons.push([Markup.button.url('💬 Написать клиенту', `tg://user?id=${orderCheck.client_id}`)]);
             }
 
-            await ctx.editMessageText(newText, Markup.inlineKeyboard(buttons));
-            await ctx.answerCbQuery("✅ Вы назначены на заказ!");
+            await courierBot.telegram.sendMessage(courierId, privateText, Markup.inlineKeyboard(buttons));
+
         } catch (err) {
             console.error("Ошибка при взятии заказа курьером:", err.message);
             try { await ctx.answerCbQuery("❌ Ошибка базы данных", {show_alert: true}); } catch(e){}
