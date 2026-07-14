@@ -86,6 +86,23 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 }
             }
 
+            try {
+                const oldText = ctx.callbackQuery.message.text;
+                await ctx.editMessageText(oldText + `\n\n✅ ОПЛАТА ОДОБРЕНА АДМИНИСТРАТОРОМ!`, { reply_markup: { inline_keyboard: buttons } });
+            } catch (e) {}
+
+            // ==========================================
+            // 🔥 УМНЫЙ ШЛАГБАУМ ДЛЯ САМОВЫВОЗА
+            // ==========================================
+            // Проверяем: либо через поле метода доставки, либо если в адресе написано "Самовывоз"
+            const isPickup = order.delivery_method === 'pickup' || 
+                             (order.address && order.address.toLowerCase().includes('самовывоз'));
+
+            if (isPickup) {
+                console.log(`[АДМИН] Заказ #${orderId} — это САМОВЫВОЗ. Курьерам не шлем!`);
+                return; // 👈 КРАШ-ПРУФ: Просто выходим из функции. Кухня уже получила заказ, а курьеры ничего не увидят!
+            }
+
            // ==========================================
             // ОТПРАВКА КУРЬЕРАМ В ОБЩУЮ ГРУППУ
             // ==========================================
