@@ -113,14 +113,15 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
 
             if (!order) return;
 
-            // Защита от двойного нажатия (уже отменен)
+           // Защита от двойного нажатия (уже отменен)
             if (order.status === 'canceled') {
                 return ctx.answerCbQuery("⚠️ Заказ уже отменен!", { show_alert: true }).catch(() => {});
             }
 
-            // Защита: нельзя отменить заказ, если его уже везет курьер
-            if (['delivery', 'completed'].includes(order.status)) {
-                return ctx.answerCbQuery("❌ Невозможно отменить: заказ уже в пути или доставлен!", { show_alert: true }).catch(() => {});
+            // 👉 ИСПРАВЛЕНО: Убрали 'delivery'. Теперь ресторан может отменить заказ, даже если курьер в пути.
+            // Оставили только защиту от отмены УЖЕ ЗАВЕРШЕННОГО заказа.
+            if (order.status === 'completed') {
+                return ctx.answerCbQuery("❌ Невозможно отменить: заказ уже успешно доставлен клиенту!", { show_alert: true }).catch(() => {});
             }
 
             // 2. Меняем статус в базе на canceled
@@ -130,8 +131,9 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
             const cid = order.client_id;
             if (cid && String(cid) !== '111' && String(cid) !== 'null' && String(cid) !== 'undefined') {
                 const clientMsg = `❌ <b>Заказ #${String(orderId).slice(0,5)} отменен рестораном.</b>\n\n` +
-                                  `К сожалению, заведение сейчас не может принять ваш заказ (возможно, большая загрузка на кухне или закончились нужные продукты).\n\n` +
-                                  `Пожалуйста, вернитесь в меню и выберите другой ресторан. Приносим извинения за неудобства! 😔`;
+                                  `Возможно, большая загрузка на кухне или закончились нужные продукты).\n\n` +
+                                  `Пожалуйста, вернитесь в меню и выберите другой ресторан. Приносим извинения за неудобства!😔\n
+                                  Поддержка: @foodkg_admin`;
                 try {
                     await clientBot.telegram.sendMessage(cid, clientMsg, { parse_mode: 'HTML' });
                 } catch(e) {
