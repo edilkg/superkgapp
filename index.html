@@ -976,8 +976,8 @@
         <p style="color: var(--tg-theme-hint-color); margin: 0; font-size: 14px;">Ресторан: <b id="st-res-name">...</b></p>
         
         <p id="st-res-phone-container" style="color: var(--tg-theme-hint-color); margin: 4px 0 0 0; font-size: 14px; display: none;">
-            Тел ресторана: <b id="st-res-phone">...</b>
-        </p>
+    Номер: <b id="st-res-phone"></b>
+</p>
 
         <p style="color: var(--tg-theme-hint-color); margin: 4px 0 0 0; font-size: 14px;">Сумма: <b id="st-price">...</b></p>
     </div>
@@ -3463,11 +3463,11 @@ function goToMainMenu() {
     document.getElementById('st-res-name').innerText = order.restaurant;
     document.getElementById('st-price').innerText = order.total_price + ' сом';
 
-    // 👇 ДОБАВИЛИ ПРОСТОЙ ПОИСК И ВЫВОД ТЕЛЕФОНА
+    // 👇 ТРИ СТРОКИ: Находим ресторан и выводим телефон как простой текст
     const currentRest = Object.values(database).find(r => r.title === order.restaurant);
     if (currentRest && currentRest.phone) {
-        document.getElementById('st-res-phone').innerText = currentRest.phone; // Вписываем номер
-        document.getElementById('st-res-phone-container').style.display = 'block'; // Показываем скрытую строку
+        document.getElementById('st-res-phone').innerText = currentRest.phone; 
+        document.getElementById('st-res-phone-container').style.display = 'block';
     }
     // 👆 КОНЕЦ
 
