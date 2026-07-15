@@ -2594,7 +2594,7 @@ function confirmAddressFromModal() {
 
             if (payBtn) {
                 originalBtnText = payBtn.innerText;
-                payBtn.innerText = '⏳ Обработка...';
+                payBtn.innerText = '⏳ Секундочку...';
                 payBtn.style.pointerEvents = 'none';
                 payBtn.style.opacity = '0.7';
             }
@@ -3454,13 +3454,15 @@ function goToMainMenu() {
             }
         }
 
-        // Обновляем большой экран статуса
-        function updateFullStatusUI(order) {
+    function updateFullStatusUI(order) {
     document.getElementById('st-res-name').innerText = order.restaurant;
     document.getElementById('st-price').innerText = order.total_price + ' сом';
 
-    // 👇 ТРИ ПРОСТЫЕ СТРОЧКИ ДЛЯ ТЕЛЕФОНА
-    const currentRest = database.find(r => r.name === order.restaurant);
+    // 👇 ИСПРАВЛЕННЫЙ ПОИСК ТЕЛЕФОНА (ДЛЯ ОБЪЕКТА DATABASE)
+    // Превращаем твой объект в массив и ищем совпадение по title
+    const restaurantsArray = Object.values(database);
+    const currentRest = restaurantsArray.find(r => r.title === order.restaurant);
+    
     const phoneText = (currentRest && currentRest.phone) ? currentRest.phone : 'Не указан';
     if(document.getElementById('st-res-phone')) document.getElementById('st-res-phone').innerText = phoneText;
     // 👆 КОНЕЦ
