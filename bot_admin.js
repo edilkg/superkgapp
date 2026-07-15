@@ -2,7 +2,7 @@ const { Markup } = require('telegraf');
 
 module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase, ADMIN_GROUP_ID) {
     
-    // ==========================================
+   // ==========================================
     // 1. КНОПКА: ОДОБРИТЬ ОПЛАТУ ЗАКАЗА
     // ==========================================
     adminBot.action(/approve_order_(.+)/, async (ctx) => {
@@ -31,6 +31,12 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 `✅ ЗАКАЗ #${String(orderId).slice(0,5)} ОДОБРЕН (Оплата получена)\nРесторан: ${order.restaurant || 'Не указан'}\nСумма: ${order.total_price} сом`, 
                 Markup.inlineKeyboard(buttons)
             ).catch(() => {});
+
+            // ==========================================
+            // 🔥 ОПРЕДЕЛЯЕМ ТИП ЗАКАЗА (ДОСТАВКА ИЛИ САМОВЫВОЗ)
+            // ==========================================
+            const isPickup = order.delivery_method === 'pickup' || 
+                             (order.address && order.address.toLowerCase().includes('самовывоз'));
 
             // 👉 ОТПРАВКА В РЕСТОРАН (С ВЫВОДОМ ПРИБОРОВ И КОММЕНТАРИЯ КУХНЕ)
             if (order.restaurant) {
@@ -64,9 +70,13 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                             restDetails = filteredParts.join(' | ');
                         }
                     }
+
+                    // 👉 ШАБЛОН №1: ДЛЯ РЕСТОРАНА (С УМНЫМ ЗАГОЛОВКОМ)
+                    const orderHeader = isPickup 
+                        ? `🚨 САМОВЫВОЗ! Заказ <b>#${String(orderId).slice(0,5)}</b> 🏃‍♂️` 
+                        : `🍔 НОВЫЙ ЗАКАЗ <b>#${String(orderId).slice(0,5)}</b>`;
                     
-                    // 👉 НОВЫЙ ШАБЛОН СООБЩЕНИЯ ДЛЯ РЕСТОРАНА
-                    let msgRest = `🍔 НОВЫЙ ЗАКАЗ <b>#${String(orderId).slice(0,5)}</b>\n\n` +
+                    let msgRest = `${orderHeader}\n\n` +
                                   `👤 Клиент: <b>${clientName}</b>\n` +
                                   `📞 Телефон: ${clientPhone}\n` +
                                   `💬 Детали: <b>${restDetails}</b>\n\n` +
@@ -86,28 +96,19 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 }
             }
 
-            // Изменяем сообщение админа
-            try {
-                const oldText = ctx.callbackQuery.message.text;
-                await ctx.editMessageText(oldText + `\n\n✅ ОПЛАТА ОДОБРЕНА АДМИНИСТРАТОРОМ!`, { reply_markup: { inline_keyboard: buttons } });
-            } catch (e) {}
-
             // ==========================================
-            // 🔥 УМНЫЙ ШЛАГБАУМ ДЛЯ САМОВЫВОЗА
+            // 🔥 ШЛАГБАУМ ДЛЯ КУРЬЕРОВ
+            // Если это самовывоз, стопаем код здесь!
             // ==========================================
-            // Проверяем: либо через поле метода доставки, либо если в адресе написано "Самовывоз"
-            const isPickup = order.delivery_method === 'pickup' || 
-                             (order.address && order.address.toLowerCase().includes('самовывоз'));
-
             if (isPickup) {
                 console.log(`[АДМИН] Заказ #${orderId} — это САМОВЫВОЗ. Курьерам не шлем!`);
-                return; // 👈 КРАШ-ПРУФ: Просто выходим из функции. Кухня уже получила заказ, а курьеры ничего не увидят!
+                return; 
             }
 
-           // ==========================================
-            // ОТПРАВКА КУРЬЕРАМ В ОБЩУЮ ГРУППУ
             // ==========================================
-            const COURIER_GROUP_ID = '-1004348705428'; // 👈 ВСТАВЬ СЮДА СВОЙ РЕАЛЬНЫЙ ID ГРУППЫ КУРЬЕРОВ
+            // ШАБЛОН №2: ОТПРАВКА КУРЬЕРАМ В ОБЩУЮ ГРУППУ (Только если это доставка)
+            // ==========================================
+            const COURIER_GROUP_ID = '-1004348705428'; // 👈 Твой ID группы курьеров
             
             let itemsArr = [];
             try { itemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]'); } catch(e) {}
@@ -123,7 +124,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             // Вычитаем еду из общей суммы, чтобы получить чистую стоимость доставки
             const deliveryPrice = Math.max(0, (order.total_price || 0) - foodPrice);
 
-            // 👉 ЧИСТЫЙ И КРАСИВЫЙ ШАБЛОН: Только Ресторан и Сумма доставки
+            // 👉 ЧИСТЫЙ И КРАСИВЫЙ ШАБЛОН ДЛЯ КУРЬЕРОВ: Только Ресторан и Сумма доставки
             let msgCourier = `🔥 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n` +
                              `🏢 Ресторан: <b>${order.restaurant || 'Не указан'}</b>\n` +
                              `💰 Доставка: <b>${deliveryPrice} сом</b>\n\n` +
@@ -141,7 +142,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 console.error("❌ Ошибка отправки заказа в общую группу курьеров:", e);
             }
 
-        } catch (err) { // 👈 Вот этот catch и закрывающие скобки ниже мы вернули на место!
+        } catch (err) { // 👈 Тот самый важный catch!
             console.error("[АДМИН] Ошибка при одобрении заказа:", err);
             try { await ctx.answerCbQuery("❌ Произошла ошибка на сервере", { show_alert: true }); } catch(e){}
         }
