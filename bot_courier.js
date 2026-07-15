@@ -111,9 +111,6 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
     // ==========================================
     // 1. КУРЬЕР БЕРЕТ ЗАКАЗ ИЗ ОБЩЕЙ ГРУППЫ (ЕДЕТ В РЕСТОРАН)
     // ==========================================
-    // ==========================================
-    // 1. КУРЬЕР БЕРЕТ ЗАКАЗ ИЗ ОБЩЕЙ ГРУППЫ (ЕДЕТ В РЕСТОРАН)
-    // ==========================================
     courierBot.action(/courier_take_(.+)/, async (ctx) => {
         const orderId = ctx.match[1].trim(); 
         const courierId = ctx.from.id;
@@ -138,6 +135,17 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             if (checkErr || !orderCheck) {
                 console.error("❌ Ошибка Supabase при поиске заказа:", checkErr);
                 return ctx.answerCbQuery("❌ Заказ не найден в базе данных", { show_alert: true });
+            }
+
+            // 👉 НОВАЯ ЗАЩИТА ОТ ОТМЕНЫ РЕСТОРАНОМ 
+            if (orderCheck.status === 'canceled') {
+                await ctx.answerCbQuery("❌ Отбой! Ресторан отменил этот заказ.", { show_alert: true });
+                // Силовой сброс кнопки в группе, чтобы больше никто не кликал
+                await ctx.editMessageText(
+                    ctx.callbackQuery.message.text + `\n\n❌ ОТМЕНЕН РЕСТОРАНОМ`,
+                    { reply_markup: { inline_keyboard: [] } }
+                ).catch(() => {});
+                return;
             }
             
             // 👉 ПРОВЕРКА НА ГОНКУ (ЕСЛИ ЗАКАЗ УЖЕ ЗАБРАЛИ ДО НЕГО)
