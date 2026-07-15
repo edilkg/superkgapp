@@ -3459,29 +3459,17 @@ function goToMainMenu() {
             }
         }
 
-    async function updateFullStatusUI(order) { // 👈 ДОБАВИЛИ async
+    function updateFullStatusUI(order) {
     document.getElementById('st-res-name').innerText = order.restaurant;
     document.getElementById('st-price').innerText = order.total_price + ' сом';
 
-    // 👇 ТОТ САМЫЙ ЧЕСТНЫЙ МЕТОД: Тянем телефон напрямую из Supabase!
-    try {
-        const { data: restDb } = await supabase
-            .from('restaurants')
-            .select('phone')
-            .ilike('name', order.restaurant)
-            .maybeSingle();
-
-        const phoneText = restDb?.phone || 'Не указан';
-        if(document.getElementById('st-res-phone')) {
-            document.getElementById('st-res-phone').innerText = phoneText;
-        }
-    } catch (err) {
-        console.error("Ошибка получения телефона ресторана:", err);
-        if(document.getElementById('st-res-phone')) {
-            document.getElementById('st-res-phone').innerText = 'Не указан';
-        }
+    // 👇 ДОБАВИЛИ ПРОСТОЙ ПОИСК И ВЫВОД ТЕЛЕФОНА
+    const currentRest = Object.values(database).find(r => r.title === order.restaurant);
+    if (currentRest && currentRest.phone) {
+        document.getElementById('st-res-phone').innerText = currentRest.phone; // Вписываем номер
+        document.getElementById('st-res-phone-container').style.display = 'block'; // Показываем скрытую строку
     }
-    // 👆 КОНЕЦ ЖИВОГО ЗАПРОСА
+    // 👆 КОНЕЦ
 
     const info = getStatusData(order.status);
 
