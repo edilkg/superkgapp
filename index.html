@@ -872,7 +872,7 @@
         </div>
 
         <div class="cart-section">
-            <div class="delivery-toggle">
+            <div class="delivery-toggle" style="display: none;">
                 <div class="toggle-btn active" id="tab-delivery" onclick="setDeliveryMode('delivery')">Доставка</div>
                 <div class="toggle-btn" id="tab-pickup" onclick="setDeliveryMode('pickup')">Самовывоз</div>
             </div>
@@ -2594,24 +2594,10 @@ function confirmAddressFromModal() {
             }
             // --- 🟢 КОНЕЦ ЗАМОРОЗКИ ---
 
-            // ==========================================
-            // 🔥 УМНОЕ ФОРМИРОВАНИЕ АДРЕСА (ДЛЯ САМОВЫВОЗА)
-            // ==========================================
             let fullAddress = orderAddressData.street;
-            if (orderAddressData.kv) {
+            if(orderAddressData.kv) {
                 fullAddress += ` (${orderAddressData.kv})`;
             }
-
-            // Если доставка 0 и адрес не пустой - значит юзер выбрал "Самовывоз"
-            // Жестко вписываем это слово в адрес, чтобы админ-бот (isPickup) его 100% заметил!
-            if (currentDeliveryFee === 0) {
-                fullAddress = "🏃‍♂️ Самовывоз"; 
-                // А чтобы курьер (если вдруг что-то пойдет не так) не уехал в никуда, 
-                // мы просто стираем координаты доставки для этого заказа.
-                clientLat = null;
-                clientLon = null;
-            }
-            // ==========================================
             
             // Склеиваем комментарий
             let finalCommentParts = [];
@@ -3350,59 +3336,83 @@ function goToMainMenu() {
         }
 
         async function checkActiveOrder() {
-            // Переносим старый одиночный заказ в новый формат массива (чтобы у старых юзеров ничего не сломалось)
-            let oldId = localStorage.getItem('tamak_active_order_id');
-            let activeOrders = JSON.parse(localStorage.getItem('tamak_active_order_ids') || '[]');
-            if (oldId && !activeOrders.includes(parseInt(oldId))) {
-                activeOrders.push(parseInt(oldId));
-                localStorage.removeItem('tamak_active_order_id');
-                localStorage.setItem('tamak_active_order_ids', JSON.stringify(activeOrders));
-            }
+    // 1. Переносим старый одиночный заказ в новый формат массива (чтобы у старых юзеров ничего не сломалось)
+    let oldId = localStorage.getItem('tamak_active_order_id');
+    let activeOrders = JSON.parse(localStorage.getItem('tamak_active_order_ids') || '[]');
+    
+    if (oldId && !activeOrders.includes(parseInt(oldId))) {
+        activeOrders.push(parseInt(oldId));
+        localStorage.removeItem('tamak_active_order_id');
+        localStorage.setItem('tamak_active_order_ids', JSON.stringify(activeOrders));
+    }
 
-            if (activeOrders.length === 0) {
-                document.getElementById('active-orders-container').innerHTML = '';
-                return;
-            }
+    // Если список пуст — очищаем экран и выходим
+    if (activeOrders.length === 0) {
+        let container = document.getElementById('active-orders-container');
+        if (container) container.innerHTML = '';
+        return;
+    }
 
-            // Загружаем данные по всем активным заказам разом
-            const { data: orders, error } = await supabaseClient.from('orders').select('*').in('id', activeOrders);
-            
-            if (orders) {
-                let currentActive = [];
+    // 2. Загружаем данные по всем активным заказам разом из Supabase
+    const { data: orders, error } = await supabaseClient
+        .from('orders')
+        .select('*')
+        .in('id', activeOrders);
+        
+    if (orders) {
+        let currentActive = []; // ID реально активных заказов для сохранения в память
+        let ordersToRender = []; // Данные активных заказов для отрисовки баннеров
+        
+        orders.forEach(order => {
+            if (!['completed', 'canceled'].includes(order.status)) {
+                // Заказ всё ещё активен!
+                currentActive.push(order.id);
+                ordersToRender.push(order);
                 
-                orders.forEach(order => {
-                    if (!['completed', 'canceled'].includes(order.status)) {
-                        currentActive.push(order.id);
-                        
-                        // Создаем отдельный канал прослушки для каждого заказа
-                        if (!orderSubscriptions[order.id]) {
-                            const channelName = 'order-watch-' + order.id;
-                            orderSubscriptions[order.id] = supabaseClient.channel(channelName)
-                                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${order.id}` }, (payload) => {
-                                    checkActiveOrder(); // Перерисовываем мини-баннеры на главной
-                                    // Если юзер прямо сейчас смотрит статус этого заказа на весь экран — обновляем и его
-                                    if (window.currentViewingOrderId == payload.new.id) {
-                                        updateFullStatusUI(payload.new);
-                                    }
-                                }).subscribe();
-                        }
-                    } else {
-                        // Если заказ завершен, закрываем его канал связи
-                        if (orderSubscriptions[order.id]) {
-                            supabaseClient.removeChannel(orderSubscriptions[order.id]);
-                            delete orderSubscriptions[order.id];
-                        }
-                    }
-                });
-                
-                // Очищаем локальную память от старых (завершенных) заказов
-                if (currentActive.length !== activeOrders.length) {
-                    localStorage.setItem('tamak_active_order_ids', JSON.stringify(currentActive));
+                // Создаем отдельный канал прослушки для каждого активного заказа
+                if (!orderSubscriptions[order.id]) {
+                    const channelName = 'order-watch-' + order.id;
+                    orderSubscriptions[order.id] = supabaseClient.channel(channelName)
+                        .on('postgres_changes', { 
+                            event: 'UPDATE', 
+                            schema: 'public', 
+                            table: 'orders', 
+                            filter: `id=eq.${order.id}` 
+                        }, (payload) => {
+                            checkActiveOrder(); // Перерисовываем мини-баннеры на главной
+                            // Если юзер прямо сейчас смотрит статус этого заказа на весь экран — обновляем и его
+                            if (window.currentViewingOrderId == payload.new.id) {
+                                updateFullStatusUI(payload.new);
+                            }
+                        }).subscribe();
                 }
-                
-                renderActiveOrderBanners(orders);
+            } else {
+                // ЗАКАЗ ЗАВЕРШЕН ИЛИ ОТМЕНЕН!
+                // Закрываем его канал связи (WebSockets), чтобы не жрать батарею телефона
+                if (orderSubscriptions[order.id]) {
+                    supabaseClient.removeChannel(orderSubscriptions[order.id]);
+                    delete orderSubscriptions[order.id];
+                }
             }
+        });
+        
+        // 3. АВТО-ОЧИСТКА ПАМЯТИ
+        // Перезаписываем localStorage только теми ID, которые реально остались активны.
+        // Это навсегда удалит "зависшие" заказы из телефона клиента.
+        if (currentActive.length !== activeOrders.length) {
+            localStorage.setItem('tamak_active_order_ids', JSON.stringify(currentActive));
         }
+        
+        // 4. Отрисовываем баннеры ТОЛЬКО для активных заказов
+        if (ordersToRender.length > 0) {
+            renderActiveOrderBanners(ordersToRender);
+        } else {
+            // Если все заказы отсеялись (стали completed) — полностью убираем баннер
+            let container = document.getElementById('active-orders-container');
+            if (container) container.innerHTML = '';
+        }
+    }
+}
 
         // Рисуем список баннеров на главной странице
         function renderActiveOrderBanners(orders) {
