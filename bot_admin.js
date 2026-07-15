@@ -25,6 +25,17 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             const cid = order.client_id;
             if (cid && String(cid) !== '111' && String(cid) !== 'null' && String(cid) !== 'undefined') {
                 buttons.push([Markup.button.url("💬 Написать клиенту", `tg://user?id=${cid}`)]);
+                
+                // 👇 ВОТ ТО САМОЕ УВЕДОМЛЕНИЕ ЮЗЕРУ, КОТОРОЕ СЛУЧАЙНО УДАЛИЛИ
+                try { 
+                    await adminBot.telegram.sendMessage(
+                        cid, 
+                        `✅ <b>Оплата успешно получена!</b>\n\nВаш заказ <b>#${String(orderId).slice(0,5)}</b> передан в ресторан и курьерам. Скоро он будет у вас! 🚀`, 
+                        { parse_mode: 'HTML' }
+                    ); 
+                } catch(e) {
+                    console.error("Ошибка при отправке уведомления клиенту об оплате:", e);
+                }
             }
 
             await ctx.editMessageText(
@@ -128,7 +139,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             try { await ctx.answerCbQuery("❌ Произошла ошибка на сервере", { show_alert: true }); } catch(e){}
         }
     });
-    
+
     // ==========================================
     // 2. КНОПКА: ОТКЛОНИТЬ ОПЛАТУ
     // ==========================================
