@@ -2,5 +2,5 @@ git config --global user.email "sulaimaonv.2002.es@gmail.com"
 git config --global user.name "edilkgr"
 
 git add .
-git commit -m "добавилномернастраницуоформлкния3"
+git commit -m "добавилАДРЕС ДЛЯ КУРЬЕРОВ3"
 git push

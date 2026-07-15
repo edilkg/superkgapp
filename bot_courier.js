@@ -108,7 +108,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
         }
     });
 
-    // ==========================================
+   // ==========================================
     // 1. КУРЬЕР БЕРЕТ ЗАКАЗ ИЗ ОБЩЕЙ ГРУППЫ (ЕДЕТ В РЕСТОРАН)
     // ==========================================
     courierBot.action(/courier_take_(.+)/, async (ctx) => {
@@ -204,19 +204,33 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             const clientPhone = orderCheck.phone || 'Не указан';
             const clientName = orderCheck.client_name || 'Гость';
             const address = orderCheck.address || 'Не указан';
-            const comment = orderCheck.comment || 'Нет комментариев';
             
+            // 👉 ВОТ ТА САМАЯ ФУНКЦИЯ ИЗ АДМИНКИ: Вытаскиваем адрес и чистим коммент
+            let addressSuffix = '';
+            let displayComment = orderCheck.comment || 'Нет комментариев';
+
+            if (displayComment.includes('🏪 Адрес ресторана:')) {
+                const parts = displayComment.split(' | ');
+                const addrPart = parts.find(p => p.includes('🏪 Адрес ресторана:'));
+                if (addrPart) {
+                    addressSuffix = ` (${addrPart.replace('🏪 Адрес ресторана:', '').trim()})`;
+                    displayComment = parts.filter(p => !p.includes('🏪 Адрес ресторана:')).join(' | ') || 'Нет комментариев';
+                }
+            }
+            const fullRestName = `${orderCheck.restaurant || 'Не указан'}${addressSuffix}`;
+            // 👈 КОНЕЦ НОВОГО БЛОКА
+
             // 🗺 Умная проверка координат
             const lat = orderCheck.lat || orderCheck.latitude;
             const lon = orderCheck.lon || orderCheck.longitude;
 
             let privateText = `📦 <b>Детали заказа #${String(orderId).slice(0,5)}</b>\n\n` +
                               `💰 <b>Оплата:</b> <u>${deliveryPriceText} сом</u>\n\n` +
-                              `📍 Ресторан: <b>${orderCheck.restaurant || 'Не указан'}</b>\n\n` +
+                              `📍 Ресторан: <b>${fullRestName}</b>\n\n` + // 👈 ВЫВОДИМ С АДРЕСОМ
                               `👤 <b>Клиент:</b> ${clientName}\n` +
                               `📞 <b>Номер:</b> <code>${clientPhone}</code>\n` +
                               `📍 <b>Адрес доставки:</b> <u>${address}</u>\n` +
-                              `💬 <b>Комментарий:</b> <i>${comment}</i>\n`;
+                              `💬 <b>Комментарий:</b> <i>${displayComment}</i>\n`; // 👈 ВЫВОДИМ ОЧИЩЕННЫЙ КОММЕНТ
 
             const buttons = [
                 [Markup.button.callback('📦 Я взял заказ (Еду к клиенту)', `courier_picked_up_${orderId}`)]
