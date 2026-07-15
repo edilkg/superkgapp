@@ -3464,11 +3464,11 @@ function goToMainMenu() {
     document.getElementById('st-res-name').innerText = order.restaurant;
     document.getElementById('st-price').innerText = order.total_price + ' сом';
 
-    // 👇 ТРИ СТРОКИ: Находим ресторан и выводим телефон как простой текст
+    // 👇 ДОБАВИЛИ ПРОСТОЙ ПОИСК И ВЫВОД ТЕЛЕФОНА
     const currentRest = Object.values(database).find(r => r.title === order.restaurant);
     if (currentRest && currentRest.phone) {
-        document.getElementById('st-res-phone').innerText = currentRest.phone; 
-        document.getElementById('st-res-phone-container').style.display = 'block';
+        document.getElementById('st-res-phone').innerText = currentRest.phone; // Вписываем номер
+        document.getElementById('st-res-phone-container').style.display = 'block'; // Показываем скрытую строку
     }
     // 👆 КОНЕЦ
 

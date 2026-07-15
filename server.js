@@ -35,16 +35,14 @@ const adminActions = setupAdminBot(bot, restBot, courierBot, supabase, ADMIN_GRO
 // ==========================================
 // ПРИЕМ ЗАКАЗОВ С САЙТА
 // ==========================================
-// ==========================================
-// ПРИЕМ ЗАКАЗОВ С САЙТА
-// ==========================================
 app.post('/web-data', async (req, res) => {
     try {
-        // 👉 ИЗМЕНЕНИЕ 1: Достаем resComment, isDoorDelivery, cutlery из запроса
-        const { type, user, phone, address, restaurantName, totalPrice, comment, resComment, isDoorDelivery, cutlery, items, dest_lat, dest_lon } = req.body;
+        // 👉 1. ДОБАВИЛИ restaurantAddress в прием данных
+        const { type, user, phone, address, restaurantName, restaurantAddress, totalPrice, comment, resComment, isDoorDelivery, cutlery, items, dest_lat, dest_lon } = req.body;
+        
         if (type !== 'food') return res.status(400).json({ error: 'Тип не еда' });
 
-        // 👉 БРОНЕЖИЛЕТ ОТ СПАМА (МАКСИМУМ 2 ЗАКАЗА НА СЕРВЕРЕ)
+        // 👉 БРОНЕЖИЛЕТ ОТ СПАМА 
         if (user && user.id && user.id != 111) {
             const { data: activeUserOrders } = await supabase
                 .from('orders')
@@ -57,14 +55,15 @@ app.post('/web-data', async (req, res) => {
             }
         }
 
-        // 👉 ИЗМЕНЕНИЕ 2: Склеиваем ВСЕ детали заказа в красивую строку
         let extraDetails = [];
+        // 👉 2. СОХРАНЯЕМ АДРЕС В БАЗУ ДАННЫХ
+        if (restaurantAddress) extraDetails.push(`🏪 Адрес ресторана: ${restaurantAddress}`); 
         if (isDoorDelivery) extraDetails.push("🚪 Доставка до двери");
         if (cutlery > 0) extraDetails.push(`🍴 Приборы: ${cutlery}`);
         if (comment) extraDetails.push(`📍 Ориентир: ${comment}`);
         if (resComment) extraDetails.push(`💬 Кухне: ${resComment}`);
 
-        // 🗺 ДОБАВЛЯЕМ ССЫЛКУ НА 2ГИС (В самый конец)
+        // 🗺 ДОБАВЛЯЕМ ССЫЛКУ НА 2ГИС 
         if (dest_lat && dest_lon) {
             extraDetails.push(`🗺 2ГИС: https://2gis.kg/geo/${dest_lon},${dest_lat}`);
         }
@@ -88,8 +87,8 @@ app.post('/web-data', async (req, res) => {
         // Моментально отвечаем фронтенду
         res.status(200).json({ success: true, orderId: newOrder.id });
 
-        // Отправляем админу и курьерам
-        adminActions.sendOrderToAdmin(newOrder);
+        // 👉 3. ПЕРЕДАЕМ АДРЕС АДМИН-БОТУ ДЛЯ КРАСИВОГО ОТОБРАЖЕНИЯ
+        adminActions.sendOrderToAdmin({ ...newOrder, restaurantAddress });
 
     } catch (err) {
         console.error(err);
