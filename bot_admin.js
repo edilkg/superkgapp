@@ -26,11 +26,10 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             if (cid && String(cid) !== '111' && String(cid) !== 'null' && String(cid) !== 'undefined') {
                 buttons.push([Markup.button.url("💬 Написать клиенту", `tg://user?id=${cid}`)]);
                 
-                // 👇 ВОТ ТО САМОЕ УВЕДОМЛЕНИЕ ЮЗЕРУ, КОТОРОЕ СЛУЧАЙНО УДАЛИЛИ
                 try { 
                     await adminBot.telegram.sendMessage(
                         cid, 
-                        `✅ <b>Оплата успешно получена!</b>\n\nВаш заказ <b>#${String(orderId).slice(0,5)}</b> передан в ресторан и курьерУ🚀`, 
+                        `✅ <b>Оплата успешно получена!</b>\n\nВаш заказ <b>#${String(orderId).slice(0,5)}</b> передан в ресторан и курьеру🚀`, 
                         { parse_mode: 'HTML' }
                     ); 
                 } catch(e) {
@@ -38,14 +37,26 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 }
             }
 
-await ctx.editMessageText(
-    `✅ ЗАКАЗ #${String(orderId).slice(0,5)} ОДОБРЕН (Оплата получена)\n` +
-    `🏢 Ресторан: ${order.restaurant || 'Не указан'}\n` +
-    `💰 Сумма: ${order.total_price} сом`, 
-    Markup.inlineKeyboard(buttons)
-).catch(() => {});
+            // 👉 НОВАЯ ЛОГИКА: Формируем красивое название с адресом в скобках
+            let addressSuffix = '';
+            if (order.comment && order.comment.includes('🏪 Адрес ресторана:')) {
+                const parts = order.comment.split(' | ');
+                const addrPart = parts.find(p => p.includes('🏪 Адрес ресторана:'));
+                if (addrPart) {
+                    addressSuffix = ` (${addrPart.replace('🏪 Адрес ресторана:', '').trim()})`;
+                }
+            }
+            // Получаем: "MAX BURGER (ул. Советская, 67в)"
+            const fullRestName = `${order.restaurant || 'Не указан'}${addressSuffix}`;
 
-            // 👉 ОТПРАВКА В РЕСТОРАН (С ВЫВОДОМ ПРИБОРОВ И КОММЕНТАРИЯ КУХНЕ)
+            await ctx.editMessageText(
+                `✅ ЗАКАЗ #${String(orderId).slice(0,5)} ОДОБРЕН (Оплата получена)\n` +
+                `🏢 Ресторан: ${fullRestName}\n` + // 👈 ВЫВОДИМ КРАСИВО
+                `💰 Сумма: ${order.total_price} сом`, 
+                Markup.inlineKeyboard(buttons)
+            ).catch(() => {});
+
+            // 👉 ОТПРАВКА В РЕСТОРАН (Тут база ищет чистое имя MAX BURGER, ошибки не будет!)
             if (order.restaurant) {
                 const { data: restData, error: restErr } = await supabase.from('restaurants').select('id, name, is_approved').ilike('name', order.restaurant).maybeSingle();
                 
@@ -59,7 +70,6 @@ await ctx.editMessageText(
                     let itemsArr = [];
                     try { itemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]'); } catch(e) {}
                     
-                    // 👉 СЧИТАЕМ СУММУ ТОЛЬКО ЗА ЕДУ ДЛЯ РЕСТОРАНА
                     let foodOnlyTotal = 0;
                     itemsArr.forEach(i => {
                         const price = Number(i.price || (i.item ? i.item.price : 0)) || 0;
@@ -67,7 +77,6 @@ await ctx.editMessageText(
                         foodOnlyTotal += price * count;
                     });
 
-                    // ЗАЩИТА ОТ КРАША ТЕЛЕГРАМА (Экранируем < и >)
                     const itemsText = itemsArr.map(i => {
                         const name = i.item ? i.item.name : i.name;
                         return `▫️ ${name.replace(/</g, '&lt;').replace(/>/g, '&gt;')} x${i.count}`;
@@ -76,7 +85,6 @@ await ctx.editMessageText(
                     const clientName = (order.client_name || 'Гость').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                     const clientPhone = order.phone || 'Не указан';
                     
-                    // 👉 ИСПРАВЛЕНИЕ: Фильтруем общую строку комментариев Supabase, вытаскивая ТОЛЬКО Приборы и Комментарий кухне
                     let restDetails = 'Нет';
                     if (order.comment) {
                         const parts = order.comment.split(' | ');
@@ -86,13 +94,12 @@ await ctx.editMessageText(
                         }
                     }
                     
-                    // 👉 НОВЫЙ ШАБЛОН СООБЩЕНИЯ ДЛЯ РЕСТОРАНА (выводим foodOnlyTotal)
                     let msgRest = `🍔 НОВЫЙ ЗАКАЗ <b>#${String(orderId).slice(0,5)}</b>\n\n` +
                                   `👤 Клиент: <b>${clientName}</b>\n` +
                                   `📞 Номер: ${clientPhone}\n` +
                                   `💬 Детали: <b>${restDetails}</b>\n\n` +
                                   `🛒 Заказ:\n${itemsText}\n\n` +
-                                  `💰 Сумма: ${foodOnlyTotal} сом`; // ИЗМЕНИЛИ ЭТУ СТРОКУ
+                                  `💰 Сумма: ${foodOnlyTotal} сом`; 
                     
                     await restBot.telegram.sendMessage(restData.id, msgRest, {
                         parse_mode: 'HTML',
@@ -110,12 +117,11 @@ await ctx.editMessageText(
             // ==========================================
             // ОТПРАВКА КУРЬЕРАМ В ОБЩУЮ ГРУППУ
             // ==========================================
-            const COURIER_GROUP_ID = '-1004348705428'; // 👈 ВСТАВЬ СЮДА СВОЙ РЕАЛЬНЫЙ ID ГРУППЫ КУРЬЕРОВ
+            const COURIER_GROUP_ID = '-1004348705428'; 
             
             let itemsArr = [];
             try { itemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]'); } catch(e) {}
             
-            // Считаем чистую стоимость еды в заказе
             let foodPrice = 0;
             itemsArr.forEach(i => {
                 const price = Number(i.price || (i.item ? i.item.price : 0)) || 0;
@@ -123,17 +129,15 @@ await ctx.editMessageText(
                 foodPrice += price * count;
             });
 
-            // Вычитаем еду из общей суммы, чтобы получить чистую стоимость доставки
             const deliveryPrice = Math.max(0, (order.total_price || 0) - foodPrice);
 
-            // 👉 ЧИСТЫЙ И КРАСИВЫЙ ШАБЛОН: Только Ресторан и Сумма доставки
+            // 👉 ВЫВОДИМ КРАСИВОЕ ИМЯ С АДРЕСОМ И ДЛЯ КУРЬЕРА
             let msgCourier = `🔥 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n` +
-                             `🏢 Ресторан: <b>${order.restaurant || 'Не указан'}</b>\n` +
+                             `🏢 Ресторан: <b>${fullRestName}</b>\n` + 
                              `💰 Доставка: <b>${deliveryPrice} сом</b>\n\n` +
                              `Кто заберет?`;
             
             try {
-                // Шлем ровно ОДНО сообщение в группу со всеми курьерами
                 await courierBot.telegram.sendMessage(COURIER_GROUP_ID, msgCourier, {
                     parse_mode: 'HTML',
                     ...Markup.inlineKeyboard([
@@ -144,7 +148,7 @@ await ctx.editMessageText(
                 console.error("❌ Ошибка отправки заказа в общую группу курьеров:", e);
             }
 
-        } catch (err) { // 👈 Вот этот catch и закрывающие скобки ниже мы вернули на место!
+        } catch (err) {
             console.error("[АДМИН] Ошибка при одобрении заказа:", err);
             try { await ctx.answerCbQuery("❌ Произошла ошибка на сервере", { show_alert: true }); } catch(e){}
         }
@@ -161,7 +165,6 @@ await ctx.editMessageText(
             const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
             if (!order) return;
 
-            // Защита от двойного нажатия
             if (order.status === 'canceled') {
                 return ctx.answerCbQuery("⚠️ Заказ уже отменен!", { show_alert: true }).catch(() => {});
             }
@@ -214,47 +217,38 @@ await ctx.editMessageText(
 
     // ==========================================
     // 4. УМНАЯ КОМАНДА ДЛЯ ПОПОЛНЕНИЯ БАЛАНСА КУРЬЕРА
-    // Формат: /pay [Имя, Телефон или ID] [Сумма]
     // ==========================================
     adminBot.command('pay', async (ctx) => {
-        // Проверяем, что команду пишут именно в админской группе
         if (ctx.chat.id.toString() !== ADMIN_GROUP_ID.toString()) return;
         
         const text = ctx.message.text.trim();
         const args = text.split(/\s+/);
         
         if (args.length < 3) {
-            return ctx.reply("❌ Неверный формат!\nИспользуйте: /pay [Имя, Телефон или ID] [Сумма]\nПримеры:\n/pay 0500402002 500\n/pay Азамат 200");
+            return ctx.reply("❌ Неверный формат!\nИспользуйте: /pay [Имя, Телефон или ID] [Сумма]");
         }
         
-        const amount = parseInt(args.pop()); // Забираем самое последнее слово как сумму
+        const amount = parseInt(args.pop()); 
         if (isNaN(amount) || amount <= 0) return ctx.reply("❌ Сумма должна быть числом больше нуля!");
 
-        const identifier = args.slice(1).join(' '); // Все, что было между /pay и суммой
-        const cleanSearchPhone = identifier.replace(/[\s\+\-\(\)]/g, ''); // Очищаем от плюсов и пробелов для точного поиска
+        const identifier = args.slice(1).join(' '); 
+        const cleanSearchPhone = identifier.replace(/[\s\+\-\(\)]/g, ''); 
 
         try {
-            // Скачиваем список курьеров (это безопасно и быстро для поиска по разным параметрам)
             const { data: couriers, error } = await supabase.from('couriers').select('id, name, phone, balance');
             if (error || !couriers) return ctx.reply("❌ Ошибка при поиске курьеров в базе.");
 
-            // Ищем совпадения
             const matched = couriers.filter(c => {
                 const idStr = String(c.id);
                 const nameStr = (c.name || '').toLowerCase();
                 const phoneStr = (c.phone || '').replace(/[\s\+\-\(\)]/g, '');
                 const searchStr = identifier.toLowerCase();
 
-                // Считается совпадением, если:
-                // 1) Точно совпал ID
-                // 2) Имя содержит введенный текст
-                // 3) Номер телефона содержит введенные цифры (минимум 5 цифр для защиты от случайных совпадений)
                 return idStr === searchStr || 
                        nameStr.includes(searchStr) || 
                        (cleanSearchPhone.length >= 5 && phoneStr.includes(cleanSearchPhone));
             });
 
-            // Логика ответов
             if (matched.length === 0) {
                 return ctx.reply(`❌ Курьер "${identifier}" не найден.\nПроверьте правильность написания имени или номера.`);
             }
@@ -268,7 +262,6 @@ await ctx.editMessageText(
                 return ctx.reply(msg, { parse_mode: 'HTML' });
             }
 
-            // Если найден ровно 1 курьер — пополняем!
             const c = matched[0];
             const newBalance = (c.balance || 0) + amount;
             
@@ -276,7 +269,6 @@ await ctx.editMessageText(
             
             await ctx.reply(`✅ Баланс успешно пополнен!\n👤 Курьер: ${c.name}\n📞 Тел: ${c.phone || 'Нет'}\n💰 Зачислено: ${amount} сом\n💳 Текущий баланс: ${newBalance} сом.`);
             
-            // Отправляем радостное уведомление самому курьеру
             try { 
                 await courierBot.telegram.sendMessage(c.id, `💰 Ваш баланс пополнен администратором на ${amount} сом!\n💳 Текущий баланс: ${newBalance} сом.\n\nУдачных доставок! 🛵`); 
             } catch(e) {
@@ -301,7 +293,27 @@ await ctx.editMessageText(
                     return `▫️ ${name} x${i.count}`;
                 }).join('\n');
                 
-                const message = `🚨 НОВЫЙ ЗАКАЗ НА ПРОВЕРКУ ОПЛАТЫ!\nID: #${String(orderData.id).slice(0,5)}\n💰 Сумма: ${orderData.total_price} сом\n\n👤 Клиент: ${orderData.client_name || 'Гость'}\n📞 Номер: ${orderData.phone || 'Не указан'}\n📍 Адрес: ${orderData.address || 'Не указан'}\n💬 Комментарий: ${orderData.comment || 'Нет'}\n\n🏢 Ресторан: ${orderData.restaurant || 'Не указан'}\n\n🛒 Блюда:\n${itemsText}`;
+                // 👉 НОВАЯ ЛОГИКА: Достаем адрес ресторана для самого первого сообщения админу
+                let addressSuffix = '';
+                let displayComment = orderData.comment || 'Нет';
+                
+                if (orderData.restaurantAddress) {
+                    addressSuffix = ` (${orderData.restaurantAddress})`;
+                    // Вырезаем адрес из комментариев, чтобы не дублировался
+                    if (displayComment.includes('🏪 Адрес ресторана:')) {
+                        displayComment = displayComment.split(' | ').filter(p => !p.includes('🏪 Адрес ресторана:')).join(' | ') || 'Нет';
+                    }
+                } else if (displayComment.includes('🏪 Адрес ресторана:')) {
+                    const parts = displayComment.split(' | ');
+                    const addrPart = parts.find(p => p.includes('🏪 Адрес ресторана:'));
+                    if (addrPart) {
+                        addressSuffix = ` (${addrPart.replace('🏪 Адрес ресторана:', '').trim()})`;
+                        displayComment = parts.filter(p => !p.includes('🏪 Адрес ресторана:')).join(' | ') || 'Нет';
+                    }
+                }
+                const fullRestName = `${orderData.restaurant || 'Не указан'}${addressSuffix}`;
+
+                const message = `🚨 НОВЫЙ ЗАКАЗ НА ПРОВЕРКУ ОПЛАТЫ!\nID: #${String(orderData.id).slice(0,5)}\n💰 Сумма: ${orderData.total_price} сом\n\n👤 Клиент: ${orderData.client_name || 'Гость'}\n📞 Номер: ${orderData.phone || 'Не указан'}\n📍 Адрес: ${orderData.address || 'Не указан'}\n💬 Комментарий: ${displayComment}\n\n🏢 Ресторан: ${fullRestName}\n\n🛒 Блюда:\n${itemsText}`;
 
                 const buttons = [
                     [Markup.button.callback("✅ Оплата получена", `approve_order_${orderData.id}`)],
@@ -309,7 +321,6 @@ await ctx.editMessageText(
                 ];
 
                 const cid = orderData.client_id;
-                // ЗАЩИТА: Надежная проверка ID клиента
                 if (cid && String(cid) !== '111' && String(cid) !== 'null' && String(cid) !== 'undefined') {
                     buttons.push([Markup.button.url("💬 Написать клиенту", `tg://user?id=${cid}`)]);
                 }

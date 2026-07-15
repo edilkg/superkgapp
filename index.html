@@ -2634,7 +2634,8 @@ function confirmAddressFromModal() {
                 address: fullAddress, 
                 dest_lat: clientLat, 
                 dest_lon: clientLon, 
-                restaurantName: (database[cartActiveTabResId]?.title + ' (' + database[cartActiveTabResId]?.address + ')') || "Ресторан",
+                restaurantName: database[cartActiveTabResId]?.title || "Ресторан",
+                restaurantAddress: database[cartActiveTabResId]?.address || "",
                 totalPrice: totalSum + (currentDeliveryFee > 0 ? currentDeliveryFee + doorDeliveryFee : 0),
                 comment: gluedComment, 
                 items: cleanItems      
