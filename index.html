@@ -1207,7 +1207,7 @@ if (tg.disableVerticalSwipes) {
             // Твой реальный ресторан из базы 
             '5521273499': { 
                 lat: 42.650075, lon: 77.086667, city: 'Чолпон-Ата', 
-                title: 'MAX BURGER Советская, 67в',
+                title: 'MAX BURGER',
                 phone: '+996555123456',
                 logo: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/max%20logo%20krug.jpg', 
                 address: 'ул. Советская, 67в', 
@@ -1218,7 +1218,7 @@ if (tg.disableVerticalSwipes) {
             },
             '101': { 
                 lat: 42.64584, lon: 77.076624, city: 'Чолпон-Ата',
-                title: 'Шашлык Парк Советская, 132', 
+                title: 'Шашлык Парк', 
                 phone: '+996555123456',
                 logo: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/shaskykparkmninlog.png', 
                 address: 'ул. Советская, 132', 
@@ -1229,7 +1229,7 @@ if (tg.disableVerticalSwipes) {
             },
             '102': { 
                 lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', 
-                title: 'Лагманкана Советская, 57', 
+                title: 'Лагманкана', 
                 phone: '+996555123456',
                 logo: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/lagman%20mini%20logo.png', 
                 address: 'ул. Советская, 57', 
@@ -1240,7 +1240,7 @@ if (tg.disableVerticalSwipes) {
             },
             '103': { 
                 lat: 42.650075, lon: 77.086667, city: 'Чолпон-Ата',
-                title: 'Кунжут Фаст Фуд Советская, 67в', 
+                title: 'Кунжут Фаст Фуд', 
                 phone: '+996555123456',
                 logo: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/KUNJUT%20MINI%20LOG.png', 
                 address: 'ул. Советская, 67в', 
@@ -1251,7 +1251,7 @@ if (tg.disableVerticalSwipes) {
             },
             '104': { 
                 lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', 
-                title: 'Бай манты Советская, 168д', 
+                title: 'Бай манты', 
                 phone: '+996555123456',
                 logo: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/baimantu%20minilogo.jpeg', 
                 address: 'Советская улица 168д', 
@@ -2634,7 +2634,7 @@ function confirmAddressFromModal() {
                 address: fullAddress, 
                 dest_lat: clientLat, 
                 dest_lon: clientLon, 
-                restaurantName: database[cartActiveTabResId]?.title || "Ресторан",
+                restaurantName: (database[cartActiveTabResId]?.title + ' (' + database[cartActiveTabResId]?.address + ')') || "Ресторан",
                 totalPrice: totalSum + (currentDeliveryFee > 0 ? currentDeliveryFee + doorDeliveryFee : 0),
                 comment: gluedComment, 
                 items: cleanItems      
