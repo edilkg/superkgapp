@@ -976,7 +976,7 @@
         <p style="color: var(--tg-theme-hint-color); margin: 0; font-size: 14px;">Ресторан: <b id="st-res-name">...</b></p>
         
         <p id="st-res-phone-container" style="color: var(--tg-theme-hint-color); margin: 4px 0 0 0; font-size: 14px; display: none;">
-            Телефон: <a id="st-res-phone" href="#" style="color: #FF9800; text-decoration: none; font-weight: bold;">...</a>
+            Тел ресторана: <b id="st-res-phone">...</b>
         </p>
 
         <p style="color: var(--tg-theme-hint-color); margin: 4px 0 0 0; font-size: 14px;">Сумма: <b id="st-price">...</b></p>
@@ -3459,21 +3459,11 @@ function goToMainMenu() {
     document.getElementById('st-res-name').innerText = order.restaurant;
     document.getElementById('st-price').innerText = order.total_price + ' сом';
 
-    // 👇 НОВАЯ ЛОГИКА: ВЫВОД КЛИКАБЕЛЬНОГО ТЕЛЕФОНА 👇
-    const phoneContainer = document.getElementById('st-res-phone-container');
-    const phoneLink = document.getElementById('st-res-phone');
-    
-    // Ищем текущий ресторан в локальной базе
-    const currentRest = typeof database !== 'undefined' ? database.find(r => r.name === order.restaurant) : null;
-
-    if (currentRest && currentRest.phone && phoneContainer && phoneLink) {
-        phoneContainer.style.display = 'block';       // Показываем контейнер
-        phoneLink.innerText = currentRest.phone;      // Вписываем номер
-        phoneLink.href = `tel:${currentRest.phone}`;  // Делаем ссылку для звонка
-    } else if (phoneContainer) {
-        phoneContainer.style.display = 'none';        // Прячем, если номера нет
-    }
-    // 👆 КОНЕЦ НОВОЙ ЛОГИКИ 👆
+    // 👇 ТРИ ПРОСТЫЕ СТРОЧКИ ДЛЯ ТЕЛЕФОНА
+    const currentRest = database.find(r => r.name === order.restaurant);
+    const phoneText = (currentRest && currentRest.phone) ? currentRest.phone : 'Не указан';
+    if(document.getElementById('st-res-phone')) document.getElementById('st-res-phone').innerText = phoneText;
+    // 👆 КОНЕЦ
 
     const info = getStatusData(order.status);
 
@@ -3481,10 +3471,7 @@ function goToMainMenu() {
     if(document.getElementById('st-status-desc')) document.getElementById('st-status-desc').innerText = info.desc;
     
     const stText = document.getElementById('st-status-text');
-    if(stText) { 
-        stText.innerText = info.text; 
-        stText.style.color = info.color; 
-    }
+    if(stText) { stText.innerText = info.text; stText.style.color = info.color; }
 }
 
         // Запускаем проверку при загрузке приложения
