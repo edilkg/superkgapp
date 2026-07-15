@@ -132,8 +132,7 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
             if (cid && String(cid) !== '111' && String(cid) !== 'null' && String(cid) !== 'undefined') {
                 const clientMsg = `❌ <b>Заказ #${String(orderId).slice(0,5)} отменен рестораном.</b>\n\n` +
                                   `Возможно, большая загрузка на кухне или закончились нужные продукты).\n\n` +
-                                  `Пожалуйста, вернитесь в меню и выберите другой ресторан. Приносим извинения за неудобства!😔\n
-                                  Поддержка: @foodkg_admin`;
+                                  `Пожалуйста, вернитесь в меню и выберите другой ресторан. Приносим извинения за неудобства!😔 Поддержка: @foodkg_admin`;
                 try {
                     await clientBot.telegram.sendMessage(cid, clientMsg, { parse_mode: 'HTML' });
                 } catch(e) {
@@ -147,7 +146,7 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
                 try {
                     await courierBot.telegram.sendMessage(
                         courierId, 
-                        `🚨 <b>ОТМЕНА ЗАКАЗА!</b>\n\nРесторан отменил заказ <b>#${String(orderId).slice(0,5)}</b>.\nВам не нужно за ним ехать, заказ аннулирован.`, 
+                        `🚨 <b>ОТМЕНА ЗАКАЗА!</b>\n\nРесторан отменил заказ <b>#${String(orderId).slice(0,5)}</b>.`, 
                         { parse_mode: 'HTML' }
                     );
                 } catch(e) {

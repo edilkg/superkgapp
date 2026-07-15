@@ -2,7 +2,7 @@ const { Markup } = require('telegraf');
 
 module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase, ADMIN_GROUP_ID) {
     
-     // ==========================================
+    // ==========================================
     // 1. КНОПКА: ОДОБРИТЬ ОПЛАТУ ЗАКАЗА
     // ==========================================
     adminBot.action(/approve_order_(.+)/, async (ctx) => {
@@ -30,7 +30,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 try { 
                     await adminBot.telegram.sendMessage(
                         cid, 
-                        `✅ <b>Оплата успешно получена!</b>\n\nВаш заказ <b>#${String(orderId).slice(0,5)}</b> передан в ресторан и курьерам. Скоро он будет у вас! 🚀`, 
+                        `✅ <b>Оплата успешно получена!</b>\n\nВаш заказ <b>#${String(orderId).slice(0,5)}</b> передан в ресторан и курьерам🚀`, 
                         { parse_mode: 'HTML' }
                     ); 
                 } catch(e) {
@@ -57,6 +57,14 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                     let itemsArr = [];
                     try { itemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]'); } catch(e) {}
                     
+                    // 👉 СЧИТАЕМ СУММУ ТОЛЬКО ЗА ЕДУ ДЛЯ РЕСТОРАНА
+                    let foodOnlyTotal = 0;
+                    itemsArr.forEach(i => {
+                        const price = Number(i.price || (i.item ? i.item.price : 0)) || 0;
+                        const count = Number(i.count) || 0;
+                        foodOnlyTotal += price * count;
+                    });
+
                     // ЗАЩИТА ОТ КРАША ТЕЛЕГРАМА (Экранируем < и >)
                     const itemsText = itemsArr.map(i => {
                         const name = i.item ? i.item.name : i.name;
@@ -76,13 +84,13 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                         }
                     }
                     
-                    // 👉 НОВЫЙ ШАБЛОН СООБЩЕНИЯ ДЛЯ РЕСТОРАНА
+                    // 👉 НОВЫЙ ШАБЛОН СООБЩЕНИЯ ДЛЯ РЕСТОРАНА (выводим foodOnlyTotal)
                     let msgRest = `🍔 НОВЫЙ ЗАКАЗ <b>#${String(orderId).slice(0,5)}</b>\n\n` +
                                   `👤 Клиент: <b>${clientName}</b>\n` +
                                   `📞 Телефон: ${clientPhone}\n` +
                                   `💬 Детали: <b>${restDetails}</b>\n\n` +
                                   `🛒 Заказ:\n${itemsText}\n\n` +
-                                  `💰 Сумма: ${order.total_price} сом`;
+                                  `💰 Сумма: ${foodOnlyTotal} сом`; // ИЗМЕНИЛИ ЭТУ СТРОКУ
                     
                     await restBot.telegram.sendMessage(restData.id, msgRest, {
                         parse_mode: 'HTML',
@@ -97,7 +105,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 }
             }
 
-           // ==========================================
+            // ==========================================
             // ОТПРАВКА КУРЬЕРАМ В ОБЩУЮ ГРУППУ
             // ==========================================
             const COURIER_GROUP_ID = '-1004348705428'; // 👈 ВСТАВЬ СЮДА СВОЙ РЕАЛЬНЫЙ ID ГРУППЫ КУРЬЕРОВ

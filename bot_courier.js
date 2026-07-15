@@ -168,7 +168,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             const cPhone = courierData?.phone || 'Номер не указан';
             const cProfile = ctx.from.username ? `@${ctx.from.username}` : `<a href="tg://user?id=${courierId}">Профиль</a>`;
 
-            const notifyMessage = `🛵 Курьер выехал в ресторан за заказом <b>#${String(orderId).slice(0,5)}</b>\n\n👤 Курьер: <b>${cName}</b>\n📞 Телефон: ${cPhone}\n💬 Telegram: ${cProfile}`;
+            const notifyMessage = `🛵 Курьер едет к вам за заказом <b>#${String(orderId).slice(0,5)}</b>\n\n👤 Курьер: <b>${cName}</b>\n📞 Телефон: ${cPhone}\n💬 Telegram: ${cProfile}`;
 
             // Уведомляем админа и ресторан
             try { await bot.telegram.sendMessage(ADMIN_GROUP_ID, notifyMessage, { parse_mode: 'HTML' }); } catch(e) {}
