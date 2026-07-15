@@ -1,4 +1,3 @@
-// bot_restaurant.js
 const { Markup } = require('telegraf');
 
 module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, supabase, ADMIN_GROUP_ID) {
@@ -42,7 +41,7 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
             await supabase.from('restaurants').update({ phone: text, step: 'waiting' }).eq('id', id);
             ctx.reply("Спасибо! Заявка отправлена администратору.");
 
-            // ПУШ АДМИНУ (Отправляем через главного бота)
+            // ПУШ АДМИНУ (Отправляем через клиентского бота)
             return clientBot.telegram.sendMessage(ADMIN_GROUP_ID, 
                 `🏢 НОВАЯ ЗАЯВКА (РЕСТОРАН)\nНазвание: ${rest.name}\nТелефон: ${text}\nID: ${id}`,
                 Markup.inlineKeyboard([[Markup.button.callback('✅ ОДОБРИТЬ РЕСТОРАН', `approve_rest_${id}`)]])
@@ -97,20 +96,78 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
         } catch (e) {}
     });
 
-    // Кнопка: ОТКЛОНИТЬ ЗАКАЗ
+    // ==========================================
+    // Кнопка: ОТКЛОНИТЬ ЗАКАЗ (С УМНЫМИ УВЕДОМЛЕНИЯМИ)
+    // ==========================================
     restBot.action(/rest_decline_(.+)/, async (ctx) => {
-        const orderId = ctx.match[1];
+        const orderId = ctx.match[1].trim();
         try {
-            // Защита: нельзя отменить заказ, если его уже везет курьер
-            const { data: order } = await supabase.from('orders').select('status').eq('id', orderId).maybeSingle();
-            if (order && ['delivery', 'completed'].includes(order.status)) {
-                return ctx.answerCbQuery("❌ Невозможно отменить: заказ уже в пути или доставлен!", { show_alert: true });
+            await ctx.answerCbQuery("Отклоняем заказ...").catch(() => {});
+
+            // 1. Запрашиваем ВСЕ данные заказа (status, client_id, courier_id, restaurant)
+            const { data: order } = await supabase
+                .from('orders')
+                .select('*')
+                .eq('id', orderId)
+                .maybeSingle();
+
+            if (!order) return;
+
+            // Защита от двойного нажатия (уже отменен)
+            if (order.status === 'canceled') {
+                return ctx.answerCbQuery("⚠️ Заказ уже отменен!", { show_alert: true }).catch(() => {});
             }
 
+            // Защита: нельзя отменить заказ, если его уже везет курьер
+            if (['delivery', 'completed'].includes(order.status)) {
+                return ctx.answerCbQuery("❌ Невозможно отменить: заказ уже в пути или доставлен!", { show_alert: true }).catch(() => {});
+            }
+
+            // 2. Меняем статус в базе на canceled
             await supabase.from('orders').update({ status: 'canceled' }).eq('id', orderId);
-            await ctx.editMessageText(`❌ Заказ отклонен.`);
-            await ctx.answerCbQuery("Заказ отменен");
-        } catch (e) {}
+
+            // 3. УВЕДОМЛЯЕМ КЛИЕНТА (С извинениями)
+            const cid = order.client_id;
+            if (cid && String(cid) !== '111' && String(cid) !== 'null' && String(cid) !== 'undefined') {
+                const clientMsg = `❌ <b>Заказ #${String(orderId).slice(0,5)} отменен рестораном.</b>\n\n` +
+                                  `К сожалению, заведение сейчас не может принять ваш заказ (возможно, большая загрузка на кухне или закончились нужные продукты).\n\n` +
+                                  `Пожалуйста, вернитесь в меню и выберите другой ресторан. Приносим извинения за неудобства! 😔`;
+                try {
+                    await clientBot.telegram.sendMessage(cid, clientMsg, { parse_mode: 'HTML' });
+                } catch(e) {
+                    console.error("Ошибка отправки уведомления клиенту:", e);
+                }
+            }
+
+            // 4. УВЕДОМЛЯЕМ КУРЬЕРА (Если он уже нажал "Я возьму")
+            const courierId = order.courier_id;
+            if (courierId && String(courierId) !== 'null' && String(courierId) !== 'undefined') {
+                try {
+                    await courierBot.telegram.sendMessage(
+                        courierId, 
+                        `🚨 <b>ОТМЕНА ЗАКАЗА!</b>\n\nРесторан отменил заказ <b>#${String(orderId).slice(0,5)}</b>.\nВам не нужно за ним ехать, заказ аннулирован.`, 
+                        { parse_mode: 'HTML' }
+                    );
+                } catch(e) {
+                    console.error("Ошибка отправки уведомления курьеру:", e);
+                }
+            }
+
+            // 5. УВЕДОМЛЯЕМ АДМИНА (Контроль качества)
+            try {
+                await clientBot.telegram.sendMessage(
+                    ADMIN_GROUP_ID,
+                    `⚠️ <b>Отказ ресторана!</b>\nЗаказ #${String(orderId).slice(0,5)} был только что отклонен заведением <b>${order.restaurant || 'Неизвестно'}</b>.`,
+                    { parse_mode: 'HTML' }
+                );
+            } catch(e) {}
+
+            // 6. Меняем сообщение у самого ресторана
+            await ctx.editMessageText(`❌ Заказ #${String(orderId).slice(0,5)} ОТКЛОНЕН вами.`).catch(() => {});
+            
+        } catch (err) {
+            console.error("❌ Ошибка при отклонении рестораном:", err);
+        }
     });
 
     console.log('📦 Модуль Restaurant загружен');
