@@ -43,7 +43,7 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
 
             // ПУШ АДМИНУ (Отправляем через клиентского бота)
             return clientBot.telegram.sendMessage(ADMIN_GROUP_ID, 
-                `🏢 НОВАЯ ЗАЯВКА (РЕСТОРАН)\nНазвание: ${rest.name}\nТелефон: ${text}\nID: ${id}`,
+                `🏢 НОВАЯ ЗАЯВКА (РЕСТОРАН)\nНазвание: ${rest.name}\nТел: ${text}\nID: ${id}`,
                 Markup.inlineKeyboard([[Markup.button.callback('✅ ОДОБРИТЬ РЕСТОРАН', `approve_rest_${id}`)]])
             );
         }

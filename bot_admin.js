@@ -30,7 +30,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 try { 
                     await adminBot.telegram.sendMessage(
                         cid, 
-                        `✅ <b>Оплата успешно получена!</b>\n\nВаш заказ <b>#${String(orderId).slice(0,5)}</b> передан в ресторан и курьерам🚀`, 
+                        `✅ <b>Оплата успешно получена!</b>\n\nВаш заказ <b>#${String(orderId).slice(0,5)}</b> передан в ресторан и курьерУ🚀`, 
                         { parse_mode: 'HTML' }
                     ); 
                 } catch(e) {
@@ -38,10 +38,12 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 }
             }
 
-            await ctx.editMessageText(
-                `✅ ЗАКАЗ #${String(orderId).slice(0,5)} ОДОБРЕН (Оплата получена)\nРесторан: ${order.restaurant || 'Не указан'}\nСумма: ${order.total_price} сом`, 
-                Markup.inlineKeyboard(buttons)
-            ).catch(() => {});
+await ctx.editMessageText(
+    `✅ ЗАКАЗ #${String(orderId).slice(0,5)} ОДОБРЕН (Оплата получена)\n` +
+    `🏢 Ресторан: ${order.restaurant || 'Не указан'}\n` +
+    `💰 Сумма: ${order.total_price} сом`, 
+    Markup.inlineKeyboard(buttons)
+).catch(() => {});
 
             // 👉 ОТПРАВКА В РЕСТОРАН (С ВЫВОДОМ ПРИБОРОВ И КОММЕНТАРИЯ КУХНЕ)
             if (order.restaurant) {
@@ -87,7 +89,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                     // 👉 НОВЫЙ ШАБЛОН СООБЩЕНИЯ ДЛЯ РЕСТОРАНА (выводим foodOnlyTotal)
                     let msgRest = `🍔 НОВЫЙ ЗАКАЗ <b>#${String(orderId).slice(0,5)}</b>\n\n` +
                                   `👤 Клиент: <b>${clientName}</b>\n` +
-                                  `📞 Телефон: ${clientPhone}\n` +
+                                  `📞 Номер: ${clientPhone}\n` +
                                   `💬 Детали: <b>${restDetails}</b>\n\n` +
                                   `🛒 Заказ:\n${itemsText}\n\n` +
                                   `💰 Сумма: ${foodOnlyTotal} сом`; // ИЗМЕНИЛИ ЭТУ СТРОКУ
@@ -272,7 +274,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             
             await supabase.from('couriers').update({ balance: newBalance }).eq('id', c.id);
             
-            await ctx.reply(`✅ Баланс успешно пополнен!\n👤 Курьер: ${c.name}\n📞 Телефон: ${c.phone || 'Нет'}\n💰 Зачислено: ${amount} сом\n💳 Текущий баланс: ${newBalance} сом.`);
+            await ctx.reply(`✅ Баланс успешно пополнен!\n👤 Курьер: ${c.name}\n📞 Тел: ${c.phone || 'Нет'}\n💰 Зачислено: ${amount} сом\n💳 Текущий баланс: ${newBalance} сом.`);
             
             // Отправляем радостное уведомление самому курьеру
             try { 
@@ -299,7 +301,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                     return `▫️ ${name} x${i.count}`;
                 }).join('\n');
                 
-                const message = `🚨 НОВЫЙ ЗАКАЗ НА ПРОВЕРКУ ОПЛАТЫ!\nID: #${String(orderData.id).slice(0,5)}\n💰 Сумма: ${orderData.total_price} сом\n\n👤 Клиент: ${orderData.client_name || 'Гость'}\n📞 Телефон: ${orderData.phone || 'Не указан'}\n📍 Адрес: ${orderData.address || 'Не указан'}\n💬 Комментарий: ${orderData.comment || 'Нет'}\n\n🏢 Ресторан: ${orderData.restaurant || 'Не указан'}\n\n🛒 Блюда:\n${itemsText}`;
+                const message = `🚨 НОВЫЙ ЗАКАЗ НА ПРОВЕРКУ ОПЛАТЫ!\nID: #${String(orderData.id).slice(0,5)}\n💰 Сумма: ${orderData.total_price} сом\n\n👤 Клиент: ${orderData.client_name || 'Гость'}\n📞 Номер: ${orderData.phone || 'Не указан'}\n📍 Адрес: ${orderData.address || 'Не указан'}\n💬 Комментарий: ${orderData.comment || 'Нет'}\n\n🏢 Ресторан: ${orderData.restaurant || 'Не указан'}\n\n🛒 Блюда:\n${itemsText}`;
 
                 const buttons = [
                     [Markup.button.callback("✅ Оплата получена", `approve_order_${orderData.id}`)],

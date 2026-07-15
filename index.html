@@ -968,19 +968,25 @@
         <div style="width: 24px;"></div>
     </div>
     <div style="padding: 16px;">
-        <div style="background: white; border-radius: 12px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-            <div id="st-status-icon" style="font-size: 40px; margin-bottom: 12px;">💸</div>
-            <h3 id="st-status-text" style="margin: 0 0 8px 0; color: #FF9800;">Проверяем оплату...</h3>
-            <p id="st-status-desc" style="color: #666; margin: 0 0 12px 0; font-size: 13px; line-height: 1.4;">Менеджер проверяет поступление средств.</p>
-            <p style="color: var(--tg-theme-hint-color); margin: 0; font-size: 14px;">Ресторан: <b id="st-res-name">...</b></p>
-            <p style="color: var(--tg-theme-hint-color); margin: 4px 0 0 0; font-size: 14px;">Сумма: <b id="st-price">...</b></p>
-        </div>
+    <div style="background: white; border-radius: 12px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+        <div id="st-status-icon" style="font-size: 40px; margin-bottom: 12px;">💸</div>
+        <h3 id="st-status-text" style="margin: 0 0 8px 0; color: #FF9800;">Проверяем оплату...</h3>
+        <p id="st-status-desc" style="color: #666; margin: 0 0 12px 0; font-size: 13px; line-height: 1.4;">Менеджер проверяет поступление средств.</p>
         
-        <div style="margin-top: 24px;">
-            <button class="main-button" style="margin-bottom: 12px;" onclick="goToMainMenu()">🏠 В главное меню</button>
-            <button class="main-button" style="background: #e0e0e0; color: #333;" onclick="startNewOrder()">🍔 Заказать еще раз</button>
-        </div>
+        <p style="color: var(--tg-theme-hint-color); margin: 0; font-size: 14px;">Ресторан: <b id="st-res-name">...</b></p>
+        
+        <p id="st-res-phone-container" style="color: var(--tg-theme-hint-color); margin: 4px 0 0 0; font-size: 14px; display: none;">
+            Телефон: <a id="st-res-phone" href="#" style="color: #FF9800; text-decoration: none; font-weight: bold;">...</a>
+        </p>
+
+        <p style="color: var(--tg-theme-hint-color); margin: 4px 0 0 0; font-size: 14px;">Сумма: <b id="st-price">...</b></p>
     </div>
+    
+    <div style="margin-top: 24px;">
+        <button class="main-button" style="margin-bottom: 12px;" onclick="goToMainMenu()">🏠 В главное меню</button>
+        <button class="main-button" style="background: #e0e0e0; color: #333;" onclick="startNewOrder()">🍔 Заказать еще раз</button>
+    </div>
+</div>
 </div>
 
     <div id="modal-profile" class="modal-overlay hidden">
@@ -3450,17 +3456,36 @@ function goToMainMenu() {
 
         // Обновляем большой экран статуса
         function updateFullStatusUI(order) {
-            document.getElementById('st-res-name').innerText = order.restaurant;
-            document.getElementById('st-price').innerText = order.total_price + ' сом';
+    document.getElementById('st-res-name').innerText = order.restaurant;
+    document.getElementById('st-price').innerText = order.total_price + ' сом';
 
-            const info = getStatusData(order.status);
+    // 👇 НОВАЯ ЛОГИКА: ВЫВОД КЛИКАБЕЛЬНОГО ТЕЛЕФОНА 👇
+    const phoneContainer = document.getElementById('st-res-phone-container');
+    const phoneLink = document.getElementById('st-res-phone');
+    
+    // Ищем текущий ресторан в локальной базе
+    const currentRest = typeof database !== 'undefined' ? database.find(r => r.name === order.restaurant) : null;
 
-            if(document.getElementById('st-status-icon')) document.getElementById('st-status-icon').innerText = info.icon;
-            if(document.getElementById('st-status-desc')) document.getElementById('st-status-desc').innerText = info.desc;
-            
-            const stText = document.getElementById('st-status-text');
-            if(stText) { stText.innerText = info.text; stText.style.color = info.color; }
-        }
+    if (currentRest && currentRest.phone && phoneContainer && phoneLink) {
+        phoneContainer.style.display = 'block';       // Показываем контейнер
+        phoneLink.innerText = currentRest.phone;      // Вписываем номер
+        phoneLink.href = `tel:${currentRest.phone}`;  // Делаем ссылку для звонка
+    } else if (phoneContainer) {
+        phoneContainer.style.display = 'none';        // Прячем, если номера нет
+    }
+    // 👆 КОНЕЦ НОВОЙ ЛОГИКИ 👆
+
+    const info = getStatusData(order.status);
+
+    if(document.getElementById('st-status-icon')) document.getElementById('st-status-icon').innerText = info.icon;
+    if(document.getElementById('st-status-desc')) document.getElementById('st-status-desc').innerText = info.desc;
+    
+    const stText = document.getElementById('st-status-text');
+    if(stText) { 
+        stText.innerText = info.text; 
+        stText.style.color = info.color; 
+    }
+}
 
         // Запускаем проверку при загрузке приложения
         checkActiveOrder();

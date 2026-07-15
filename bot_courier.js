@@ -211,11 +211,10 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             const lon = orderCheck.lon || orderCheck.longitude;
 
             let privateText = `📦 <b>Детали заказа #${String(orderId).slice(0,5)}</b>\n\n` +
-                              `✅ <b>ВЫ ПРИНЯЛИ ЗАКАЗ!</b>\n` +
-                              `💰 <b>Оплата за доставку:</b> <u>${deliveryPriceText} сом</u>\n\n` +
-                              `📍 Отправляйтесь в ресторан: <b>${orderCheck.restaurant || 'Не указан'}</b>\n\n` +
+                              `💰 <b>Оплата:</b> <u>${deliveryPriceText} сом</u>\n\n` +
+                              `📍 Ресторан: <b>${orderCheck.restaurant || 'Не указан'}</b>\n\n` +
                               `👤 <b>Клиент:</b> ${clientName}\n` +
-                              `📞 <b>Телефон клиента:</b> <code>${clientPhone}</code>\n` +
+                              `📞 <b>Номер:</b> <code>${clientPhone}</code>\n` +
                               `📍 <b>Адрес доставки:</b> <u>${address}</u>\n` +
                               `💬 <b>Комментарий:</b> <i>${comment}</i>\n`;
 
@@ -319,7 +318,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 
                 // Отправляем чек-уведомление курьеру
                 try {
-                    await courierBot.telegram.sendMessage(courierId, `\nДоход 💸Комиссия за заказ: ${commission} сом (10%).\n💳Остаток Баланса: ${newBalance} сом.`);
+                    await courierBot.telegram.sendMessage(courierId, `\n💸Комиссия за заказ: ${commission} сом (10%).\n💳Остаток Баланса: ${newBalance} сом.`);
                 } catch(e) {}
             }
 
