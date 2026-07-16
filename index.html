@@ -1512,7 +1512,7 @@ function renderRestaurants(searchQuery = '') {
                     name: item.name,
                     price: item.price,
                     weight: item.weight || '',
-                    category: item.category,
+                    category: item.category ? item.category.trim() : 'Другое', // СРАЗУ УБИРАЕМ ПРОБЕЛЫ
                     desc: item.description || '',
                     img: item.img_url
                 }));
@@ -1530,12 +1530,23 @@ function renderRestaurants(searchQuery = '') {
                     container.parentNode.insertBefore(catBar, container);
                 }
 
-                const categories = [...new Set(res.items.map(item => item.category))];
+                let categories = [...new Set(res.items.map(item => item.category))];
+                
+                // ЖЕЛЕЗОБЕТОННАЯ СОРТИРОВКА ДЛЯ ВЕРХНИХ КНОПОК
+                const sortOrder = (res.categories_order || []).map(c => c.trim().toLowerCase());
+                categories.sort((a, b) => {
+                    let indexA = sortOrder.indexOf(a.toLowerCase());
+                    let indexB = sortOrder.indexOf(b.toLowerCase());
+                    if (indexA === -1) indexA = 999;
+                    if (indexB === -1) indexB = 999;
+                    return indexA - indexB;
+                });
+
                 catBar.innerHTML = categories.map((cat, i) => 
                     `<button class="${i === 0 ? 'active' : ''}" onclick="scrollToCategory('${cat}', this)">${cat}</button>`
                 ).join('');
 
-                // 5. Отрисовываем сами карточки блюд твоей старой функцией!
+                // 5. Отрисовываем сами карточки блюд
                 renderRestaurantMenu();
 
             } catch (err) {
@@ -1568,66 +1579,59 @@ function filterMenu(resId, category, btn) {
         }
 
         function renderRestaurantMenu(itemsToRender) {
-    const res = database[currentRestaurantId];
-    const items = itemsToRender || res.items;
-    let html = '';
-    
-    // Группируем блюда по категориям
-    let categories = [...new Set(items.map(item => item.category))];
-    
-    // --- НАЧАЛО НОВОГО БЛОКА СОРТИРОВКИ ---
-    // Достаем порядок из текущего ресторана (если его нет - берем пустой массив)
-    const sortOrder = res.categories_order || [];
+            const res = database[currentRestaurantId];
+            const items = itemsToRender || res.items;
+            let html = '';
+            
+            // Группируем блюда по категориям
+            let categories = [...new Set(items.map(item => item.category))];
+            
+            // ЖЕЛЕЗОБЕТОННАЯ СОРТИРОВКА ДЛЯ САМИХ БЛЮД ВНИЗУ
+            const sortOrder = (res.categories_order || []).map(c => c.trim().toLowerCase());
+            categories.sort((a, b) => {
+                let indexA = sortOrder.indexOf(a.toLowerCase());
+                let indexB = sortOrder.indexOf(b.toLowerCase());
+                if (indexA === -1) indexA = 999;
+                if (indexB === -1) indexB = 999;
+                return indexA - indexB;
+            });
+            
+            categories.forEach(cat => {
+                html += `<h3 id="cat-${cat}" class="cat-section-title">${cat}</h3>`;
+                html += `<div class="products-grid">`;
+                
+                items.filter(i => i.category === cat).forEach(item => {
+                    let count = cartItems[item.id] ? cartItems[item.id].count : 0;
+                    let weightHtml = item.weight ? `<span style="color: #888; font-size: 13px; font-weight: 500; margin-left: 6px;">• ${item.weight}</span>` : '';
 
-    // Сортируем полученные категории
-    categories.sort((a, b) => {
-        let indexA = sortOrder.indexOf(a);
-        let indexB = sortOrder.indexOf(b);
-
-        // Если категории нет в нашем списке sortOrder, отправляем её в конец списка
-        if (indexA === -1) indexA = 999;
-        if (indexB === -1) indexB = 999;
-
-        return indexA - indexB;
-    });
-    // --- КОНЕЦ НОВОГО БЛОКА СОРТИРОВКИ ---
-
-    categories.forEach(cat => {
-        html += `<h3 id="cat-${cat}" class="cat-section-title">${cat}</h3>`;
-        html += `<div class="products-grid">`;
-        
-        items.filter(i => i.category === cat).forEach(item => {
-            let count = cartItems[item.id] ? cartItems[item.id].count : 0;
-            let weightHtml = item.weight ? `<span style="color: #888; font-size: 13px; font-weight: 500; margin-left: 6px;">• ${item.weight}</span>` : '';
-
-            html += `
-            <div class="item-card">
-                <div class="img-wrap" onclick="openProductModal('${item.id}')" style="cursor: pointer;">
-                    <img src="${item.img}" class="item-img" loading="lazy">
-                </div>
-                <div class="item-info">
-                    <div style="flex-grow: 1; cursor: pointer;" onclick="openProductModal('${item.id}')">
-                        <div class="item-price">${item.price} сом ${weightHtml}</div>
-                        <div class="item-name">${item.name}</div>
-                    </div>
-                    <div class="item-action">
-                        ${count > 0 
-                            ? `<div class="item-counter active">
-                                <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', -1)">−</div>
-                                <div class="c-val">${count}</div>
-                                <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">+</div>
-                               </div>` 
-                            : `<button class="btn-add" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">Добавить</button>`
-                        }
-                    </div>
-                </div>
-            </div>`;
-        });
-        html += `</div>`;
-    });
-    
-    document.getElementById('all-products-container').innerHTML = html;
-}
+                    html += `
+                    <div class="item-card">
+                        <div class="img-wrap" onclick="openProductModal('${item.id}')" style="cursor: pointer;">
+                            <img src="${item.img}" class="item-img" loading="lazy">
+                        </div>
+                        <div class="item-info">
+                            <div style="flex-grow: 1; cursor: pointer;" onclick="openProductModal('${item.id}')">
+                                <div class="item-price">${item.price} сом ${weightHtml}</div>
+                                <div class="item-name">${item.name}</div>
+                            </div>
+                            <div class="item-action">
+                                ${count > 0 
+                                    ? `<div class="item-counter active">
+                                        <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', -1)">−</div>
+                                        <div class="c-val">${count}</div>
+                                        <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">+</div>
+                                       </div>` 
+                                    : `<button class="btn-add" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">Добавить</button>`
+                                }
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                html += `</div>`;
+            });
+            
+            document.getElementById('all-products-container').innerHTML = html;
+        }
 
         function updateCart(itemId, delta) {
             haptic('light'); 
