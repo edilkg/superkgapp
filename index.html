@@ -1214,7 +1214,8 @@ if (tg.disableVerticalSwipes) {
                 hours: '10:00 - 24:00', 
                 img: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/max%20big%20logo.jpg', 
                 tags: ['burgers', 'shawarma'], // <--- Теги для фильтра
-                items: [] 
+                items: [],
+                categories_order: ['Манты', 'Дополнительно', 'Напитки']
             },
             '101': { 
                 lat: 42.64584, lon: 77.076624, city: 'Чолпон-Ата',
@@ -1225,7 +1226,8 @@ if (tg.disableVerticalSwipes) {
                 hours: '10:00 - 24:00', 
                 img: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/shashlyk%20biglogo%20(1).jpeg', 
                 tags: ['shashlik', 'pizza', 'desserts'],
-                items: [] 
+                items: [],
+                categories_order: ['Манты', 'Дополнительно', 'Напитки']
             },
             '102': { 
                 lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', 
@@ -1236,7 +1238,8 @@ if (tg.disableVerticalSwipes) {
                 hours: '09:00 - 23:00', 
                 img: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/lagmanlogo.jpg', 
                 tags: [],
-                items: [] 
+                items: [],
+                categories_order: ['Манты', 'Дополнительно', 'Напитки']
             },
             '103': { 
                 lat: 42.650075, lon: 77.086667, city: 'Чолпон-Ата',
@@ -1247,7 +1250,8 @@ if (tg.disableVerticalSwipes) {
                 hours: '09:00 - 24:00', 
                 img: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/KUNJUT%20BIGLOGO.jpg', 
                 tags: ['burgers', 'sushi', 'shawarma', 'pizza'],
-                items: [] 
+                items: [],
+                categories_order: ['Манты', 'Дополнительно', 'Напитки']
             },
             '104': { 
                 lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', 
@@ -1258,7 +1262,8 @@ if (tg.disableVerticalSwipes) {
                 hours: '09:00 - 23:00', 
                 img: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/baimantu%20biglogo.jpeg', 
                 tags: [],
-                items: [] 
+                items: [],
+                categories_order: ['Манты', 'Дополнительно', 'Напитки']
             }
         };
         history.replaceState({screen: 'main'}, '');
@@ -1567,9 +1572,26 @@ function filterMenu(resId, category, btn) {
     const items = itemsToRender || res.items;
     let html = '';
     
-    // Группируем блюда по категориям для сохранения скроллинга
-    const categories = [...new Set(items.map(item => item.category))];
+    // Группируем блюда по категориям
+    let categories = [...new Set(items.map(item => item.category))];
     
+    // --- НАЧАЛО НОВОГО БЛОКА СОРТИРОВКИ ---
+    // Достаем порядок из текущего ресторана (если его нет - берем пустой массив)
+    const sortOrder = res.categories_order || [];
+
+    // Сортируем полученные категории
+    categories.sort((a, b) => {
+        let indexA = sortOrder.indexOf(a);
+        let indexB = sortOrder.indexOf(b);
+
+        // Если категории нет в нашем списке sortOrder, отправляем её в конец списка
+        if (indexA === -1) indexA = 999;
+        if (indexB === -1) indexB = 999;
+
+        return indexA - indexB;
+    });
+    // --- КОНЕЦ НОВОГО БЛОКА СОРТИРОВКИ ---
+
     categories.forEach(cat => {
         html += `<h3 id="cat-${cat}" class="cat-section-title">${cat}</h3>`;
         html += `<div class="products-grid">`;
