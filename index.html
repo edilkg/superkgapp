@@ -101,7 +101,7 @@
         .search-container { padding: 12px 16px; background-color: var(--card-bg); }
         .search-bar { width: 100%; box-sizing: border-box; background-color: var(--bg-color); padding: 12px 16px; border-radius: 12px; color: var(--text-dark); font-size: 14px; border: none; }
         
-        .main-categories { display: flex; overflow-x: auto; padding: 16px 16px 8px 16px; background-color: var(--card-bg); gap: 10px; scrollbar-width: none; align-items: flex-start;}
+        .main-categories { display: flex; overflow-x: auto; padding: 8px 0px 8px 5px; background-color: var(--card-bg); gap: 10px; scrollbar-width: none; align-items: flex-start;}
         .main-categories::-webkit-scrollbar { display: none; }
         .cat-circle { width: 68px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: transform 0.15s ease;}
         .cat-circle:active { transform: scale(0.92); }
@@ -779,52 +779,70 @@
             </div>
         </div>
 
-        <div class="search-container">
-    <div style="position: relative; display: flex; align-items: center; width: 100%;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 14px;">
-            <path d="m21 21-4.34-4.34"/>
-            <circle cx="11" cy="11" r="8"/>
-        </svg>
-        
-        <input type="text" id="search-input" class="search-bar" placeholder="Найти ресторан" oninput="handleSearch()" style="padding-left: 42px;">
-    </div>
-</div>
-        
-        <div class="main-categories">
-            <div class="cat-circle" onclick="toggleFilter(this, 'burgers')">
-                <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/BURGERGLAVMENU.png" alt="Бургеры" loading="lazy">
-                <span class="cat-text">Бургеры</span>
-            </div>
-            <div class="cat-circle" onclick="toggleFilter(this, 'sushi')">
-                <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/sushissss.png" alt="Суши" loading="lazy">
-                <span class="cat-text">Суши</span>
-            </div>
-            <div class="cat-circle" onclick="toggleFilter(this, 'shawarma')">
-                <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/pngtree-crispy-shawarma-wrap-png-image_13507904.png" alt="Шаурма" loading="lazy">
-                <span class="cat-text">Шаурма</span>
-            </div>
-            <div class="cat-circle" onclick="toggleFilter(this, 'shashlik')">
-                <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/shashluk-removebg-preview.png" alt="Шашлык" loading="lazy">
-                <span class="cat-text">Шашлыки</span>
-            </div>
-            <div class="cat-circle" onclick="toggleFilter(this, 'pizza')">
-                <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/pngtree-yummy-stretchy-cheese-pepperoni-pizza-png-image_19960043.png" alt="Пицца" loading="lazy">
-                <span class="cat-text">Пиццa</span>
-            </div>
-            <div class="cat-circle" onclick="toggleFilter(this, 'desserts')">
-                <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/desert_-removebg-preview.png" alt="Десерты" loading="lazy">
-                <span class="cat-text">Десерты</span>
-            </div>
+        <!-- ОБЪЕДИНЕННАЯ НАВИГАЦИЯ НА ГЛАВНОМ ЭКРАНЕ (ПОИСК + КАТЕГОРИИ) -->
+        <div class="main-nav-container" style="display: flex; align-items: center; background: var(--card-bg); position: sticky; top: 0; z-index: 99; border-bottom: 1px solid #eee; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
             
-            <!-- <div class="cat-circle" onclick="toggleFilter(this, 'sandwiches')">
-                <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/pngtree-yummy-stretchy-cheese-pepperoni-pizza-png-image_19960043.png" alt="Сэндвичи" loading="lazy">
-                <span class="cat-text">Сэндвичи</span>
-            </div> -->
-            <!-- <div class="cat-circle" onclick="toggleFilter(this, 'hotdog')">
-                <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/pngimg.com%20-%20hot-dog_PNG10435.png" alt="Хот-Дог" loading="lazy">
-                <span class="cat-text">Хот-Дог</span>
-            </div> -->
-            
+            <!-- Инпут поиска (скрыт по умолчанию, раскрывается на всю ширину) -->
+            <div id="main-search-wrapper" style="display: none; flex-grow: 1; align-items: center; gap: 8px; padding: 12px 16px; width: 100%;">
+                
+                <!-- Кнопка "Назад" (закрывает поиск) -->
+                <button onclick="clearMainSearch()" style="background: none; border: none; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-right: 4px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #222;">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                </button>
+
+                <input type="text" id="search-input" class="search-bar" placeholder="Найти ресторан..." oninput="handleSearch()" style="flex-grow: 1; border: 1px solid #e0e0e0; border-radius: 20px; padding: 10px 16px; font-size: 14px; outline: none; background: #f9f9f9; width: 100%; margin: 0;">
+                
+                <!-- Кнопка очистки текста (крестик) -->
+                <button onclick="document.getElementById('search-input').value=''; handleSearch();" style="background: none; border: none; padding: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #999; flex-shrink: 0;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Горизонтальное меню категорий -->
+            <div class="main-categories" id="main-categories-wrapper" style="flex-grow: 1; margin: 0; width: auto; border-radius: 0;">
+                <!-- НОВАЯ КНОПКА ПОИСКА В ВИДЕ КАТЕГОРИИ -->
+                <div class="cat-circle" onclick="toggleMainSearch()" style="margin-right: 4px;">
+                    <div style="width: 68px; height: 68px; background: #f4f4f5; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; transition: 0.2s;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </div>
+                    <span class="cat-text">Поиск</span>
+                </div>
+
+                <div class="cat-circle" onclick="toggleFilter(this, 'burgers')">
+                    <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/BURGERGLAVMENU.png" alt="Бургеры" loading="lazy">
+                    <span class="cat-text">Бургеры</span>
+                </div>
+                <div class="cat-circle" onclick="toggleFilter(this, 'sushi')">
+                    <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/sushissss.png" alt="Суши" loading="lazy">
+                    <span class="cat-text">Суши</span>
+                </div>
+                <div class="cat-circle" onclick="toggleFilter(this, 'shawarma')">
+                    <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/pngtree-crispy-shawarma-wrap-png-image_13507904.png" alt="Шаурма" loading="lazy">
+                    <span class="cat-text">Шаурма</span>
+                </div>
+                <div class="cat-circle" onclick="toggleFilter(this, 'shashlik')">
+                    <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/shashluk-removebg-preview.png" alt="Шашлык" loading="lazy">
+                    <span class="cat-text">Шашлыки</span>
+                </div>
+                <div class="cat-circle" onclick="toggleFilter(this, 'pizza')">
+                    <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/pngtree-yummy-stretchy-cheese-pepperoni-pizza-png-image_19960043.png" alt="Пицца" loading="lazy">
+                    <span class="cat-text">Пиццa</span>
+                </div>
+                <div class="cat-circle" onclick="toggleFilter(this, 'desserts')">
+                    <img src="https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/desert_-removebg-preview.png" alt="Десерты" loading="lazy">
+                    <span class="cat-text">Десерты</span>
+                </div>
+            </div>
+        </div>
         </div>
         <div id="active-orders-container"></div>
         <div class="restaurant-list" id="restaurant-list"></div>
@@ -1499,9 +1517,10 @@ function renderRestaurants(searchQuery = '') {
             const container = document.getElementById('all-products-container');
             container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: 800; color: #999;">⏳ Загрузка меню...</div>';
             
-            // Очищаем старые категории
+            // Очищаем старые категории и сбрасываем поиск
             let catBar = document.getElementById('category-bar');
             if (catBar) catBar.innerHTML = '';
+            if (typeof clearMenuSearch === 'function') clearMenuSearch();
 
             history.pushState({screen: 'menu', page: 'menu', resId: resId}, '');
             showScreen('menu');
@@ -1533,11 +1552,42 @@ function renderRestaurants(searchQuery = '') {
                     return;
                 }
 
-                // 4. Отрисовываем горизонтальные кнопки категорий
+                // 4. Отрисовываем НАВИГАЦИЮ (Поиск + Горизонтальные категории)
+                let navContainer = document.getElementById('menu-nav-container');
+                if (!navContainer) {
+                    // Создаем главный липкий контейнер
+                    navContainer = document.createElement('div');
+                    navContainer.id = 'menu-nav-container';
+                    navContainer.style.cssText = 'display: flex; align-items: center; background: white; position: sticky; top: 0; z-index: 50; border-bottom: 1px solid #eee; padding-left: 10px; width: 100%; box-sizing: border-box;';
+                    
+                    navContainer.innerHTML = `
+                        <button id="menu-search-toggle-btn" onclick="toggleMenuSearch()" style="background: none; border: none; padding: 10px 10px 10px 0; cursor: pointer; display: flex; align-items: center; flex-shrink: 0;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #222;">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                        </button>
+                        
+                        <div id="menu-search-container" style="display: none; flex-grow: 1; align-items: center; gap: 8px; padding-right: 10px;">
+                            <input type="text" id="menu-search-input" oninput="handleMenuSearch()" placeholder="Поиск блюда..." style="flex-grow: 1; border: 1px solid #e0e0e0; border-radius: 20px; padding: 6px 14px; font-size: 14px; outline: none; background: #f9f9f9; width: 100%;">
+                            <button onclick="clearMenuSearch()" style="background: none; border: none; padding: 4px; cursor: pointer; color: #999; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                        </div>
+
+                        <div id="category-bar-wrapper" style="flex-grow: 1; min-width: 0; overflow: hidden;"></div>
+                    `;
+                    container.parentNode.insertBefore(navContainer, container);
+                }
+
+                // Вставляем твой category-bar внутрь нашей обертки
                 if (!catBar) {
                     catBar = document.createElement('div');
                     catBar.id = 'category-bar';
-                    container.parentNode.insertBefore(catBar, container);
+                    // Отключаем его личные рамки и липкость, так как они теперь у родителя (navContainer)
+                    catBar.style.position = 'static'; 
+                    catBar.style.borderBottom = 'none';
+                    document.getElementById('category-bar-wrapper').appendChild(catBar);
                 }
 
                 let categories = [...new Set(res.items.map(item => item.category))];
@@ -1555,7 +1605,6 @@ function renderRestaurants(searchQuery = '') {
                 catBar.innerHTML = categories.map((cat, i) => 
                     `<button class="${i === 0 ? 'active' : ''}" onclick="scrollToCategory('${cat}', this)">${cat}</button>`
                 ).join('');
-
                 // 5. Отрисовываем сами карточки блюд
                 renderRestaurantMenu();
 
@@ -3522,6 +3571,136 @@ function goToMainMenu() {
 
         // Вызываем проверку при загрузке сайта (если юзер закрыл приложение и зашел снова)
         checkActiveOrder();
+        
+// ==========================================
+// ЛОГИКА ПОИСКА РЕСТОРАНОВ (ГЛАВНЫЙ ЭКРАН)
+// ==========================================
+function toggleMainSearch() {
+    if (typeof haptic === 'function') haptic('selection');
+    
+    const searchWrapper = document.getElementById('main-search-wrapper');
+    const categoriesWrapper = document.getElementById('main-categories-wrapper');
+    const searchInput = document.getElementById('search-input');
+    
+    if (searchWrapper && searchWrapper.style.display === 'none') {
+        // Показываем строку поиска, прячем меню категорий целиком
+        searchWrapper.style.display = 'flex';
+        categoriesWrapper.style.display = 'none';
+        
+        // Фокус на инпут для мгновенного ввода
+        setTimeout(() => searchInput.focus(), 50);
+    }
+}
+
+function clearMainSearch() {
+    if (typeof haptic === 'function') haptic('selection');
+    
+    const searchWrapper = document.getElementById('main-search-wrapper');
+    const categoriesWrapper = document.getElementById('main-categories-wrapper');
+    const searchInput = document.getElementById('search-input');
+    
+    // Сбрасываем текст
+    if (searchInput) searchInput.value = '';
+    
+    // Прячем поиск, возвращаем категории
+    if (searchWrapper) searchWrapper.style.display = 'none';
+    if (categoriesWrapper) categoriesWrapper.style.display = 'flex';
+    
+    // Вызываем родную функцию фильтрации, чтобы вернуть полный список ресторанов
+    handleSearch();
+}
+        // ==========================================
+// ЛОГИКА ПОИСКА ПО МЕНЮ РЕСТОРАНА
+// ==========================================
+function toggleMenuSearch() {
+    if (typeof haptic === 'function') haptic('selection');
+    const searchContainer = document.getElementById('menu-search-container');
+    const categoriesDiv = document.getElementById('category-bar-wrapper');
+    const toggleBtn = document.getElementById('menu-search-toggle-btn');
+    const searchInput = document.getElementById('menu-search-input');
+
+    if (searchContainer && searchContainer.style.display === 'none') {
+        // Открываем поиск, прячем кнопки категорий
+        searchContainer.style.display = 'flex';
+        categoriesDiv.style.display = 'none';
+        
+        // Лупа превращается в стрелку "Назад"
+        toggleBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #666;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>`;
+        toggleBtn.setAttribute('onclick', 'clearMenuSearch()');
+        searchInput.focus();
+    }
+}
+
+function clearMenuSearch() {
+    if (typeof haptic === 'function') haptic('selection');
+    const searchContainer = document.getElementById('menu-search-container');
+    const categoriesDiv = document.getElementById('category-bar-wrapper');
+    const toggleBtn = document.getElementById('menu-search-toggle-btn');
+    const searchInput = document.getElementById('menu-search-input');
+
+    if (searchInput) searchInput.value = '';
+    if (searchContainer) searchContainer.style.display = 'none';
+    if (categoriesDiv) categoriesDiv.style.display = 'block';
+    
+    // Возвращаем лупу
+    if (toggleBtn) {
+        toggleBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #222;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`;
+        toggleBtn.setAttribute('onclick', 'toggleMenuSearch()');
+    }
+    
+    // Сбрасываем визуальную фильтрацию блюд
+    handleMenuSearch(); 
+}
+
+// ==========================================
+// ЛОГИКА ПОИСКА ПО МЕНЮ РЕСТОРАНА
+// ==========================================
+function handleMenuSearch() {
+    const searchInput = document.getElementById('menu-search-input');
+    if (!searchInput) return;
+    
+    const query = searchInput.value.toLowerCase().trim();
+    const container = document.getElementById('all-products-container');
+    if (!container) return;
+
+    // В твоем renderRestaurantMenu заголовки и сетки создаются парами.
+    // Находим их все, чтобы управлять ими синхронно.
+    const headers = container.querySelectorAll('.cat-section-title');
+    const grids = container.querySelectorAll('.products-grid');
+
+    // Проходимся по каждой сетке с блюдами
+    grids.forEach((grid, index) => {
+        const cards = grid.querySelectorAll('.item-card');
+        let hasVisibleCards = false;
+
+        cards.forEach(card => {
+            // Ищем текст только в названии блюда (item-name)
+            const nameEl = card.querySelector('.item-name');
+            const nameText = nameEl ? nameEl.innerText.toLowerCase() : '';
+            
+            // Если текст совпадает с поиском
+            if (nameText.includes(query)) {
+                card.style.display = ''; // Показываем карточку
+                hasVisibleCards = true;
+            } else {
+                card.style.display = 'none'; // Прячем карточку
+            }
+        });
+
+        // Умное скрытие категорий:
+        // Если в этой сетке (категории) есть хотя бы одно совпадение, показываем заголовок и сетку.
+        // Если нет — скрываем всё, чтобы не было пустых дыр в дизайне.
+        if (headers[index]) {
+            if (hasVisibleCards) {
+                headers[index].style.display = '';
+                grid.style.display = '';
+            } else {
+                headers[index].style.display = 'none';
+                grid.style.display = 'none'; // Убираем, чтобы отступы пустой сетки не портили вид
+            }
+        }
+    });
+}
 </script>
 <div id="screen-payment" class="screen hidden" style="overflow-y: auto !important; display: block;">
     
