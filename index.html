@@ -1517,13 +1517,17 @@ function renderRestaurants(searchQuery = '') {
             const container = document.getElementById('all-products-container');
             container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: 800; color: #999;">⏳ Загрузка меню...</div>';
             
-            // Очищаем старые категории и сбрасываем поиск
+            // Очищаем старые категории
             let catBar = document.getElementById('category-bar');
             if (catBar) catBar.innerHTML = '';
-            if (typeof clearMenuSearch === 'function') clearMenuSearch();
+            
+            // БЕЗОПАСНЫЙ СБРОС ПОИСКА (ошибка тут больше не сломает открытие меню)
+            try {
+                if (typeof clearMenuSearch === 'function') clearMenuSearch();
+            } catch (err) {}
 
             history.pushState({screen: 'menu', page: 'menu', resId: resId}, '');
-            showScreen('menu');
+            showScreen('menu'); // Вот этот переход теперь 100% сработает!
 
             try {
                 // 2. СКАЧИВАЕМ ДАННЫЕ ИЗ SUPABASE
@@ -3632,24 +3636,29 @@ function toggleMenuSearch() {
 }
 
 function clearMenuSearch() {
-    if (typeof haptic === 'function') haptic('selection');
-    const searchContainer = document.getElementById('menu-search-container');
-    const categoriesDiv = document.getElementById('category-bar-wrapper');
-    const toggleBtn = document.getElementById('menu-search-toggle-btn');
-    const searchInput = document.getElementById('menu-search-input');
+    try {
+        if (typeof haptic === 'function') haptic('selection');
+        
+        const searchContainer = document.getElementById('menu-search-container');
+        const categoriesDiv = document.getElementById('category-bar-wrapper');
+        const toggleBtn = document.getElementById('menu-search-toggle-btn');
+        const searchInput = document.getElementById('menu-search-input');
 
-    if (searchInput) searchInput.value = '';
-    if (searchContainer) searchContainer.style.display = 'none';
-    if (categoriesDiv) categoriesDiv.style.display = 'block';
-    
-    // Возвращаем лупу
-    if (toggleBtn) {
-        toggleBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #222;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`;
-        toggleBtn.setAttribute('onclick', 'toggleMenuSearch()');
+        if (searchInput) searchInput.value = '';
+        if (searchContainer) searchContainer.style.display = 'none';
+        if (categoriesDiv) categoriesDiv.style.display = 'block';
+        
+        // Возвращаем лупу
+        if (toggleBtn) {
+            toggleBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #222;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>`;
+            toggleBtn.setAttribute('onclick', 'toggleMenuSearch()');
+        }
+        
+        // Сбрасываем визуальную фильтрацию блюд
+        if (typeof handleMenuSearch === 'function') handleMenuSearch(); 
+    } catch (e) {
+        console.error("Ошибка при сбросе поиска:", e);
     }
-    
-    // Сбрасываем визуальную фильтрацию блюд
-    handleMenuSearch(); 
 }
 
 // ==========================================
