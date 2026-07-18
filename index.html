@@ -1028,7 +1028,7 @@
                 
                 <div class="pm-section-title">Состав</div>
                 <div class="pm-text" id="pm-composition">Состав блюда...</div>
-                
+                <div id="pm-variants-list" style="display: none; margin-top: 16px; flex-direction: column; gap: 12px;"></div>
                 <div class="pm-counter-full">
                     <div class="pm-btn" onclick="changeProductModalCount(-1)">−</div>
                     <div class="pm-val" id="pm-count">0</div>
@@ -1624,59 +1624,89 @@ function filterMenu(resId, category, btn) {
         }
 
         function renderRestaurantMenu(itemsToRender) {
-            const res = database[currentRestaurantId];
-            const items = itemsToRender || res.items;
-            let html = '';
-            
-            // Группируем блюда по категориям
-            let categories = [...new Set(items.map(item => item.category))];
-            
-            // ЖЕЛЕЗОБЕТОННАЯ СОРТИРОВКА ДЛЯ САМИХ БЛЮД ВНИЗУ
-            const sortOrder = (res.categories_order || []).map(c => c.trim().toLowerCase());
-            categories.sort((a, b) => {
-                let indexA = sortOrder.indexOf(a.toLowerCase());
-                let indexB = sortOrder.indexOf(b.toLowerCase());
-                if (indexA === -1) indexA = 999;
-                if (indexB === -1) indexB = 999;
-                return indexA - indexB;
-            });
-            
-            categories.forEach(cat => {
-                html += `<h3 id="cat-${cat}" class="cat-section-title">${cat}</h3>`;
-                html += `<div class="products-grid">`;
-                
-                items.filter(i => i.category === cat).forEach(item => {
-                    let count = cartItems[item.id] ? cartItems[item.id].count : 0;
-                    let weightHtml = item.weight ? `<span style="color: #888; font-size: 13px; font-weight: 500; margin-left: 6px;">• ${item.weight}</span>` : '';
-
-                    html += `
-                    <div class="item-card">
-                        <div class="img-wrap" onclick="openProductModal('${item.id}')" style="cursor: pointer;">
-                            <img src="${item.img}" class="item-img" loading="lazy">
-                        </div>
-                        <div class="item-info">
-                            <div style="flex-grow: 1; cursor: pointer;" onclick="openProductModal('${item.id}')">
-                                <div class="item-price">${item.price} сом ${weightHtml}</div>
-                                <div class="item-name">${item.name}</div>
-                            </div>
-                            <div class="item-action">
-                                ${count > 0 
-                                    ? `<div class="item-counter active">
-                                        <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', -1)">−</div>
-                                        <div class="c-val">${count}</div>
-                                        <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">+</div>
-                                       </div>` 
-                                    : `<button class="btn-add" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">Добавить</button>`
-                                }
-                            </div>
-                        </div>
-                    </div>`;
-                });
-                html += `</div>`;
-            });
-            
-            document.getElementById('all-products-container').innerHTML = html;
+    const res = database[currentRestaurantId];
+    if (!res || !res.items) return; // Железобетонная защита
+    
+    const items = itemsToRender || res.items;
+    let html = '';
+    
+    // 👉 1. СОБИРАЕМ ИМЕНА ВСЕХ ПОД-ТОВАРОВ, ЧТОБЫ СКРЫТЬ ИХ ИЗ ОБЩЕГО СПИСКА
+    let childNames = new Set();
+    items.forEach(item => {
+        if (item.desc && item.desc.includes(';')) {
+            const parts = item.desc.split(';').map(p => p.trim().toLowerCase()).filter(p => p.length > 0);
+            parts.forEach(p => childNames.add(p));
         }
+    });
+
+    // 👉 2. ФИЛЬТРУЕМ МЕНЮ: Убираем из списка реальные под-товары
+    const visibleItems = items.filter(item => {
+        // Если имя этого товара перечислено в чьей-то группе — скрываем его
+        if (childNames.has(item.name.toLowerCase().trim())) return false;
+        return true;
+    });
+    
+    // Группируем блюда по категориям (только видимые!)
+    let categories = [...new Set(visibleItems.map(item => item.category))];
+    
+    // ЖЕЛЕЗОБЕТОННАЯ СОРТИРОВКА ДЛЯ САМИХ БЛЮД ВНИЗУ
+    const sortOrder = (res.categories_order || []).map(c => c.trim().toLowerCase());
+    categories.sort((a, b) => {
+        let indexA = sortOrder.indexOf(a.toLowerCase());
+        let indexB = sortOrder.indexOf(b.toLowerCase());
+        if (indexA === -1) indexA = 999;
+        if (indexB === -1) indexB = 999;
+        return indexA - indexB;
+    });
+    
+    categories.forEach(cat => {
+        html += `<h3 id="cat-${cat}" class="cat-section-title">${cat}</h3>`;
+        html += `<div class="products-grid">`;
+        
+        // Рендерим только видимые товары в этой категории
+        visibleItems.filter(i => i.category === cat).forEach(item => {
+            let count = cartItems[item.id] ? cartItems[item.id].count : 0;
+            let weightHtml = item.weight ? `<span style="color: #888; font-size: 13px; font-weight: 500; margin-left: 6px;">• ${item.weight}</span>` : '';
+
+            // ПРОВЕРКА НА ГРУППУ
+            let hasVariants = item.desc && item.desc.includes(';');
+            let actionHtml = '';
+
+            if (hasVariants) {
+                // Желтая Soft-кнопка "Выбрать"
+                actionHtml = `<button class="btn-add" style="background: FCE000; color: #333; border: none; font-weight: 700;" onclick="event.stopPropagation(); openProductModal('${item.id}')">ВЫБРАТЬ</button>`;
+            } else {
+                // Стандартный счетчик
+                actionHtml = count > 0 
+                    ? `<div class="item-counter active">
+                        <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', -1)">−</div>
+                        <div class="c-val">${count}</div>
+                        <div class="btn-pm" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">+</div>
+                       </div>` 
+                    : `<button class="btn-add" onclick="event.stopPropagation(); updateCart('${item.id}', 1)">Добавить</button>`;
+            }
+
+            html += `
+            <div class="item-card">
+                <div class="img-wrap" onclick="openProductModal('${item.id}')" style="cursor: pointer;">
+                    <img src="${item.img || item.img_url || ''}" class="item-img" loading="lazy">
+                </div>
+                <div class="item-info">
+                    <div style="flex-grow: 1; cursor: pointer;" onclick="openProductModal('${item.id}')">
+                        <div class="item-price">${item.price} сом ${weightHtml}</div>
+                        <div class="item-name">${item.name}</div>
+                    </div>
+                    <div class="item-action">
+                        ${actionHtml}
+                    </div>
+                </div>
+            </div>`;
+        });
+        html += `</div>`;
+    });
+    
+    document.getElementById('all-products-container').innerHTML = html;
+}
 
         function updateCart(itemId, delta) {
             haptic('light'); 
@@ -2894,28 +2924,132 @@ function copyPaymentNumber() {
         // ==========================================
         var currentModalItem = null; // Используем var, чтобы избежать ошибки инициализации
 
-        function openProductModal(itemId) {
-            const res = database[currentRestaurantId];
-            currentModalItem = res.items.find(i => i.id === itemId);
-            
-            document.getElementById('pm-img').src = currentModalItem.img;
-            document.getElementById('pm-title').innerText = currentModalItem.name;
-            document.getElementById('pm-price').innerText = currentModalItem.price + ' сом';
-            
-            // Если в базе нет данных, подставляем заглушки
-            // Если в базе нет данных, подставляем заглушки
-            document.getElementById('pm-weight').innerText = currentModalItem.weight || ''; 
-            
-            // Берем описание (description) из базы данных и вставляем его в поле "Состав"
-            document.getElementById('pm-composition').innerText = currentModalItem.desc || 'Состав не указан';
-            
-            updateProductModalUI();
-            
-            document.getElementById('modal-product').classList.remove('hidden');
-            if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-                window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
-            }
+        // ==========================================
+// УМНОЕ МОДАЛЬНОЕ ОКНО
+// ==========================================
+function openProductModal(itemId) {
+    const res = database[currentRestaurantId];
+    if (!res || !res.items) return; 
+    
+    currentModalItem = res.items.find(i => i.id === itemId);
+    if (!currentModalItem) return; 
+    
+    document.getElementById('pm-img').src = currentModalItem.img || currentModalItem.img_url || '';
+    document.getElementById('pm-title').innerText = currentModalItem.name;
+    
+    const priceEl = document.getElementById('pm-price');
+    const weightEl = document.getElementById('pm-weight');
+    const compEl = document.getElementById('pm-composition');
+    const compTitle = compEl ? compEl.previousElementSibling : null; 
+    const counterFull = document.querySelector('.pm-counter-full');
+    const variantsList = document.getElementById('pm-variants-list');
+
+    let hasVariants = currentModalItem.desc && currentModalItem.desc.includes(';');
+
+    if (hasVariants) {
+        // РЕЖИМ МИНИ-МЕНЮ
+        if (priceEl) priceEl.innerText = 'от ' + currentModalItem.price + ' сом';
+        if (weightEl) weightEl.innerText = '';
+        
+        if (compTitle) compTitle.style.display = 'none';
+        if (compEl) compEl.style.display = 'none';
+        if (counterFull) counterFull.style.display = 'none'; 
+        
+        if (variantsList) {
+            variantsList.style.display = 'flex';
+            renderVariantsInModal(currentModalItem); 
         }
+    } else {
+        // РЕЖИМ ОБЫЧНОГО БЛЮДА
+        if (priceEl) priceEl.innerText = currentModalItem.price + ' сом';
+        if (weightEl) weightEl.innerText = currentModalItem.weight || '';
+        
+        if (compTitle) compTitle.style.display = '';
+        if (compEl) {
+            compEl.innerText = currentModalItem.desc || 'Состав не указан';
+            compEl.style.display = 'block';
+        }
+        if (counterFull) counterFull.style.display = 'flex'; 
+        if (variantsList) variantsList.style.display = 'none';
+    }
+    
+    if (typeof updateProductModalUI === 'function') {
+        updateProductModalUI();
+    }
+    
+    document.getElementById('modal-product').classList.remove('hidden');
+    if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
+        window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+    }
+}
+
+// 👉 МАГИЯ: Берет имена из строки и находит реальные товары в БД!
+function renderVariantsInModal(parentItem) {
+    const container = document.getElementById('pm-variants-list');
+    if (!container || !parentItem || !parentItem.desc) return;
+
+    const res = database[currentRestaurantId];
+    if (!res || !res.items) return;
+
+    // Режем строку описания на имена
+    const childNames = parentItem.desc.split(';').map(n => n.trim().toLowerCase()).filter(n => n.length > 0);
+    
+    let html = '';
+    childNames.forEach(cName => {
+        // ИЩЕМ РЕАЛЬНОЕ БЛЮДО В БАЗЕ ПО ЕГО ИМЕНИ
+        const realChild = res.items.find(i => i.name.toLowerCase().trim() === cName);
+
+        if (realChild) {
+            let count = cartItems[realChild.id] ? cartItems[realChild.id].count : 0;
+            // Достаем РЕАЛЬНЫЙ вес из базы
+            let weightHtml = realChild.weight ? `<div style="font-size: 13px; color: #888; margin-top: 2px;">${realChild.weight}</div>` : '';
+
+            html += `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #f0f0f0; text-align: left;">
+                <div>
+                    <div style="font-weight: 600; font-size: 15px; color: #222;">${realChild.name}</div>
+                    <div style="font-size: 14px; font-weight: 500;">${realChild.price} сом</div>
+                    ${weightHtml}
+                </div>
+                <div>
+                    ${count > 0 
+                        ? `<div class="item-counter active" style="margin: 0; background: #f0f0f0; display: flex; align-items: center;">
+                            <div class="btn-pm" onclick="event.stopPropagation(); updateVariantCartModal('${realChild.id}', -1)">−</div>
+                            <div class="c-val" style="min-width: 20px; text-align: center;">${count}</div>
+                            <div class="btn-pm" onclick="event.stopPropagation(); updateVariantCartModal('${realChild.id}', 1)">+</div>
+                           </div>`
+                        : `<button class="btn-add" style="margin: 0; padding: 6px 14px; border-radius: 12px; font-size: 13px;" onclick="event.stopPropagation(); updateVariantCartModal('${realChild.id}', 1)">Добавить</button>`
+                    }
+                </div>
+            </div>`;
+        } else {
+            // Если ты случайно опечатался в базе (защита от краша)
+            html += `
+            <div style="padding-bottom: 12px; border-bottom: 1px solid #f0f0f0; color: #d32f2f; font-size: 13px;">
+                ⚠️ Блюдо "${cName}" не найдено в базе. Проверьте название.
+            </div>`;
+        }
+    });
+    container.innerHTML = html;
+}
+
+// Чистая функция добавления. Так как товар УЖЕ есть в БД, нам не нужны костыли.
+function updateVariantCartModal(realVariantId, delta) {
+    if (typeof haptic === 'function') haptic('selection');
+
+    // Просто вызываем твою родную функцию добавления в корзину
+    if (typeof updateCart === 'function') {
+        updateCart(realVariantId, delta);
+    }
+
+    // Мгновенно обновляем модалку
+    if (currentModalItem) {
+        renderVariantsInModal(currentModalItem);
+    }
+    if (typeof updateProductModalUI === 'function') {
+        updateProductModalUI();
+    }
+}
 
         function updateProductModalUI() {
             if (!currentModalItem) return;
