@@ -1623,9 +1623,9 @@ function filterMenu(resId, category, btn) {
             renderRestaurantMenu(filteredItems);
         }
 
-        function renderRestaurantMenu(itemsToRender) {
+ function renderRestaurantMenu(itemsToRender) {
     const res = database[currentRestaurantId];
-    if (!res || !res.items) return; // Железобетонная защита
+    if (!res || !res.items) return; // Железобетонная защита от null/undefined
     
     const items = itemsToRender || res.items;
     let html = '';
@@ -1633,7 +1633,7 @@ function filterMenu(resId, category, btn) {
     // 👉 1. СОБИРАЕМ ИМЕНА ВСЕХ ПОД-ТОВАРОВ, ЧТОБЫ СКРЫТЬ ИХ ИЗ ОБЩЕГО СПИСКА
     let childNames = new Set();
     items.forEach(item => {
-        if (item.desc && item.desc.includes(';')) {
+        if (item && item.desc && item.desc.includes(';')) {
             const parts = item.desc.split(';').map(p => p.trim().toLowerCase()).filter(p => p.length > 0);
             parts.forEach(p => childNames.add(p));
         }
@@ -1641,6 +1641,7 @@ function filterMenu(resId, category, btn) {
 
     // 👉 2. ФИЛЬТРУЕМ МЕНЮ: Убираем из списка реальные под-товары
     const visibleItems = items.filter(item => {
+        if (!item || !item.name) return false;
         // Если имя этого товара перечислено в чьей-то группе — скрываем его
         if (childNames.has(item.name.toLowerCase().trim())) return false;
         return true;
@@ -1650,8 +1651,9 @@ function filterMenu(resId, category, btn) {
     let categories = [...new Set(visibleItems.map(item => item.category))];
     
     // ЖЕЛЕЗОБЕТОННАЯ СОРТИРОВКА ДЛЯ САМИХ БЛЮД ВНИЗУ
-    const sortOrder = (res.categories_order || []).map(c => c.trim().toLowerCase());
+    const sortOrder = (res.categories_order || []).map(c => c && c.trim().toLowerCase());
     categories.sort((a, b) => {
+        if (!a || !b) return 0;
         let indexA = sortOrder.indexOf(a.toLowerCase());
         let indexB = sortOrder.indexOf(b.toLowerCase());
         if (indexA === -1) indexA = 999;
@@ -1660,21 +1662,28 @@ function filterMenu(resId, category, btn) {
     });
     
     categories.forEach(cat => {
+        if (!cat) return;
         html += `<h3 id="cat-${cat}" class="cat-section-title">${cat}</h3>`;
         html += `<div class="products-grid">`;
         
         // Рендерим только видимые товары в этой категории
-        visibleItems.filter(i => i.category === cat).forEach(item => {
+        visibleItems.filter(i => i && i.category === cat).forEach(item => {
             let count = cartItems[item.id] ? cartItems[item.id].count : 0;
             let weightHtml = item.weight ? `<span style="color: #888; font-size: 13px; font-weight: 500; margin-left: 6px;">• ${item.weight}</span>` : '';
+
+            // 👉 КРИТИЧЕСКОЕ ОБНОВЛЕНИЕ: Защита от "null сом" / "noonson"
+            let priceDisplay = '';
+            if (item.price !== null && item.price !== undefined && parseFloat(item.price) > 0) {
+                priceDisplay = item.price + ' сом';
+            }
 
             // ПРОВЕРКА НА ГРУППУ
             let hasVariants = item.desc && item.desc.includes(';');
             let actionHtml = '';
 
             if (hasVariants) {
-                // Желтая Soft-кнопка "Выбрать"
-                actionHtml = `<button class="btn-add" style="background: FCE000; color: #333; border: none; font-weight: 700;" onclick="event.stopPropagation(); openProductModal('${item.id}')">ВЫБРАТЬ</button>`;
+                // Премиальная Soft-кнопка "Выбрать"
+                actionHtml = `<button class="btn-add" style="background: #FCE000; color: #1A1A1A; border: none; font-weight: 700;" onclick="event.stopPropagation(); openProductModal('${item.id}')">ВЫБРАТЬ</button>`;
             } else {
                 // Стандартный счетчик
                 actionHtml = count > 0 
@@ -1693,7 +1702,7 @@ function filterMenu(resId, category, btn) {
                 </div>
                 <div class="item-info">
                     <div style="flex-grow: 1; cursor: pointer;" onclick="openProductModal('${item.id}')">
-                        <div class="item-price">${item.price} сом ${weightHtml}</div>
+                        <div class="item-price">${priceDisplay}${weightHtml}</div>
                         <div class="item-name">${item.name}</div>
                     </div>
                     <div class="item-action">
