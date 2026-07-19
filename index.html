@@ -1243,7 +1243,7 @@ if (tg.disableVerticalSwipes) {
                 img: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/lagmanlogo.jpg', 
                 tags: [],
                 items: [],
-                categories_order: []
+                categories_order: ['Лагманы', 'Супы', 'Вторые блюда', 'Напитки', 'Салаты', 'Завтраки', 'Гарниры', 'Мучные изделия',]
             },
             '103': { 
                 lat: 42.650075, lon: 77.086667, city: 'Чолпон-Ата',
@@ -1683,7 +1683,7 @@ function filterMenu(resId, category, btn) {
 
             if (hasVariants) {
                 // Премиальная Soft-кнопка "Выбрать"
-                actionHtml = `<button class="btn-add" style="background: #FCE000; color: #1A1A1A; border: none; font-weight: 700;" onclick="event.stopPropagation(); openProductModal('${item.id}')">ВЫБРАТЬ</button>`;
+                actionHtml = `<button class="btn-add" style="background: #FFB200; color: #1A1A1A; border: none; font-weight: 700;" onclick="event.stopPropagation(); openProductModal('${item.id}')">ВЫБРАТЬ</button>`;
             } else {
                 // Стандартный счетчик
                 actionHtml = count > 0 
