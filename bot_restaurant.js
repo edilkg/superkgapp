@@ -109,8 +109,7 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
                     return courierBot.telegram.sendMessage(COURIER_GROUP_ID,
                         `🚨 <b>РУЧНОЙ ВЫЗОВ (от ресторана)</b>\n\n` +
                         `📍 Забрать: <b>${rest.name}</b>\n` +
-                        `📞 Данные клиента:\n${text}\n\n` +
-                        `💸 Комиссия за заказ: 20 сом.`,
+                        `📞 Данные клиента:\n${text}\n\n`,
                         { 
                             parse_mode: 'HTML',
                             reply_markup: {
