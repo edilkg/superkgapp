@@ -17,12 +17,19 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
 
             if (!rest.is_approved) return ctx.reply("⏳ Ваша заявка находится на проверке у администратора.");
 
-            ctx.reply(`✅ Кабинет ресторана "${rest.name}" активен!\nСюда будут приходить новые заказы.`);
-        } catch (err) {}
+            // 👉 ДОБАВЛЕНО: Постоянная кнопка внизу экрана для одобренных ресторанов
+            ctx.reply(`✅ Кабинет ресторана "${rest.name}" активен!\nСюда будут приходить новые заказы.`,
+                Markup.keyboard([
+                    ['🚕 Вызвать курьера (Вручную)']
+                ]).resize()
+            );
+        } catch (err) {
+            console.error("Ошибка при старте ресторана:", err);
+        }
     });
 
     // ==========================================
-    // 2. ШАГИ РЕГИСТРАЦИИ
+    // 2. ОБРАБОТКА ТЕКСТА И РУЧНЫХ ЗАКАЗОВ
     // ==========================================
     restBot.on('text', async (ctx) => {
         const id = ctx.from.id;
@@ -30,22 +37,94 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
         if (text.startsWith('/')) return;
 
         const { data: rest } = await supabase.from('restaurants').select('*').eq('id', id).maybeSingle();
-        if (!rest || rest.is_approved) return;
+        if (!rest) return;
 
-        if (rest.step === 'ask_name') {
-            await supabase.from('restaurants').update({ name: text, step: 'ask_phone' }).eq('id', id);
-            return ctx.reply(`Принято! Теперь напишите номер телефона:`);
+        // --- ЛОГИКА РЕГИСТРАЦИИ ---
+        if (!rest.is_approved) {
+            if (rest.step === 'ask_name') {
+                await supabase.from('restaurants').update({ name: text, step: 'ask_phone' }).eq('id', id);
+                return ctx.reply(`Принято! Теперь напишите номер телефона:`);
+            }
+
+            if (rest.step === 'ask_phone') {
+                await supabase.from('restaurants').update({ phone: text, step: 'waiting' }).eq('id', id);
+                ctx.reply("Спасибо! Заявка отправлена администратору.");
+
+                return clientBot.telegram.sendMessage(ADMIN_GROUP_ID, 
+                    `🏢 НОВАЯ ЗАЯВКА (РЕСТОРАН)\nНазвание: ${rest.name}\nТел: ${text}\nID: ${id}`,
+                    Markup.inlineKeyboard([[Markup.button.callback('✅ ОДОБРИТЬ РЕСТОРАН', `approve_rest_${id}`)]])
+                );
+            }
+            return; // Если заявка ждет одобрения, игнорируем другой текст
         }
 
-        if (rest.step === 'ask_phone') {
-            await supabase.from('restaurants').update({ phone: text, step: 'waiting' }).eq('id', id);
-            ctx.reply("Спасибо! Заявка отправлена администратору.");
+        // --- ЛОГИКА РУЧНОГО ВЫЗОВА (КНОПКИ ВНИЗУ) ---
+        if (rest.is_approved) {
+            // Менеджер нажал кнопку вызова
+            if (text === '🚕 Вызвать курьера (Вручную)') {
+                await supabase.from('restaurants').update({ step: 'ask_manual_data' }).eq('id', id);
+                return ctx.reply("📝 Отправьте данные клиента (например: 0555123456, ул. Советская 45):",
+                    Markup.keyboard([
+                        ['❌ Отмена']
+                    ]).resize()
+                );
+            }
 
-            // ПУШ АДМИНУ (Отправляем через клиентского бота)
-            return clientBot.telegram.sendMessage(ADMIN_GROUP_ID, 
-                `🏢 НОВАЯ ЗАЯВКА (РЕСТОРАН)\nНазвание: ${rest.name}\nТел: ${text}\nID: ${id}`,
-                Markup.inlineKeyboard([[Markup.button.callback('✅ ОДОБРИТЬ РЕСТОРАН', `approve_rest_${id}`)]])
-            );
+            // Менеджер передумал и нажал отмену
+            if (text === '❌ Отмена') {
+                await supabase.from('restaurants').update({ step: 'active' }).eq('id', id);
+                return ctx.reply("Действие отменено.", 
+                    Markup.keyboard([
+                        ['🚕 Вызвать курьера (Вручную)']
+                    ]).resize()
+                );
+            }
+
+            // Менеджер отправил данные клиента
+            if (rest.step === 'ask_manual_data') {
+                // Возвращаем ресторан в активный статус
+                await supabase.from('restaurants').update({ step: 'active' }).eq('id', id);
+                
+                try {
+                    // Создаем заказ в БД с пометкой is_manual = true
+                    const { data: newOrder, error } = await supabase.from('orders').insert([{
+                        restaurant: rest.name,
+                        address: text,
+                        status: 'pending', // Ждет курьера
+                        is_manual: true
+                    }]).select().single();
+
+                    if (error) throw error;
+
+                    // Отвечаем менеджеру
+                    ctx.reply(`✅ Вызов успешно отправлен курьерам!\nДанные клиента: ${text}`, 
+                        Markup.keyboard([
+                            ['🚕 Вызвать курьера (Вручную)']
+                        ]).resize()
+                    );
+
+                    // Отправляем в общую группу курьеров
+                    return courierBot.telegram.sendMessage(ADMIN_GROUP_ID,
+                        `🚨 <b>РУЧНОЙ ВЫЗОВ (от ресторана)</b>\n\n` +
+                        `📍 Забрать: <b>${rest.name}</b>\n` +
+                        `📞 Данные клиента:\n${text}\n\n` +
+                        `💸 Комиссия за заказ: 20 сом.`,
+                        { 
+                            parse_mode: 'HTML',
+                            reply_markup: {
+                                inline_keyboard: [[{ text: '🚕 Принять заказ', callback_data: `courier_accept_${newOrder.id}` }]]
+                            }
+                        }
+                    );
+                } catch (err) {
+                    console.error("Ошибка создания ручного заказа:", err);
+                    return ctx.reply("❌ Ошибка базы данных при создании заказа.",
+                        Markup.keyboard([
+                            ['🚕 Вызвать курьера (Вручную)']
+                        ]).resize()
+                    );
+                }
+            }
         }
     });
 
@@ -56,17 +135,14 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
         const orderId = ctx.match[1];
         
         try {
-            // 👉 ЗАЩИТА: Проверяем статус заказа ПЕРЕД тем, как менять его
             const { data: order } = await supabase.from('orders').select('status').eq('id', orderId).maybeSingle();
             if (!order) return ctx.answerCbQuery("❌ Заказ не найден в базе", { show_alert: true });
 
-            // Если заказ УЖЕ в пути, доставлен или отменен — блокируем нажатие!
             if (['delivery', 'completed', 'canceled'].includes(order.status)) {
                 await ctx.answerCbQuery("❌ Поздно! Заказ уже у курьера или завершен.", { show_alert: true });
                 return ctx.editMessageText(`❌ Заказ #${String(orderId).slice(0,5)} УЖЕ передан курьеру (или завершен)!\nВам не нужно его принимать.`);
             }
 
-            // Если всё нормально (ожидает оплаты или только что оплачен), меняем на "cooking"
             await supabase.from('orders').update({ status: 'cooking' }).eq('id', orderId);
             
             await ctx.editMessageText(`👨‍🍳 Заказ #${String(orderId).slice(0,5)} готовится!\nНажмите кнопку, когда отдадите пакет:`,
@@ -80,11 +156,9 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
         }
     });
 
-    // Кнопка: ОТДАТЬ КУРЬЕРУ
     restBot.action(/rest_given_(.+)/, async (ctx) => {
         const orderId = ctx.match[1];
         try {
-            // Тоже добавляем мини-защиту, чтобы ресторан не мог "нажать", если заказ уже завершен
             const { data: order } = await supabase.from('orders').select('status').eq('id', orderId).maybeSingle();
             if (order && order.status === 'completed') {
                 await ctx.answerCbQuery("❌ Заказ уже доставлен клиенту!", { show_alert: true });
@@ -97,14 +171,13 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
     });
 
     // ==========================================
-    // Кнопка: ОТКЛОНИТЬ ЗАКАЗ (С УМНЫМИ УВЕДОМЛЕНИЯМИ)
+    // 4. Кнопка: ОТКЛОНИТЬ ЗАКАЗ (С УМНЫМИ УВЕДОМЛЕНИЯМИ)
     // ==========================================
     restBot.action(/rest_decline_(.+)/, async (ctx) => {
         const orderId = ctx.match[1].trim();
         try {
             await ctx.answerCbQuery("Отклоняем заказ...").catch(() => {});
 
-            // 1. Запрашиваем ВСЕ данные заказа (status, client_id, courier_id, restaurant)
             const { data: order } = await supabase
                 .from('orders')
                 .select('*')
@@ -113,21 +186,16 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
 
             if (!order) return;
 
-           // Защита от двойного нажатия (уже отменен)
             if (order.status === 'canceled') {
                 return ctx.answerCbQuery("⚠️ Заказ уже отменен!", { show_alert: true }).catch(() => {});
             }
 
-            // 👉 ИСПРАВЛЕНО: Убрали 'delivery'. Теперь ресторан может отменить заказ, даже если курьер в пути.
-            // Оставили только защиту от отмены УЖЕ ЗАВЕРШЕННОГО заказа.
             if (order.status === 'completed') {
                 return ctx.answerCbQuery("❌ Невозможно отменить: заказ уже успешно доставлен клиенту!", { show_alert: true }).catch(() => {});
             }
 
-            // 2. Меняем статус в базе на canceled
             await supabase.from('orders').update({ status: 'canceled' }).eq('id', orderId);
 
-            // 3. УВЕДОМЛЯЕМ КЛИЕНТА (С извинениями)
             const cid = order.client_id;
             if (cid && String(cid) !== '111' && String(cid) !== 'null' && String(cid) !== 'undefined') {
                 const clientMsg = `❌ <b>Заказ #${String(orderId).slice(0,5)} отменен рестораном.</b>\n\n` +
@@ -140,7 +208,6 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
                 }
             }
 
-            // 4. УВЕДОМЛЯЕМ КУРЬЕРА (Если он уже нажал "Я возьму")
             const courierId = order.courier_id;
             if (courierId && String(courierId) !== 'null' && String(courierId) !== 'undefined') {
                 try {
@@ -154,7 +221,6 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
                 }
             }
 
-            // 5. УВЕДОМЛЯЕМ АДМИНА (Контроль качества)
             try {
                 await clientBot.telegram.sendMessage(
                     ADMIN_GROUP_ID,
@@ -163,7 +229,6 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
                 );
             } catch(e) {}
 
-            // 6. Меняем сообщение у самого ресторана
             await ctx.editMessageText(`❌ Заказ #${String(orderId).slice(0,5)} ОТКЛОНЕН вами.`).catch(() => {});
             
         } catch (err) {
