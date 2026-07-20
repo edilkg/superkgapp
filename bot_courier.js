@@ -1,5 +1,8 @@
 const { Markup } = require('telegraf');
 
+// Функция защиты от крашей Telegram при отправке спецсимволов
+const safeHtml = (str) => String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, ADMIN_GROUP_ID) {
     
     // ==========================================
@@ -13,21 +16,15 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             const { data: courier } = await supabase.from('couriers').select('*').eq('id', id).maybeSingle();
 
             if (!courier) {
-                // Регистрируем с пометкой, что нужно спросить телефон
                 await supabase.from('couriers').insert([{ id, name: ctx.from.first_name || 'Курьер', status: 'offline', step: 'ask_phone', balance: 0 }]);
-                
                 return ctx.reply("Привет! Чтобы стать курьером, отправь свой номер телефона, нажав на кнопку ниже:", 
-                    Markup.keyboard([
-                        [Markup.button.contactRequest('📱 Отправить мой номер')]
-                    ]).resize()
+                    Markup.keyboard([[Markup.button.contactRequest('📱 Отправить мой номер')]]).resize()
                 );
             }
 
             if (courier.step === 'ask_phone') {
-                return ctx.reply("Пожалуйста, отправь свой номер телефона, нажав на кнопку ниже:", 
-                    Markup.keyboard([
-                        [Markup.button.contactRequest('📱 Отправить мой номер')]
-                    ]).resize()
+                return ctx.reply("Пожалуйста, отправь свой номер телефона:", 
+                    Markup.keyboard([[Markup.button.contactRequest('📱 Отправить мой номер')]]).resize()
                 );
             }
 
@@ -35,215 +32,156 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 return ctx.reply("⏳ Твой аккаунт на проверке.", Markup.removeKeyboard());
             }
 
-            // Перезаписываем старые кнопки, оставляя только "Профиль"
             ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\nИмя: ${courier.name || 'Курьер'}\nТелефон: ${courier.phone || 'Не указан'}\nБаланс: ${courier.balance || 0} сом\n\nДля пополнения баланса напишите админу: @foodkg_admin`, 
-                Markup.keyboard([
-                    ['👤 Профиль']
-                ]).resize()
+                Markup.keyboard([['👤 Профиль']]).resize()
             );
         } catch (e) { 
             console.error("Ошибка при старте курьера:", e); 
         }
     });
 
-    // ==========================================
-    // 0.1 ПОЛУЧЕНИЕ НОМЕРА ТЕЛЕФОНА (КНОПКА КОНТАКТА)
-    // ==========================================
     courierBot.on('contact', async (ctx) => {
         try {
             const id = ctx.from.id;
             const { data: courier } = await supabase.from('couriers').select('step').eq('id', id).maybeSingle();
-
             if (!courier || courier.step !== 'ask_phone') return;
 
             const phone = ctx.message.contact.phone_number;
-
             await supabase.from('couriers').update({ phone: phone, step: 'completed', status: 'waiting_approval' }).eq('id', id);
-
             await ctx.reply("✅ Спасибо! Заявка отправлена админу. Жди одобрения.", Markup.removeKeyboard());
 
-            // ПУШ АДМИНУ
             return bot.telegram.sendMessage(ADMIN_GROUP_ID, 
                 `🛵 НОВАЯ ЗАЯВКА (КУРЬЕР)\nИмя: ${ctx.from.first_name || 'Не указано'}\nТелефон: ${phone}\nID: ${id}`,
                 Markup.inlineKeyboard([[Markup.button.callback('✅ ОДОБРИТЬ КУРЬЕРА', `approve_courier_${id}`)]])
             );
-        } catch (e) {
-            console.error("Ошибка при получении контакта курьера:", e);
-        }
+        } catch (e) { console.error("Ошибка контакта:", e); }
     });
 
-    // ==========================================
-    // 0.2 ОБРАБОТКА ТЕКСТА (ЕСЛИ ВВЕЛ НОМЕР ВРУЧНУЮ ИЛИ НАЖАЛ БАЛАНС)
-    // ==========================================
     courierBot.on('text', async (ctx) => {
         try {
             const id = ctx.from.id;
             const text = ctx.message.text;
-
             if (text.startsWith('/')) return;
 
             const { data: courier } = await supabase.from('couriers').select('*').eq('id', id).maybeSingle();
             if (!courier) return;
 
-            // Если бот ждет номер телефона
             if (courier.step === 'ask_phone') {
                 await supabase.from('couriers').update({ phone: text, step: 'completed', status: 'waiting_approval' }).eq('id', id);
+                await ctx.reply("✅ Спасибо! Заявка отправлена админу.", Markup.removeKeyboard());
 
-                await ctx.reply("✅ Спасибо! Заявка отправлена админу. Ждите одобрения.", Markup.removeKeyboard());
-
-                // ПУШ АДМИНУ
                 return bot.telegram.sendMessage(ADMIN_GROUP_ID, 
                     `🛵 НОВАЯ ЗАЯВКА (КУРЬЕР)\nИмя: ${ctx.from.first_name || 'Не указано'}\nТелефон: ${text}\nID: ${id}`,
                     Markup.inlineKeyboard([[Markup.button.callback('✅ ОДОБРИТЬ КУРЬЕРА', `approve_courier_${id}`)]])
                 );
             }
 
-            // Обработка кнопки "👤 Профиль"
             if (text === '👤 Профиль') {
                 if (courier.status === 'waiting_approval') return;
-                return ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\nИмя: ${courier.name || 'Курьер'}\nТелефон: ${courier.phone || 'Не указан'}\nБаланс: ${courier.balance || 0} сом\n\nДля пополнения баланса напишите админу: @foodkg_admin`);
+                return ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\nИмя: ${courier.name || 'Курьер'}\nТелефон: ${courier.phone || 'Не указан'}\nБаланс: ${courier.balance || 0} сом\n\nДля пополнения: @foodkg_admin`);
             }
-        } catch (e) {
-            console.error("Ошибка при обработке текста курьером:", e);
-        }
+        } catch (e) {}
     });
 
-   // ==========================================
-    // 1. КУРЬЕР БЕРЕТ ЗАКАЗ ИЗ ОБЩЕЙ ГРУППЫ (ЕДЕТ В РЕСТОРАН)
+    // ==========================================
+    // 1. КУРЬЕР БЕРЕТ ЗАКАЗ ИЗ ОБЩЕЙ ГРУППЫ
     // ==========================================
     courierBot.action(/courier_take_(.+)/, async (ctx) => {
         const orderId = ctx.match[1].trim(); 
         const courierId = ctx.from.id;
 
         try {
-            // 👉 ЗАЩИТА БАЛАНСА: Проверяем баланс курьера ПЕРЕД взятием заказа
             const { data: courierCheck } = await supabase.from('couriers').select('balance').eq('id', courierId).maybeSingle();
-            
             if (!courierCheck) return ctx.answerCbQuery("❌ Ошибка: курьер не найден", { show_alert: true });
             
             if ((courierCheck.balance || 0) <= 0) {
-                return ctx.answerCbQuery("❌ Ваш баланс 0 или ниже! Пополните счет через администратора, чтобы брать новые заказы.", { show_alert: true });
+                return ctx.answerCbQuery("❌ Ваш баланс 0 или ниже! Пополните счет, чтобы брать заказы.", { show_alert: true });
             }
 
-            // 👉 БРОНЕБОЙНОЕ ИСПРАВЛЕНИЕ: Меняем выборку полей на селект всех колонок '*'
-            const { data: orderCheck, error: checkErr } = await supabase
-                .from('orders')
-                .select('*') 
-                .eq('id', orderId)
-                .maybeSingle();
-            
-            if (checkErr || !orderCheck) {
-                console.error("❌ Ошибка Supabase при поиске заказа:", checkErr);
-                return ctx.answerCbQuery("❌ Заказ не найден в базе данных", { show_alert: true });
-            }
+            const { data: orderCheck, error: checkErr } = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
+            if (checkErr || !orderCheck) return ctx.answerCbQuery("❌ Заказ не найден", { show_alert: true });
 
-            // 👉 НОВАЯ ЗАЩИТА ОТ ОТМЕНЫ РЕСТОРАНОМ 
             if (orderCheck.status === 'canceled') {
                 await ctx.answerCbQuery("❌ Отбой! Ресторан отменил этот заказ.", { show_alert: true });
-                // Силовой сброс кнопки в группе, чтобы больше никто не кликал
-                await ctx.editMessageText(
-                    ctx.callbackQuery.message.text + `\n\n❌ ОТМЕНЕН РЕСТОРАНОМ`,
-                    { reply_markup: { inline_keyboard: [] } }
-                ).catch(() => {});
-                return;
+                return ctx.editMessageText(ctx.callbackQuery.message.text + `\n\n❌ ОТМЕНЕН РЕСТОРАНОМ`, { reply_markup: { inline_keyboard: [] } }).catch(() => {});
             }
             
-            // 👉 ПРОВЕРКА НА ГОНКУ (ЕСЛИ ЗАКАЗ УЖЕ ЗАБРАЛИ ДО НЕГО)
             if (orderCheck.courier_id && orderCheck.courier_id !== courierId) {
-                await ctx.answerCbQuery("❌ Опоздали! Этот заказ уже взял другой курьер", { show_alert: true });
-                // Силовой сброс кнопки в группе, чтобы больше никто не кликал
-                await ctx.editMessageText(
-                    ctx.callbackQuery.message.text + `\n\n❌ ЗАБРАЛ ДРУГОЙ КУРЬЕР`,
-                    { reply_markup: { inline_keyboard: [] } }
-                ).catch(() => {});
-                return;
+                await ctx.answerCbQuery("❌ Опоздали! Заказ взял другой курьер", { show_alert: true });
+                return ctx.editMessageText(ctx.callbackQuery.message.text + `\n\n❌ ЗАБРАЛ ДРУГОЙ КУРЬЕР`, { reply_markup: { inline_keyboard: [] } }).catch(() => {});
             }
 
-            // ЕСЛИ ЗАКАЗ СВОБОДЕН — Назначаем в базе на текущего курьера
+            // Назначаем заказ на курьера
             await supabase.from('orders').update({ courier_id: courierId }).eq('id', orderId);
 
             const { data: courierData } = await supabase.from('couriers').select('name, phone').eq('id', courierId).maybeSingle();
-            
             const cName = courierData?.name || ctx.from.first_name || 'Курьер';
             const cPhone = courierData?.phone || 'Номер не указан';
-            const cProfile = ctx.from.username ? `@${ctx.from.username}` : `<a href="tg://user?id=${courierId}">Профиль</a>`;
-
-            const notifyMessage = `🛵 Курьер едет к вам за заказом <b>#${String(orderId).slice(0,5)}</b>\n\n👤 Курьер: <b>${cName}</b>\n📞 Телефон: ${cPhone}\n💬 Telegram: ${cProfile}`;
-
-            // Уведомляем админа и ресторан
-            try { await bot.telegram.sendMessage(ADMIN_GROUP_ID, notifyMessage, { parse_mode: 'HTML' }); } catch(e) {}
+            
+            // Уведомляем админа и ресторан (безопасный текст)
+            const notifyMessage = `🛵 Курьер едет за заказом #${String(orderId).slice(0,5)}\n👤 Курьер: ${cName}\n📞 Телефон: ${cPhone}`;
+            try { await bot.telegram.sendMessage(ADMIN_GROUP_ID, notifyMessage); } catch(e) {}
+            
             if (orderCheck.restaurant) {
                 const { data: restData } = await supabase.from('restaurants').select('id').eq('name', orderCheck.restaurant).maybeSingle();
                 if (restData) {
-                    try { await restBot.telegram.sendMessage(restData.id, notifyMessage, { parse_mode: 'HTML' }); } catch(e) {}
+                    try { await restBot.telegram.sendMessage(restData.id, notifyMessage); } catch(e) {}
                 }
             }
 
-            // 👉 1. ОБНОВЛЯЕМ СООБЩЕНИЕ В ГРУППЕ (УБИРАЕМ КНОПКУ ДЛЯ ВСЕХ)
-            const groupMsg = ctx.callbackQuery.message.text;
-            await ctx.editMessageText(
-                groupMsg + `\n\n✅ ЗАКАЗ ВЗЯЛ: ${cName}`,
-                { parse_mode: 'HTML', reply_markup: { inline_keyboard: [] } } 
-            ).catch(() => {});
-            
-            await ctx.answerCbQuery("✅ Вы назначены на заказ! Подробности отправлены в ЛС.");
+            // Обновляем сообщение в группе (Убираем HTML, чтобы избежать ошибок парсинга)
+            const groupMsg = ctx.callbackQuery.message.text || '';
+            await ctx.editMessageText(groupMsg + `\n\n✅ ЗАКАЗ ВЗЯЛ: ${cName}`, { reply_markup: { inline_keyboard: [] } }).catch(() => {});
+            await ctx.answerCbQuery("✅ Вы назначены на заказ! Подробности в ЛС.");
 
-            // =======================================================
-            // 💸 ХИТРЫЙ ПАРСИНГ: ДОСТАЕМ СУММУ ИЗ ТЕКСТА ОБЩЕЙ ГРУППЫ
-            // =======================================================
-            const groupMsgText = ctx.callbackQuery.message.text || '';
-            let deliveryPriceText = 'Неизвестно';
-            
-            const priceMatch = groupMsgText.match(/💰 Доставка:\s*(\d+)\s*сом/);
-            if (priceMatch && priceMatch[1]) {
-                deliveryPriceText = priceMatch[1]; 
-            }
-            // =======================================================
+            // Формируем сообщение в личку
+            let privateText = '';
+            const buttons = [[Markup.button.callback('📦 Я взял заказ (Еду к клиенту)', `courier_picked_up_${orderId}`)]];
 
-            // 👉 2. ОТПРАВЛЯЕМ ПОДРОБНЫЕ ДЕТАЛИ В ЛИЧКУ КУРЬЕРУ
-            const clientPhone = orderCheck.phone || 'Не указан';
-            const clientName = orderCheck.client_name || 'Гость';
-            const address = orderCheck.address || 'Не указан';
-            
-            // 👉 ВОТ ТА САМАЯ ФУНКЦИЯ ИЗ АДМИНКИ: Вытаскиваем адрес и чистим коммент
-            let addressSuffix = '';
-            let displayComment = orderCheck.comment || 'Нет комментариев';
+            if (orderCheck.is_manual) {
+                // ЛОГИКА РУЧНОГО ЗАКАЗА
+                privateText = `📦 <b>Детали РУЧНОГО заказа #${String(orderId).slice(0,5)}</b>\n\n` +
+                              `📍 Забрать из: <b>${safeHtml(orderCheck.restaurant)}</b>\n\n` +
+                              `📞 <b>Данные клиента:</b>\n${safeHtml(orderCheck.address)}\n\n` +
+                              `💸 Комиссия системы: 20 сом`;
+            } else {
+                // ЛОГИКА ОБЫЧНОГО ЗАКАЗА
+                let deliveryPriceText = 'Неизвестно';
+                const priceMatch = groupMsg.match(/💰 Доставка:\s*(\d+)\s*сом/);
+                if (priceMatch && priceMatch[1]) deliveryPriceText = priceMatch[1];
 
-            if (displayComment.includes('🏪 Адрес ресторана:')) {
-                const parts = displayComment.split(' | ');
-                const addrPart = parts.find(p => p.includes('🏪 Адрес ресторана:'));
-                if (addrPart) {
-                    addressSuffix = ` (${addrPart.replace('🏪 Адрес ресторана:', '').trim()})`;
-                    displayComment = parts.filter(p => !p.includes('🏪 Адрес ресторана:')).join(' | ') || 'Нет комментариев';
+                let addressSuffix = '';
+                let displayComment = orderCheck.comment || 'Нет комментариев';
+
+                if (displayComment.includes('🏪 Адрес ресторана:')) {
+                    const parts = displayComment.split(' | ');
+                    const addrPart = parts.find(p => p.includes('🏪 Адрес ресторана:'));
+                    if (addrPart) {
+                        addressSuffix = ` (${addrPart.replace('🏪 Адрес ресторана:', '').trim()})`;
+                        displayComment = parts.filter(p => !p.includes('🏪 Адрес ресторана:')).join(' | ') || 'Нет комментариев';
+                    }
                 }
-            }
-            const fullRestName = `${orderCheck.restaurant || 'Не указан'}${addressSuffix}`;
-            // 👈 КОНЕЦ НОВОГО БЛОКА
+                const fullRestName = `${orderCheck.restaurant || 'Не указан'}${addressSuffix}`;
 
-            // 🗺 Умная проверка координат
-            const lat = orderCheck.lat || orderCheck.latitude;
-            const lon = orderCheck.lon || orderCheck.longitude;
-
-            let privateText = `📦 <b>Детали заказа #${String(orderId).slice(0,5)}</b>\n\n` +
+                privateText = `📦 <b>Детали заказа #${String(orderId).slice(0,5)}</b>\n\n` +
                               `💰 <b>Оплата:</b> <u>${deliveryPriceText} сом</u>\n\n` +
-                              `📍 Ресторан: <b>${fullRestName}</b>\n\n` + // 👈 ВЫВОДИМ С АДРЕСОМ
-                              `👤 <b>Клиент:</b> ${clientName}\n` +
-                              `📞 <b>Номер:</b> <code>${clientPhone}</code>\n` +
-                              `📍 <b>Адрес доставки:</b> <u>${address}</u>\n` +
-                              `💬 <b>Комментарий:</b> <i>${displayComment}</i>\n`; // 👈 ВЫВОДИМ ОЧИЩЕННЫЙ КОММЕНТ
+                              `📍 Ресторан: <b>${safeHtml(fullRestName)}</b>\n\n` + 
+                              `👤 <b>Клиент:</b> ${safeHtml(orderCheck.client_name || 'Гость')}\n` +
+                              `📞 <b>Номер:</b> <code>${safeHtml(orderCheck.phone || 'Не указан')}</code>\n` +
+                              `📍 <b>Адрес доставки:</b> <u>${safeHtml(orderCheck.address || 'Не указан')}</u>\n` +
+                              `💬 <b>Комментарий:</b> <i>${safeHtml(displayComment)}</i>\n`; 
 
-            const buttons = [
-                [Markup.button.callback('📦 Я взял заказ (Еду к клиенту)', `courier_picked_up_${orderId}`)]
-            ];
-            
-            if (lat && lon) {
-                const gisUrl = `https://2gis.kg/geo/${lon},${lat}`;
-                privateText += `\n🗺 <b>Карта:</b> <a href="${gisUrl}">Открыть точку в 2GIS</a>\n`;
-                buttons.push([Markup.button.url('🧭 Маршрут в 2GIS', gisUrl)]);
-            }
+                const lat = orderCheck.lat || orderCheck.latitude;
+                const lon = orderCheck.lon || orderCheck.longitude;
+                if (lat && lon) {
+                    const gisUrl = `https://2gis.kg/geo/${lon},${lat}`;
+                    privateText += `\n🗺 <b>Карта:</b> <a href="${gisUrl}">Открыть точку в 2GIS</a>\n`;
+                    buttons.push([Markup.button.url('🧭 Маршрут в 2GIS', gisUrl)]);
+                }
 
-            if (orderCheck.client_id && orderCheck.client_id != 111) {
-                buttons.push([Markup.button.url('💬 Написать клиенту', `tg://user?id=${orderCheck.client_id}`)]);
+                if (orderCheck.client_id && orderCheck.client_id != 111) {
+                    buttons.push([Markup.button.url('💬 Написать клиенту', `tg://user?id=${orderCheck.client_id}`)]);
+                }
             }
 
             await courierBot.telegram.sendMessage(courierId, privateText, {
@@ -252,43 +190,40 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             });
 
         } catch (err) {
-            console.error("❌ Критическая ошибка при взятии заказа курьером:", err.message);
+            console.error("❌ Ошибка при взятии заказа курьером:", err);
             try { await ctx.answerCbQuery("❌ Ошибка базы данных", {show_alert: true}); } catch(e){}
         }
     });
+
     // ==========================================
-    // 2. КУРЬЕР ЗАБРАЛ ЗАКАЗ (ВКЛЮЧАЕТ СТАТУС 3)
+    // 2. КУРЬЕР ЗАБРАЛ ЗАКАЗ (В ПУТИ)
     // ==========================================
     courierBot.action(/courier_picked_up_(.+)/, async (ctx) => {
-        const orderId = ctx.match[1];
+        const orderId = ctx.match[1].trim();
         const courierId = ctx.from.id; 
 
         try {
             await supabase.from('orders').update({ status: 'delivery' }).eq('id', orderId);
 
-            const { data: order } = await supabase.from('orders').select('client_id').eq('id', orderId).maybeSingle();
+            const { data: order } = await supabase.from('orders').select('client_id, is_manual').eq('id', orderId).maybeSingle();
             const { data: courierData } = await supabase.from('couriers').select('name, phone').eq('id', courierId).maybeSingle();
             
             const cName = courierData?.name || ctx.from.first_name || 'Курьер';
             const cPhone = courierData?.phone || 'Номер не указан';
 
-            if (order && order.client_id && order.client_id != 111) {
+            // Уведомляем клиента только если это обычный заказ
+            if (order && order.client_id && order.client_id != 111 && !order.is_manual) {
                 const clientMessage = `🚀 Курьер взял заказ и летит к вам!\n\n👤 Курьер: <b>${cName}</b>\n📞 Телефон: ${cPhone}`;
                 try { await bot.telegram.sendMessage(order.client_id, clientMessage, { parse_mode: 'HTML' }); } catch(e){}
             }
 
-            // 👉 ОБНОВЛЕНО: Сохраняем кнопку связи с клиентом на этапе "В пути"
-            const buttons = [
-                [Markup.button.callback('✅ Я доставил заказ', `courier_delivered_${orderId}`)]
-            ];
-            if (order && order.client_id && order.client_id != 111) {
+            const buttons = [[Markup.button.callback('✅ Я доставил заказ', `courier_delivered_${orderId}`)]];
+            if (order && order.client_id && order.client_id != 111 && !order.is_manual) {
                 buttons.push([Markup.button.url('💬 Написать клиенту', `tg://user?id=${order.client_id}`)]);
             }
 
-            await ctx.editMessageText(
-                ctx.callbackQuery.message.text + `\n\n🛵 ВЫ В ПУТИ К КЛИЕНТУ!\nКак только отдадите еду, нажмите кнопку:`,
-                Markup.inlineKeyboard(buttons)
-            );
+            const oldText = ctx.callbackQuery.message.text || '';
+            await ctx.editMessageText(oldText + `\n\n🛵 ВЫ В ПУТИ К КЛИЕНТУ!\nКак только отдадите еду, нажмите кнопку:`, Markup.inlineKeyboard(buttons));
             await ctx.answerCbQuery("Выехали к клиенту!");
         } catch (err) {
             console.error("Ошибка при статусе 'в пути':", err);
@@ -297,55 +232,57 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
     });
 
     // ==========================================
-    // 3. КУРЬЕР ДОСТАВИЛ ЗАКАЗ (СТАТУС 4 + СПИСАНИЕ КОМИССИИ)
+    // 3. КУРЬЕР ДОСТАВИЛ ЗАКАЗ (СПИСАНИЕ КОМИССИИ)
     // ==========================================
     courierBot.action(/courier_delivered_(.+)/, async (ctx) => {
-        const orderId = ctx.match[1];
+        const orderId = ctx.match[1].trim();
         const courierId = ctx.from.id; 
 
         try {
             await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId);
 
-            // Достаем заказ, чтобы посчитать комиссию
-            const { data: order } = await supabase.from('orders').select('client_id, items, total_price').eq('id', orderId).maybeSingle();
+            // Вытаскиваем заказ со статусом is_manual
+            const { data: order } = await supabase.from('orders').select('client_id, items, total_price, is_manual').eq('id', orderId).maybeSingle();
             
-            // 💸 РАСЧЕТ КОМИССИИ (10% ОТ СТОИМОСТИ ДОСТАВКИ)
-            let foodPrice = 0;
-            try { 
-                const itemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]');
-                itemsArr.forEach(i => {
-                    const price = Number(i.price || (i.item ? i.item.price : 0)) || 0;
-                    const count = Number(i.count) || 0;
-                    foodPrice += price * count;
-                });
-            } catch(e) {}
-            
-            // Вычисляем чистую цену доставки и берем от нее 10%
-            const deliveryPrice = Math.max(0, (order.total_price || 0) - foodPrice);
-            const commission = Math.round(deliveryPrice * 0.10); 
+            let commission = 0;
 
-            // Списываем комиссию с баланса курьера
+            if (order && order.is_manual) {
+                commission = 20; // Фиксированная комиссия за ручной заказ
+            } else if (order) {
+                // Комиссия 10% для заказов из приложения
+                let foodPrice = 0;
+                try { 
+                    const itemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]');
+                    itemsArr.forEach(i => {
+                        const price = Number(i.price || (i.item ? i.item.price : 0)) || 0;
+                        const count = Number(i.count) || 0;
+                        foodPrice += price * count;
+                    });
+                } catch(e) {}
+                
+                const deliveryPrice = Math.max(0, (order.total_price || 0) - foodPrice);
+                commission = Math.round(deliveryPrice * 0.10); 
+            }
+
+            // Списываем баланс
             const { data: cData } = await supabase.from('couriers').select('balance').eq('id', courierId).maybeSingle();
             if (cData) {
                 const newBalance = (cData.balance || 0) - commission;
                 await supabase.from('couriers').update({ balance: newBalance }).eq('id', courierId);
-                
-                // Отправляем чек-уведомление курьеру
-                try {
-                    await courierBot.telegram.sendMessage(courierId, `\n💸Комиссия за заказ: ${commission} сом (10%).\n💳Остаток Баланса: ${newBalance} сом.`);
-                } catch(e) {}
+                try { await courierBot.telegram.sendMessage(courierId, `💸 Комиссия за заказ: ${commission} сом.\n💳 Остаток Баланса: ${newBalance} сом.`); } catch(e) {}
             }
 
-            // Уведомляем клиента
-            if (order && order.client_id && order.client_id != 111) {
+            // Уведомляем клиента только если это не ручной заказ
+            if (order && order.client_id && order.client_id != 111 && !order.is_manual) {
                 try { await bot.telegram.sendMessage(order.client_id, `🎉 Заказ успешно доставлен!\nПриятного аппетита 🍔😋`); } catch(e){}
             }
 
-            await ctx.editMessageText(ctx.callbackQuery.message.text + `\n\n🎉 ЗАКАЗ УСПЕШНО ДОСТАВЛЕН!`);
+            const oldText = ctx.callbackQuery.message.text || '';
+            await ctx.editMessageText(oldText + `\n\n🎉 ЗАКАЗ УСПЕШНО ДОСТАВЛЕН!`, { reply_markup: { inline_keyboard: [] } });
             await ctx.answerCbQuery("Отличная работа!");
         } catch (err) {
             console.error("Ошибка при статусе 'доставлен':", err);
             try { await ctx.answerCbQuery("❌ Ошибка", {show_alert: true}); } catch(e){}
         }
     });
-    };
+};
