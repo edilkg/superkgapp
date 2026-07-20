@@ -17,14 +17,12 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
 
             if (!rest.is_approved) return ctx.reply("⏳ Ваша заявка находится на проверке у администратора.");
 
-            // 👉 ИСПРАВЛЕНО: Кнопка намертво прикреплена к низу (is_persistent)
-            ctx.reply(`✅ Кабинет ресторана "${rest.name}" активен!\nСюда будут приходить новые заказы.`, {
-                reply_markup: {
-                    keyboard: [[{ text: '🚕 Вызвать курьера (Вручную)' }]],
-                    resize_keyboard: true,
-                    is_persistent: true
-                }
-            });
+            // 👉 ДОБАВЛЕНО: Постоянная кнопка внизу экрана для одобренных ресторанов
+            ctx.reply(`✅ Кабинет ресторана "${rest.name}" активен!\nСюда будут приходить новые заказы.`,
+                Markup.keyboard([
+                    ['🚕 Вызвать курьера (Вручную)']
+                ]).resize()
+            );
         } catch (err) {
             console.error("Ошибка при старте ресторана:", err);
         }
@@ -57,7 +55,7 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
                     Markup.inlineKeyboard([[Markup.button.callback('✅ ОДОБРИТЬ РЕСТОРАН', `approve_rest_${id}`)]])
                 );
             }
-            return; 
+            return; // Если заявка ждет одобрения, игнорируем другой текст
         }
 
         // --- ЛОГИКА РУЧНОГО ВЫЗОВА (КНОПКИ ВНИЗУ) ---
@@ -65,77 +63,71 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
             // Менеджер нажал кнопку вызова
             if (text === '🚕 Вызвать курьера (Вручную)') {
                 await supabase.from('restaurants').update({ step: 'ask_manual_data' }).eq('id', id);
-                return ctx.reply("📝 Отправьте данные клиента (например: 0555123456, ул. Советская 45):", {
-                    reply_markup: {
-                        keyboard: [[{ text: '❌ Отмена' }]],
-                        resize_keyboard: true,
-                        is_persistent: true
-                    }
-                });
+                return ctx.reply("📝 Отправьте данные клиента (например: 0555123456, ул. Советская 45):",
+                    Markup.keyboard([
+                        ['❌ Отмена']
+                    ]).resize()
+                );
             }
 
             // Менеджер передумал и нажал отмену
             if (text === '❌ Отмена') {
                 await supabase.from('restaurants').update({ step: 'active' }).eq('id', id);
-                return ctx.reply("Действие отменено.", {
-                    reply_markup: {
-                        keyboard: [[{ text: '🚕 Вызвать курьера (Вручную)' }]],
-                        resize_keyboard: true,
-                        is_persistent: true
-                    }
-                });
+                return ctx.reply("Действие отменено.", 
+                    Markup.keyboard([
+                        ['🚕 Вызвать курьера (Вручную)']
+                    ]).resize()
+                );
             }
 
             // Менеджер отправил данные клиента
             if (rest.step === 'ask_manual_data') {
+                // Возвращаем ресторан в активный статус
                 await supabase.from('restaurants').update({ step: 'active' }).eq('id', id);
                 
                 try {
+                    // Создаем заказ в БД с пометкой is_manual = true
                     const { data: newOrder, error } = await supabase.from('orders').insert([{
                         restaurant: rest.name,
-                        address: text, 
-                        status: 'pending', 
+                        address: text, // Скрытые данные, которые увидит только победитель
+                        status: 'pending', // Ждет курьера
                         is_manual: true
                     }]).select().single();
 
                     if (error) throw error;
 
-                    // Отвечаем менеджеру с закрепленной кнопкой
-                    ctx.reply(`✅ Вызов успешно отправлен курьерам!\nДанные клиента: ${text}`, {
-                        reply_markup: {
-                            keyboard: [[{ text: '🚕 Вызвать курьера (Вручную)' }]],
-                            resize_keyboard: true,
-                            is_persistent: true
-                        }
-                    });
+                    // Отвечаем менеджеру
+                    ctx.reply(`✅ Заказ отправлен курьерам!\nДанные клиента: ${text}`, 
+                        Markup.keyboard([
+                            ['🚕 Вызвать курьера (Вручную)']
+                        ]).resize()
+                    );
 
-                    const COURIER_GROUP_ID = '-1004348705428'; 
+                    // 👉 ИСПРАВЛЕНО: Краткое сообщение для общей группы (БЕЗ ДАННЫХ И КОМИССИИ)
+                    const COURIER_GROUP_ID = '-1004348705428'; // Твоя группа курьеров
                     
                     return courierBot.telegram.sendMessage(COURIER_GROUP_ID,
                         `🚨 <b>РУЧНОЙ ВЫЗОВ (от ресторана)</b>\n\n` +
-                        `📍 Забрать: <b>${rest.name}</b>`, 
+                        `📍 Забрать: <b>${rest.name}</b>`, // Только имя ресторана, больше ничего
                         { 
                             parse_mode: 'HTML',
                             reply_markup: {
+                                // Кнопка, на которую нажмет курьер
                                 inline_keyboard: [[{ text: '🚕 Принять заказ', callback_data: `courier_take_${newOrder.id}` }]]
                             }
                         }
                     );
                 } catch (err) {
                     console.error("Ошибка создания ручного заказа:", err);
-                    return ctx.reply("❌ Ошибка базы данных при создании заказа.", {
-                        reply_markup: {
-                            keyboard: [[{ text: '🚕 Вызвать курьера (Вручную)' }]],
-                            resize_keyboard: true,
-                            is_persistent: true
-                        }
-                    });
+                    return ctx.reply("❌ Ошибка базы данных при создании заказа.",
+                        Markup.keyboard([
+                            ['🚕 Вызвать курьера (Вручную)']
+                        ]).resize()
+                    );
                 }
             }
         }
     });
-
-// ... дальше идут кнопки принятия заказа (rest_accept и т.д.) ...
 
     // ==========================================
     // 3. ЛОГИКА ЗАКАЗОВ (С ЗАЩИТОЙ ОТ ОПОЗДАНИЙ)
