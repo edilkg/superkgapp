@@ -1120,13 +1120,57 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        function calculateDynamicDeliveryFee(resLat, resLon, cLat, cLon) {
-            const straightDist = getDistance(resLat, resLon, cLat, cLon);
-            const realDist = straightDist * 1.3; 
-            let baseFee = 100; 
-            if (realDist > 1) baseFee += (realDist - 1) * 20; 
-            return Math.round(baseFee);
-        }
+        // ==========================================
+// ЛОГИКА РАСЧЕТА СТОИМОСТИ ДОСТАВКИ (УМНЫЙ ТАРИФ ИССЫК-КУЛЬ + ОКРУГЛЕНИЕ ДО 5)
+// ==========================================
+function calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon) {
+    // 1. ЗАЩИТА: Если координаты не пришли, отдаем 0 (обработается выше)
+    if (!resLat || !resLon || !clientLat || !clientLon) return 0;
+
+    // 2. Получаем расстояние в километрах (используем твою функцию getDistance)
+    const distKm = getDistance(resLat, resLon, clientLat, clientLon);
+
+    // 3. ОПРЕДЕЛЯЕМ БАЗОВУЮ ПОСАДКУ (В зависимости от радиуса)
+    let baseFee = 0;
+    
+    if (distKm <= 0.5) {
+        // До 500 метров
+        baseFee = 130; 
+    } else if (distKm <= 1) {
+        // От 500 метров до 1 км
+        baseFee = 150; 
+    } else {
+        // Если больше 1 км, базовая посадка для старта расчета берется как 150
+        baseFee = 150; 
+    }
+
+    // 4. ОПРЕДЕЛЯЕМ ТЕКУЩЕЕ ВРЕМЯ (Ночной тариф +50 сом)
+    const currentHour = new Date().getHours(); // Получаем часы по местному времени
+    
+    // Если время от 22:00 (вечер) до 06:00 (утро) — накидываем 50 сом
+    if (currentHour >= 22 || currentHour < 6) {
+        baseFee += 50; 
+    }
+
+    // 5. МАТЕМАТИКА: Считаем итоговую сумму
+    let totalFee = baseFee;
+
+    // Если расстояние больше 1 км, добавляем 25 сом за каждый лишний километр
+    if (distKm > 1) {
+        // Вычитаем 1 км (так как первый километр уже включен в baseFee)
+        const extraKm = distKm - 1; 
+        totalFee = baseFee + (extraKm * 25);
+    }
+
+    // ЖЕЛЕЗНОЕ ПРАВИЛО: Доставка никогда не может быть дешевле базовой посадки
+    let finalFee = Math.max(baseFee, totalFee);
+
+    // 6. УМНОЕ ОКРУГЛЕНИЕ: Всегда в большую сторону до ближайшего числа, кратного 5.
+    // Пример: 231 / 5 = 46.2 -> ceil(46.2) = 47 -> 47 * 5 = 235 сом.
+    finalFee = Math.ceil(finalFee / 5) * 5;
+
+    return finalFee;
+}
 
         
 
