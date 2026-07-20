@@ -89,7 +89,7 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
                     // Создаем заказ в БД с пометкой is_manual = true
                     const { data: newOrder, error } = await supabase.from('orders').insert([{
                         restaurant: rest.name,
-                        address: text,
+                        address: text, // Скрытые данные, которые увидит только победитель
                         status: 'pending', // Ждет курьера
                         is_manual: true
                     }]).select().single();
@@ -103,13 +103,12 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
                         ]).resize()
                     );
 
-                    // 👉 ИСПРАВЛЕНО: Отправляем в конкретную группу курьеров
+                    // 👉 ИСПРАВЛЕНО: Краткое сообщение для общей группы (БЕЗ ДАННЫХ И КОМИССИИ)
                     const COURIER_GROUP_ID = '-1004348705428'; // Твоя группа курьеров
                     
                     return courierBot.telegram.sendMessage(COURIER_GROUP_ID,
                         `🚨 <b>РУЧНОЙ ВЫЗОВ (от ресторана)</b>\n\n` +
-                        `📍 Забрать: <b>${rest.name}</b>\n` +
-                        `📞 Данные клиента:\n${text}\n\n`,
+                        `📍 Забрать: <b>${rest.name}</b>`, // Только имя ресторана, больше ничего
                         { 
                             parse_mode: 'HTML',
                             reply_markup: {
