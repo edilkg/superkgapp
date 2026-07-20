@@ -1489,9 +1489,10 @@ function renderRestaurants(searchQuery = '') {
                 } else {
                     const fee = calculateDynamicDeliveryFee(res.lat, res.lon, clientLat, clientLon);
                     
-                    // --- НОВОЕ: Округление времени до ближайших 5 минут ---
-                    const rawMinTime = 20 + Math.floor(straightDist * 4);
-                    const minTime = Math.round(rawMinTime / 5) * 5; // Магия округления
+                    // --- ОБНОВЛЕНО: Более быстрая доставка (2.5 мин на км) ---
+                    // 20 минут (готовка + подача) + 2.5 минуты на каждый километр пути
+                    const rawMinTime = 20 + (straightDist * 2.5);
+                    const minTime = Math.round(rawMinTime / 5) * 5; // Округление до 5
                     const maxTime = minTime + 15; // Добавляем вилку в 15 минут
                     
                     deliveryText = `<div class="res-desc" style="color: #E65100; font-weight: 700; font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px;">
