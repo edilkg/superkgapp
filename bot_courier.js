@@ -91,6 +91,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
         const courierId = ctx.from.id;
 
         try {
+            // Проверка баланса курьера
             const { data: courierCheck } = await supabase.from('couriers').select('balance').eq('id', courierId).maybeSingle();
             if (!courierCheck) return ctx.answerCbQuery("❌ Ошибка: курьер не найден", { show_alert: true });
             
@@ -98,6 +99,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 return ctx.answerCbQuery("❌ Ваш баланс 0 или ниже! Пополните счет, чтобы брать заказы.", { show_alert: true });
             }
 
+            // Проверка статуса заказа
             const { data: orderCheck, error: checkErr } = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
             if (checkErr || !orderCheck) return ctx.answerCbQuery("❌ Заказ не найден", { show_alert: true });
 
@@ -111,14 +113,24 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 return ctx.editMessageText(ctx.callbackQuery.message.text + `\n\n❌ ЗАБРАЛ ДРУГОЙ КУРЬЕР`, { reply_markup: { inline_keyboard: [] } }).catch(() => {});
             }
 
-            // Назначаем заказ на курьера
-            await supabase.from('orders').update({ courier_id: courierId }).eq('id', orderId);
+            let newBalance = courierCheck.balance || 0;
 
+            // 👉 ЛОГИКА НАЗНАЧЕНИЯ В БАЗЕ (Обычный заказ vs Ручной)
+            if (orderCheck.is_manual) {
+                // РУЧНОЙ ЗАКАЗ: Сразу завершаем его и списываем 20 сом
+                newBalance -= 20;
+                await supabase.from('orders').update({ courier_id: courierId, status: 'completed' }).eq('id', orderId);
+                await supabase.from('couriers').update({ balance: newBalance }).eq('id', courierId);
+            } else {
+                // ОБЫЧНЫЙ ЗАКАЗ: Просто назначаем курьера, статус остается прежним
+                await supabase.from('orders').update({ courier_id: courierId }).eq('id', orderId);
+            }
+
+            // Уведомления админу и ресторану
             const { data: courierData } = await supabase.from('couriers').select('name, phone').eq('id', courierId).maybeSingle();
             const cName = courierData?.name || ctx.from.first_name || 'Курьер';
             const cPhone = courierData?.phone || 'Номер не указан';
             
-            // Уведомляем админа и ресторан (безопасный текст)
             const notifyMessage = `🛵 Курьер едет за заказом #${String(orderId).slice(0,5)}\n👤 Курьер: ${cName}\n📞 Телефон: ${cPhone}`;
             try { await bot.telegram.sendMessage(ADMIN_GROUP_ID, notifyMessage); } catch(e) {}
             
@@ -129,23 +141,26 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 }
             }
 
-            // Обновляем сообщение в группе (Убираем HTML, чтобы избежать ошибок парсинга)
+            // Обновляем сообщение в общей группе
             const groupMsg = ctx.callbackQuery.message.text || '';
             await ctx.editMessageText(groupMsg + `\n\n✅ ЗАКАЗ ВЗЯЛ: ${cName}`, { reply_markup: { inline_keyboard: [] } }).catch(() => {});
             await ctx.answerCbQuery("✅ Вы назначены на заказ! Подробности в ЛС.");
 
-            // Формируем сообщение в личку
+            // 👉 ФОРМИРУЕМ СООБЩЕНИЕ В ЛИЧКУ
             let privateText = '';
-            const buttons = [[Markup.button.callback('📦 Я взял заказ (Еду к клиенту)', `courier_picked_up_${orderId}`)]];
+            const buttons = [];
 
             if (orderCheck.is_manual) {
-                // ЛОГИКА РУЧНОГО ЗАКАЗА
-                privateText = `📦 <b>Детали РУЧНОГО заказа #${String(orderId).slice(0,5)}</b>\n\n` +
-                              `📍 Забрать из: <b>${safeHtml(orderCheck.restaurant)}</b>\n\n` +
+                // ТЕКСТ ТОЛЬКО ДЛЯ РУЧНОГО ЗАКАЗА (Без кнопок вообще)
+                privateText = `📦 <b>Детали РУЧНОГО заказа #${String(orderId).slice(0,5)}</b>\n` +
+                              `📍 Забрать из: <b>${safeHtml(orderCheck.restaurant)}</b>\n` +
                               `📞 <b>Данные клиента:</b>\n${safeHtml(orderCheck.address)}\n\n` +
-                              `💸 Комиссия системы: 20 сом`;
+                              `💸 Комиссия за заказ: 20 сом\n` +
+                              `💳 Остаток Баланса: ${newBalance} сом`;
             } else {
-                // ЛОГИКА ОБЫЧНОГО ЗАКАЗА
+                // ТЕКСТ ДЛЯ ОБЫЧНОГО ЗАКАЗА ИЗ ПРИЛОЖЕНИЯ (С кнопками)
+                buttons.push([Markup.button.callback('📦 Я взял заказ (Еду к клиенту)', `courier_picked_up_${orderId}`)]);
+
                 let deliveryPriceText = 'Неизвестно';
                 const priceMatch = groupMsg.match(/💰 Доставка:\s*(\d+)\s*сом/);
                 if (priceMatch && priceMatch[1]) deliveryPriceText = priceMatch[1];
@@ -184,9 +199,10 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 }
             }
 
+            // Отправляем в личку
             await courierBot.telegram.sendMessage(courierId, privateText, {
                 parse_mode: 'HTML',
-                ...Markup.inlineKeyboard(buttons)
+                ...(buttons.length > 0 ? Markup.inlineKeyboard(buttons) : {})
             });
 
         } catch (err) {
@@ -196,7 +212,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
     });
 
     // ==========================================
-    // 2. КУРЬЕР ЗАБРАЛ ЗАКАЗ (В ПУТИ)
+    // 2. КУРЬЕР ЗАБРАЛ ЗАКАЗ (В ПУТИ) - Только для обычных заказов
     // ==========================================
     courierBot.action(/courier_picked_up_(.+)/, async (ctx) => {
         const orderId = ctx.match[1].trim();
@@ -211,7 +227,6 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             const cName = courierData?.name || ctx.from.first_name || 'Курьер';
             const cPhone = courierData?.phone || 'Номер не указан';
 
-            // Уведомляем клиента только если это обычный заказ
             if (order && order.client_id && order.client_id != 111 && !order.is_manual) {
                 const clientMessage = `🚀 Курьер взял заказ и летит к вам!\n\n👤 Курьер: <b>${cName}</b>\n📞 Телефон: ${cPhone}`;
                 try { await bot.telegram.sendMessage(order.client_id, clientMessage, { parse_mode: 'HTML' }); } catch(e){}
@@ -232,7 +247,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
     });
 
     // ==========================================
-    // 3. КУРЬЕР ДОСТАВИЛ ЗАКАЗ (СПИСАНИЕ КОМИССИИ)
+    // 3. КУРЬЕР ДОСТАВИЛ ЗАКАЗ (СПИСАНИЕ КОМИССИИ) - Для обычных заказов
     // ==========================================
     courierBot.action(/courier_delivered_(.+)/, async (ctx) => {
         const orderId = ctx.match[1].trim();
@@ -241,15 +256,13 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
         try {
             await supabase.from('orders').update({ status: 'completed' }).eq('id', orderId);
 
-            // Вытаскиваем заказ со статусом is_manual
             const { data: order } = await supabase.from('orders').select('client_id, items, total_price, is_manual').eq('id', orderId).maybeSingle();
             
             let commission = 0;
 
             if (order && order.is_manual) {
-                commission = 20; // Фиксированная комиссия за ручной заказ
+                commission = 20; 
             } else if (order) {
-                // Комиссия 10% для заказов из приложения
                 let foodPrice = 0;
                 try { 
                     const itemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]');
@@ -264,7 +277,6 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 commission = Math.round(deliveryPrice * 0.10); 
             }
 
-            // Списываем баланс
             const { data: cData } = await supabase.from('couriers').select('balance').eq('id', courierId).maybeSingle();
             if (cData) {
                 const newBalance = (cData.balance || 0) - commission;
@@ -272,7 +284,6 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 try { await courierBot.telegram.sendMessage(courierId, `💸 Комиссия за заказ: ${commission} сом.\n💳 Остаток Баланса: ${newBalance} сом.`); } catch(e) {}
             }
 
-            // Уведомляем клиента только если это не ручной заказ
             if (order && order.client_id && order.client_id != 111 && !order.is_manual) {
                 try { await bot.telegram.sendMessage(order.client_id, `🎉 Заказ успешно доставлен!\nПриятного аппетита 🍔😋`); } catch(e){}
             }
