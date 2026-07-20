@@ -103,8 +103,10 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
                         ]).resize()
                     );
 
-                    // Отправляем в общую группу курьеров
-                    return courierBot.telegram.sendMessage(ADMIN_GROUP_ID,
+                    // 👉 ИСПРАВЛЕНО: Отправляем в конкретную группу курьеров
+                    const COURIER_GROUP_ID = '-1004348705428'; // Твоя группа курьеров
+                    
+                    return courierBot.telegram.sendMessage(COURIER_GROUP_ID,
                         `🚨 <b>РУЧНОЙ ВЫЗОВ (от ресторана)</b>\n\n` +
                         `📍 Забрать: <b>${rest.name}</b>\n` +
                         `📞 Данные клиента:\n${text}\n\n` +
@@ -112,7 +114,8 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
                         { 
                             parse_mode: 'HTML',
                             reply_markup: {
-                                inline_keyboard: [[{ text: '🚕 Принять заказ', callback_data: `courier_accept_${newOrder.id}` }]]
+                                // Кнопка, на которую нажмет курьер
+                                inline_keyboard: [[{ text: '🚕 Принять заказ', callback_data: `courier_take_${newOrder.id}` }]]
                             }
                         }
                     );
