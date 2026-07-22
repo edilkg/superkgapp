@@ -1447,11 +1447,10 @@ function renderRestaurants(searchQuery = '') {
     let hasResults = false;
 
     // ---------------------------------------------------------
-    // ВАЖНО: Задаем порядок вывода ресторанов по их ID!
-    // Тот ID, который стоит первым, появится на сайте первым.
+    // ВАЖНО: Задаем порядок ресторанов по ID! Тот ID, который стоит первым, появится на сайте первым.
     // Если добавишь новый ресторан, не забудь дописать его ID сюда.
     // ---------------------------------------------------------
-    const resOrder = ['5521273499', '101', '103', '102', '104'];
+    const resOrder = ['8958317669', '8905203649', '8709006886', '843389293','5521273499'];
 
     // Перебираем рестораны строго по нашему заданному массиву
     for (let id of resOrder) {
@@ -1659,13 +1658,112 @@ function renderRestaurants(searchQuery = '') {
         }
 
 // И обязательно добавь эту функцию фильтрации рядом
-function filterMenu(resId, category, btn) {
-            document.querySelectorAll('#category-bar button').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
+async function openMenu(resId) {
+            currentRestaurantId = resId;
             const res = database[resId];
-            const filteredItems = category === 'Все' ? res.items : res.items.filter(i => i.category === category);
-            renderRestaurantMenu(filteredItems);
+            
+            document.getElementById('menu-title').innerText = res.title;
+            document.getElementById('menu-logo').src = res.logo;
+
+            // 1. Показываем экран меню и лоадер, пока данные летят с сервера
+            const container = document.getElementById('all-products-container');
+            container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: 800; color: #999;">⏳ Загрузка меню...</div>';
+            
+            // Очищаем старые категории и сбрасываем поиск
+            let catBar = document.getElementById('category-bar');
+            if (catBar) catBar.innerHTML = '';
+            if (typeof clearMenuSearch === 'function') clearMenuSearch();
+
+            history.pushState({screen: 'menu', page: 'menu', resId: resId}, '');
+            showScreen('menu');
+
+            try {
+                // 2. СКАЧИВАЕМ ДАННЫЕ ИЗ SUPABASE
+                const { data, error } = await supabaseClient
+                    .from('menu')
+                    .select('*')
+                    .eq('restaurant_id', resId)
+                    .eq('is_available', true); // Берем только то, что есть в наличии
+
+                if (error) throw error;
+
+                // 3. Адаптируем данные из базы под твой код корзины
+                res.items = data.map(item => ({
+                    id: item.id.toString(), // ID конвертируем в строку
+                    name: item.name,
+                    price: item.price,
+                    weight: item.weight || '',
+                    category: item.category ? item.category.trim() : 'Другое', // СРАЗУ УБИРАЕМ ПРОБЕЛЫ
+                    desc: item.description || '',
+                    img: item.img_url
+                }));
+
+                // Если меню пока пустое
+                if (res.items.length === 0) {
+                    container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: 800; color: #999;">Меню скоро появится 🍽️</div>';
+                    return;
+                }
+
+                // 4. Отрисовываем НАВИГАЦИЮ (Поиск + Горизонтальные категории)
+                let navContainer = document.getElementById('menu-nav-container');
+                if (!navContainer) {
+                    // Создаем главный липкий контейнер
+                    navContainer = document.createElement('div');
+                    navContainer.id = 'menu-nav-container';
+                    navContainer.style.cssText = 'display: flex; align-items: center; background: white; position: sticky; top: 0; z-index: 50; border-bottom: 1px solid #eee; padding-left: 10px; width: 100%; box-sizing: border-box;';
+                    
+                    navContainer.innerHTML = `
+                        <button id="menu-search-toggle-btn" onclick="toggleMenuSearch()" style="background: none; border: none; padding: 10px 10px 10px 0; cursor: pointer; display: flex; align-items: center; flex-shrink: 0;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #222;">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                        </button>
+                        
+                        <div id="menu-search-container" style="display: none; flex-grow: 1; align-items: center; gap: 8px; padding-right: 10px;">
+                            <input type="text" id="menu-search-input" oninput="handleMenuSearch()" placeholder="Поиск блюда..." style="flex-grow: 1; border: 1px solid #e0e0e0; border-radius: 20px; padding: 6px 14px; font-size: 14px; outline: none; background: #f9f9f9; width: 100%;">
+                            <button onclick="clearMenuSearch()" style="background: none; border: none; padding: 4px; cursor: pointer; color: #999; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                        </div>
+
+                        <div id="category-bar-wrapper" style="flex-grow: 1; min-width: 0; overflow: hidden;"></div>
+                    `;
+                    container.parentNode.insertBefore(navContainer, container);
+                }
+
+                // Вставляем твой category-bar внутрь нашей обертки
+                if (!catBar) {
+                    catBar = document.createElement('div');
+                    catBar.id = 'category-bar';
+                    // Отключаем его личные рамки и липкость, так как они теперь у родителя (navContainer)
+                    catBar.style.position = 'static'; 
+                    catBar.style.borderBottom = 'none';
+                    document.getElementById('category-bar-wrapper').appendChild(catBar);
+                }
+
+                let categories = [...new Set(res.items.map(item => item.category))];
+                
+                // ЖЕЛЕЗОБЕТОННАЯ СОРТИРОВКА ДЛЯ ВЕРХНИХ КНОПОК
+                const sortOrder = (res.categories_order || []).map(c => c.trim().toLowerCase());
+                categories.sort((a, b) => {
+                    let indexA = sortOrder.indexOf(a.toLowerCase());
+                    let indexB = sortOrder.indexOf(b.toLowerCase());
+                    if (indexA === -1) indexA = 999;
+                    if (indexB === -1) indexB = 999;
+                    return indexA - indexB;
+                });
+
+                catBar.innerHTML = categories.map((cat, i) => 
+                    `<button class="${i === 0 ? 'active' : ''}" onclick="scrollToCategory('${cat}', this)">${cat}</button>`
+                ).join('');
+                // 5. Отрисовываем сами карточки блюд
+                renderRestaurantMenu();
+
+            } catch (err) {
+                console.error("Ошибка загрузки меню:", err);
+                container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: bold; color: #d32f2f;">❌ Ошибка соединения. Попробуйте позже.</div>';
+            }
         }
 
  function renderRestaurantMenu(itemsToRender) {

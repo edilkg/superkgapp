@@ -1,8 +1,3 @@
-git config --global user.email "sulaimaonv.2002.es@gmail.com"
-git config --global user.name "edilkgr"
-
 git add .
-git commit -m "добавилкатегорийменю."
+git commit -m "доработidresto"
 git push
-
-
