@@ -3,7 +3,7 @@ const { Markup } = require('telegraf');
 module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase, ADMIN_GROUP_ID) {
     
     // ==========================================
-    // 1. КНОПКА: ОДОБРИТЬ ОПЛАТУ ЗАКАЗА
+    // 1. КНОПКА: ОДОБРИТЬ ОПЛАТУ ЗАКАЗА (ЕДИНАЯ ЛОГИКА)
     // ==========================================
     adminBot.action(/approve_order_(.+)/, async (ctx) => {
         const orderId = ctx.match[1].trim(); 
@@ -19,11 +19,14 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 return ctx.answerCbQuery("⚠️ Этот заказ уже одобрен!", { show_alert: true }).catch(() => {});
             }
 
+            // 1. Меняем статус в БД
             await supabase.from('orders').update({ status: 'paid' }).eq('id', orderId);
 
+            // 2. Уведомляем клиента и сохраняем кнопку для админа
             const buttons = [];
             const cid = order.client_id;
             if (cid && String(cid) !== '111' && String(cid) !== 'null' && String(cid) !== 'undefined') {
+                // Добавляем кнопку связи с клиентом в новый массив кнопок (Остальные кнопки сотрутся)
                 buttons.push([Markup.button.url("💬 Написать клиенту", `tg://user?id=${cid}`)]);
                 
                 try { 
@@ -37,26 +40,34 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 }
             }
 
-            // 👉 НОВАЯ ЛОГИКА: Формируем красивое название с адресом в скобках
-            let addressSuffix = '';
-            if (order.comment && order.comment.includes('🏪 Адрес ресторана:')) {
-                const parts = order.comment.split(' | ');
-                const addrPart = parts.find(p => p.includes('🏪 Адрес ресторана:'));
-                if (addrPart) {
-                    addressSuffix = ` (${addrPart.replace('🏪 Адрес ресторана:', '').trim()})`;
+            // 👉 3. ОБНОВЛЯЕМ СООБЩЕНИЕ АДМИНА (СОХРАНЯЕМ ВЕСЬ ТЕКСТ)
+            const oldText = ctx.callbackQuery.message.text || '';
+            let newText = '';
+            
+            // Если текст старый (от функции генерации) - заменяем заголовок
+            if (oldText.includes('🚨 НОВЫЙ ЗАКАЗ')) {
+                newText = oldText.replace(
+                    '🚨 НОВЫЙ ЗАКАЗ НА ПРОВЕРКУ ОПЛАТЫ!', 
+                    `✅ ЗАКАЗ #${String(orderId).slice(0,5)} ОДОБРЕН (Оплата получена)`
+                );
+            } else {
+                // Если вдруг старый текст не прочитался (подстраховка от крашей)
+                let addressSuffix = '';
+                if (order.comment && order.comment.includes('🏪 Адрес ресторана:')) {
+                    const parts = order.comment.split(' | ');
+                    const addrPart = parts.find(p => p.includes('🏪 Адрес ресторана:'));
+                    if (addrPart) {
+                        addressSuffix = ` (${addrPart.replace('🏪 Адрес ресторана:', '').trim()})`;
+                    }
                 }
+                const fullRestName = `${order.restaurant || 'Не указан'}${addressSuffix}`;
+                newText = `✅ ЗАКАЗ #${String(orderId).slice(0,5)} ОДОБРЕН (Оплата получена)\n🏢 Ресторан: ${fullRestName}\n💰 Сумма: ${order.total_price} сом`;
             }
-            // Получаем: "MAX BURGER (ул. Советская, 67в)"
-            const fullRestName = `${order.restaurant || 'Не указан'}${addressSuffix}`;
 
-            await ctx.editMessageText(
-                `✅ ЗАКАЗ #${String(orderId).slice(0,5)} ОДОБРЕН (Оплата получена)\n` +
-                `🏢 Ресторан: ${fullRestName}\n` + // 👈 ВЫВОДИМ КРАСИВО
-                `💰 Сумма: ${order.total_price} сом`, 
-                Markup.inlineKeyboard(buttons)
-            ).catch(() => {});
+            // Применяем новый текст и НОВУЮ клавиатуру (без кнопок принятия/отклонения)
+            await ctx.editMessageText(newText, buttons.length > 0 ? Markup.inlineKeyboard(buttons) : undefined).catch(() => {});
 
-            // 👉 ОТПРАВКА В РЕСТОРАН (Тут база ищет чистое имя MAX BURGER, ошибки не будет!)
+            // 👉 4. ОТПРАВКА В РЕСТОРАН
             if (order.restaurant) {
                 const { data: restData, error: restErr } = await supabase.from('restaurants').select('id, name, is_approved').ilike('name', order.restaurant).maybeSingle();
                 
@@ -114,16 +125,14 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 }
             }
 
-            // ==========================================
-            // ОТПРАВКА КУРЬЕРАМ В ОБЩУЮ ГРУППУ
-            // ==========================================
+            // 👉 5. ОТПРАВКА КУРЬЕРАМ В ОБЩУЮ ГРУППУ
             const COURIER_GROUP_ID = '-1004348705428'; 
             
-            let itemsArr = [];
-            try { itemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]'); } catch(e) {}
+            let courierItemsArr = [];
+            try { courierItemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]'); } catch(e) {}
             
             let foodPrice = 0;
-            itemsArr.forEach(i => {
+            courierItemsArr.forEach(i => {
                 const price = Number(i.price || (i.item ? i.item.price : 0)) || 0;
                 const count = Number(i.count) || 0;
                 foodPrice += price * count;
@@ -131,9 +140,18 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
 
             const deliveryPrice = Math.max(0, (order.total_price || 0) - foodPrice);
 
-            // 👉 ВЫВОДИМ КРАСИВОЕ ИМЯ С АДРЕСОМ И ДЛЯ КУРЬЕРА
+            let addressSuffixCourier = '';
+            if (order.comment && order.comment.includes('🏪 Адрес ресторана:')) {
+                const parts = order.comment.split(' | ');
+                const addrPart = parts.find(p => p.includes('🏪 Адрес ресторана:'));
+                if (addrPart) {
+                    addressSuffixCourier = ` (${addrPart.replace('🏪 Адрес ресторана:', '').trim()})`;
+                }
+            }
+            const fullRestNameCourier = `${order.restaurant || 'Не указан'}${addressSuffixCourier}`;
+
             let msgCourier = `🔥 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n` +
-                             `🏢 Ресторан: <b>${fullRestName}</b>\n` + 
+                             `🏢 Ресторан: <b>${fullRestNameCourier}</b>\n` + 
                              `💰 Доставка: <b>${deliveryPrice} сом</b>\n\n` +
                              `Кто заберет?`;
             
@@ -284,51 +302,4 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
     // ==========================================
     // 5. ОТПРАВКА ЗАКАЗА НА МОДЕРАЦИЮ АДМИНУ
     // ==========================================
-    return {
-        sendOrderToAdmin: async (orderData) => {
-            try {
-                const itemsArr = Array.isArray(orderData.items) ? orderData.items : (JSON.parse(orderData.items || '[]'));
-                const itemsText = itemsArr.map(i => {
-                    const name = i.item ? i.item.name : i.name;
-                    return `▫️ ${name} x${i.count}`;
-                }).join('\n');
-                
-                // 👉 НОВАЯ ЛОГИКА: Достаем адрес ресторана для самого первого сообщения админу
-                let addressSuffix = '';
-                let displayComment = orderData.comment || 'Нет';
-                
-                if (orderData.restaurantAddress) {
-                    addressSuffix = ` (${orderData.restaurantAddress})`;
-                    // Вырезаем адрес из комментариев, чтобы не дублировался
-                    if (displayComment.includes('🏪 Адрес ресторана:')) {
-                        displayComment = displayComment.split(' | ').filter(p => !p.includes('🏪 Адрес ресторана:')).join(' | ') || 'Нет';
-                    }
-                } else if (displayComment.includes('🏪 Адрес ресторана:')) {
-                    const parts = displayComment.split(' | ');
-                    const addrPart = parts.find(p => p.includes('🏪 Адрес ресторана:'));
-                    if (addrPart) {
-                        addressSuffix = ` (${addrPart.replace('🏪 Адрес ресторана:', '').trim()})`;
-                        displayComment = parts.filter(p => !p.includes('🏪 Адрес ресторана:')).join(' | ') || 'Нет';
-                    }
-                }
-                const fullRestName = `${orderData.restaurant || 'Не указан'}${addressSuffix}`;
-
-                const message = `🚨 НОВЫЙ ЗАКАЗ НА ПРОВЕРКУ ОПЛАТЫ!\nID: #${String(orderData.id).slice(0,5)}\n💰 Сумма: ${orderData.total_price} сом\n\n👤 Клиент: ${orderData.client_name || 'Гость'}\n📞 Номер: ${orderData.phone || 'Не указан'}\n📍 Адрес: ${orderData.address || 'Не указан'}\n💬 Комментарий: ${displayComment}\n\n🏢 Ресторан: ${fullRestName}\n\n🛒 Блюда:\n${itemsText}`;
-
-                const buttons = [
-                    [Markup.button.callback("✅ Оплата получена", `approve_order_${orderData.id}`)],
-                    [Markup.button.callback("❌ Оплаты нет", `reject_order_${orderData.id}`)]
-                ];
-
-                const cid = orderData.client_id;
-                if (cid && String(cid) !== '111' && String(cid) !== 'null' && String(cid) !== 'undefined') {
-                    buttons.push([Markup.button.url("💬 Написать клиенту", `tg://user?id=${cid}`)]);
-                }
-
-                await adminBot.telegram.sendMessage(ADMIN_GROUP_ID, message, Markup.inlineKeyboard(buttons));
-            } catch (err) {
-                console.error("❌ ОШИБКА ОТПРАВКИ В АДМИНКУ:", err.message);
-            }
-        }
-    };
-};
+    // ==========================================
