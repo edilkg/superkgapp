@@ -130,7 +130,7 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
     });
 
     // ==========================================
-    // 3. ЛОГИКА ЗАКАЗОВ (С ЗАЩИТОЙ ОТ ОПОЗДАНИЙ)
+    // 3. ЛОГИКА ЗАКАЗОВ (РЕСТОРАН - БЕЗ ЛИШНИХ КНОПОК)
     // ==========================================
     restBot.action(/rest_accept_(.+)/, async (ctx) => {
         const orderId = ctx.match[1];
@@ -141,15 +141,26 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
 
             if (['delivery', 'completed', 'canceled'].includes(order.status)) {
                 await ctx.answerCbQuery("❌ Поздно! Заказ уже у курьера или завершен.", { show_alert: true });
-                return ctx.editMessageText(`❌ Заказ #${String(orderId).slice(0,5)} УЖЕ передан курьеру (или завершен)!\nВам не нужно его принимать.`);
+                return ctx.editMessageText(`❌ Заказ #${String(orderId).slice(0,5)} УЖЕ передан курьеру (или завершен)!\nВам не нужно его принимать.`).catch(()=>{});
             }
 
+            // Меняем статус на "Готовится"
             await supabase.from('orders').update({ status: 'cooking' }).eq('id', orderId);
             
-            await ctx.editMessageText(`👨‍🍳 Заказ #${String(orderId).slice(0,5)} готовится!\nНажмите кнопку, когда отдадите пакет:`,
-                Markup.inlineKeyboard([[Markup.button.callback('📦 ОТДАНО КУРЬЕРУ', `rest_given_${orderId}`)]])
-            );
-            await ctx.answerCbQuery("Заказ принят в работу!");
+            // 👉 СОХРАНЯЕМ ВЕСЬ ТЕКСТ (С БЛЮДАМИ И ДЕТАЛЯМИ)
+            const oldText = ctx.callbackQuery.message.text || '';
+            let newText = '';
+            
+            // Меняем только верхнюю строчку, остальное остается на месте!
+            if (oldText.includes('🍔 НОВЫЙ ЗАКАЗ')) {
+                newText = oldText.replace(/🍔 НОВЫЙ ЗАКАЗ(.*)/, '✅ ЗАКАЗ$1 ПРИНЯТ (Готовится на кухне)');
+            } else {
+                newText = `✅ ЗАКАЗ #${String(orderId).slice(0,5)} ПРИНЯТ (Готовится)\n\n` + oldText;
+            }
+            
+            // Обновляем сообщение и УБИРАЕМ кнопки (кнопка "Отдано курьеру" больше не нужна)
+            await ctx.editMessageText(newText).catch(() => {});
+            await ctx.answerCbQuery("✅ Заказ успешно принят на кухню!");
 
         } catch (err) {
             console.error("Ошибка ресторана при принятии:", err);
@@ -157,18 +168,26 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
         }
     });
 
-    restBot.action(/rest_given_(.+)/, async (ctx) => {
+    // Обработка кнопки "Отклонить" (тоже сохраняем текст блюд)
+    restBot.action(/rest_decline_(.+)/, async (ctx) => {
         const orderId = ctx.match[1];
         try {
-            const { data: order } = await supabase.from('orders').select('status').eq('id', orderId).maybeSingle();
-            if (order && order.status === 'completed') {
-                await ctx.answerCbQuery("❌ Заказ уже доставлен клиенту!", { show_alert: true });
-                return ctx.editMessageText(`✅ Этот заказ УЖЕ успешно доставлен клиенту!`);
+            // 👉 Сохраняем весь текст заказа для истории
+            const oldText = ctx.callbackQuery.message.text || '';
+            let newText = '';
+
+            if (oldText.includes('🍔 НОВЫЙ ЗАКАЗ')) {
+                newText = oldText.replace(/🍔 НОВЫЙ ЗАКАЗ(.*)/, '❌ ЗАКАЗ$1 ОТКЛОНЕН РЕСТОРАНОМ');
+            } else {
+                newText = `❌ ЗАКАЗ #${String(orderId).slice(0,5)} ОТКЛОНЕН\n\n` + oldText;
             }
 
-            await ctx.editMessageText(`✅ Заказ успешно передан курьеру!`);
-            await ctx.answerCbQuery("Отлично!");
-        } catch (e) {}
+            await supabase.from('orders').update({ status: 'canceled' }).eq('id', orderId);
+            await ctx.editMessageText(newText).catch(() => {});
+            await ctx.answerCbQuery("❌ Заказ отменен", { show_alert: true }).catch(() => {});
+        } catch (err) {
+            console.error("Ошибка ресторана при отмене:", err);
+        }
     });
 
     // ==========================================
