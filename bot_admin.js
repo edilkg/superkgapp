@@ -26,7 +26,6 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             const buttons = [];
             const cid = order.client_id;
             if (cid && String(cid) !== '111' && String(cid) !== 'null' && String(cid) !== 'undefined') {
-                // Добавляем кнопку связи с клиентом в новый массив кнопок (Остальные кнопки сотрутся)
                 buttons.push([Markup.button.url("💬 Написать клиенту", `tg://user?id=${cid}`)]);
                 
                 try { 
@@ -44,14 +43,12 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
             const oldText = ctx.callbackQuery.message.text || '';
             let newText = '';
             
-            // Если текст старый (от функции генерации) - заменяем заголовок
             if (oldText.includes('🚨 НОВЫЙ ЗАКАЗ')) {
                 newText = oldText.replace(
                     '🚨 НОВЫЙ ЗАКАЗ НА ПРОВЕРКУ ОПЛАТЫ!', 
                     `✅ ЗАКАЗ #${String(orderId).slice(0,5)} ОДОБРЕН (Оплата получена)`
                 );
             } else {
-                // Если вдруг старый текст не прочитался (подстраховка от крашей)
                 let addressSuffix = '';
                 if (order.comment && order.comment.includes('🏪 Адрес ресторана:')) {
                     const parts = order.comment.split(' | ');
@@ -64,7 +61,7 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                 newText = `✅ ЗАКАЗ #${String(orderId).slice(0,5)} ОДОБРЕН (Оплата получена)\n🏢 Ресторан: ${fullRestName}\n💰 Сумма: ${order.total_price} сом`;
             }
 
-            // Применяем новый текст и НОВУЮ клавиатуру (без кнопок принятия/отклонения)
+            // Применяем новый текст и НОВУЮ клавиатуру
             await ctx.editMessageText(newText, buttons.length > 0 ? Markup.inlineKeyboard(buttons) : undefined).catch(() => {});
 
             // 👉 4. ОТПРАВКА В РЕСТОРАН
