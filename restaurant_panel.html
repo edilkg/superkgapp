@@ -48,7 +48,7 @@
     <div id="app">
         <div id="loading" class="loading-screen">
             <h2>⏳ Загрузка...</h2>
-            <p id="loading-text" style="color: var(--accent); font-weight: bold;">Инициализация...</p>
+            <p id="loading-text" style="color: var(--accent); font-weight: bold; margin-top: 10px;">Запуск приложения...</p>
         </div>
 
         <div id="error" class="error-screen" style="display: none;">
@@ -59,100 +59,98 @@
         <div id="panel" style="display: none;">
             <div class="header">
                 <h1 id="rest-name">Меню ресторана</h1>
-                <p>Управление стоп-листом</p>
+                <p>Управление стоп-листом (наличием блюд)</p>
             </div>
             <div class="menu-list" id="menu-container"></div>
         </div>
     </div>
 
     <script>
-        // ГЛОБАЛЬНЫЙ ПЕРЕХВАТЧИК ОШИБОК (Покажет на экране, если что-то сломалось)
+        // Перехватчик любых ошибок в коде
         window.onerror = function(msg, url, line) {
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('error').style.display = 'flex';
-            document.getElementById('error-title').innerText = "Критическая ошибка JS";
-            document.getElementById('error-desc').innerText = msg + " (строка " + line + ")";
+            showError("Ошибка JS", msg + " (строка " + line + ")");
         };
 
-        // 1. ИНИЦИАЛИЗАЦИЯ (Абсолютно безопасный метод для всех телефонов)
-        document.getElementById('loading-text').innerText = "Запуск Telegram...";
-        var tg = null;
-        if (window.Telegram && window.Telegram.WebApp) {
-            tg = window.Telegram.WebApp;
-            tg.expand();
-            tg.ready();
+        function setStatus(text) {
+            var el = document.getElementById('loading-text');
+            if (el) el.innerText = text;
         }
 
-        document.getElementById('loading-text').innerText = "Подключение к базе...";
+        function showError(title, desc) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('panel').style.display = 'none';
+            var errScreen = document.getElementById('error');
+            errScreen.style.display = 'flex';
+            document.getElementById('error-title').innerText = title;
+            document.getElementById('error-desc').innerText = desc;
+        }
+
         const SUPABASE_URL = 'https://dtxybpdjbdmqrvsdwvvk.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHlicGRqYmRtcXJ2c2R3dnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwODI5OTYsImV4cCI6MjA5MTY1ODk5Nn0.WFWBrwvxqEgfR9tzusvFcvfPN_mS4SmwvsWlyH13LEs';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        const TABLE_RESTAURANTS = 'restaurants'; // Таблица ресторанов
-        const TABLE_MENU = 'menu'; // Таблица блюд
+        var supabase = null;
+        var tg = null;
 
-        // 2. АВТОРИЗАЦИЯ
         async function initPanel() {
             try {
-                document.getElementById('loading-text').innerText = "Проверка прав...";
-                
-                let ownerId = 5521273499; // Заглушка для теста с локального сервера
+                setStatus("Инициализация Telegram...");
+                if (window.Telegram && window.Telegram.WebApp) {
+                    tg = window.Telegram.WebApp;
+                    tg.expand();
+                    tg.ready();
+                }
+
+                setStatus("Подключение к базе Supabase...");
+                if (!window.supabase) {
+                    showError("Ошибка сети", "Библиотека Supabase не загрузилась. Проверьте интернет-соединение.");
+                    return;
+                }
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+                setStatus("Проверка владельца заведения...");
+                let ownerId = 5521273499; // Тестовый ID для проверки на ПК
                 if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
                     ownerId = tg.initDataUnsafe.user.id;
                 }
 
-                // 👉 Ищем ресторан. В базе owner_telegram_id это скорее всего текст (String)
-                const { data: restaurant, error } = await supabase
-                    .from(TABLE_RESTAURANTS)
+                // Запрос в БД ресторанов (owner_telegram_id как число int8)
+                const { data: restaurant, error: restErr } = await supabase
+                    .from('restaurants')
                     .select('*')
-                    .eq('owner_telegram_id', String(ownerId))
+                    .eq('owner_telegram_id', Number(ownerId))
                     .maybeSingle();
 
-                if (error) throw error;
+                if (restErr) {
+                    showError("Ошибка базы (ресторан)", restErr.message);
+                    return;
+                }
 
                 if (!restaurant) {
-                    document.getElementById('loading').style.display = 'none';
-                    document.getElementById('error').style.display = 'flex';
-                    document.getElementById('error-title').innerText = "Доступ запрещен";
-                    document.getElementById('error-desc').innerText = "К вашему Telegram (ID: " + ownerId + ") не привязан ни один ресторан.";
+                    showError("Доступ запрещен", "К вашему Telegram (ID: " + ownerId + ") не привязан ресторан в базе.");
                     return;
                 }
 
                 document.getElementById('rest-name').innerText = restaurant.name || "Ваше меню";
-                
-                await loadMenuItems(restaurant.id);
 
-            } catch (err) {
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('error').style.display = 'flex';
-                document.getElementById('error-title').innerText = "Ошибка ресторанов";
-                document.getElementById('error-desc').innerText = err.message;
-            }
-        }
-
-        // 3. ЗАГРУЗКА И ОТРИСОВКА БЛЮД
-        async function loadMenuItems(restId) {
-            try {
-                document.getElementById('loading-text').innerText = "Загрузка блюд...";
-                
-                // 👉 Ищем блюда. В базе restaurant_id это точно INT8 (число)
-                const { data: menuItems, error } = await supabase
-                    .from(TABLE_MENU)
+                setStatus("Скачивание блюд из базы...");
+                const { data: menuItems, error: menuErr } = await supabase
+                    .from('menu')
                     .select('*')
-                    .eq('restaurant_id', Number(restId))
+                    .eq('restaurant_id', Number(restaurant.id))
                     .order('id', { ascending: true });
 
-                if (error) throw error;
+                if (menuErr) {
+                    showError("Ошибка базы (меню)", menuErr.message);
+                    return;
+                }
 
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('panel').style.display = 'block';
 
                 renderMenu(menuItems);
+
             } catch (err) {
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('error').style.display = 'flex';
-                document.getElementById('error-title').innerText = "Ошибка меню БД";
-                document.getElementById('error-desc').innerText = err.message;
+                showError("Системная ошибка", err.message || err);
             }
         }
 
@@ -161,7 +159,7 @@
             container.innerHTML = ''; 
 
             if (!items || items.length === 0) {
-                container.innerHTML = '<p style="text-align:center; color:gray;">В меню пока нет блюд.</p>';
+                container.innerHTML = '<p style="text-align:center; color:gray; padding:20px;">В меню пока нет блюд.</p>';
                 return;
             }
 
@@ -185,33 +183,37 @@
             });
         }
 
-        // 4. ЛОГИКА СТОП-ЛИСТА
         async function toggleItemStatus(itemId, newStatus) {
             if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
             const card = document.getElementById("item-card-" + itemId);
-            
-            if (newStatus) {
-                card.classList.remove('item-disabled');
-            } else {
-                card.classList.add('item-disabled');
+            if (card) {
+                if (newStatus) card.classList.remove('item-disabled');
+                else card.classList.add('item-disabled');
             }
 
             const { error } = await supabase
-                .from(TABLE_MENU)
+                .from('menu')
                 .update({ is_available: newStatus })
                 .eq('id', Number(itemId));
 
             if (error) {
                 alert("Ошибка сохранения: " + error.message);
-                document.getElementById("toggle-" + itemId).checked = !newStatus;
-                if (!newStatus) card.classList.remove('item-disabled');
-                else card.classList.add('item-disabled');
+                var chk = document.getElementById("toggle-" + itemId);
+                if (chk) chk.checked = !newStatus;
+                if (card) {
+                    if (!newStatus) card.classList.remove('item-disabled');
+                    else card.classList.add('item-disabled');
+                }
             }
         }
 
-        // Запуск
-        initPanel();
+        // Запуск скрипта только после полной готовности HTML-разметки
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initPanel);
+        } else {
+            initPanel();
+        }
     </script>
 </body>
 </html>
