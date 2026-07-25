@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Панель Ресторана | TamakKG</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg-color: #f4f5f7;
+            --card-bg: #ffffff;
+            --text-main: #222222;
+            --text-muted: #888888;
+            --accent: #FF8C00;
+            --success: #34C759;
+            --danger: #FF3B30;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); -webkit-font-smoothing: antialiased; }
+        
+        .header { padding: 20px 16px; background: var(--card-bg); border-bottom: 1px solid #eaeaea; position: sticky; top: 0; z-index: 10; }
+        .header h1 { font-size: 20px; font-weight: 700; }
+        .header p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+        .loading-screen, .error-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; text-align: center; padding: 20px; }
+        .error-screen h2 { margin-bottom: 10px; color: var(--danger); }
+
+        .menu-list { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+        
+        .menu-item { background: var(--card-bg); border-radius: 16px; padding: 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+        .item-info { flex-grow: 1; padding-right: 12px; }
+        .item-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+        .item-price { font-size: 14px; color: var(--accent); font-weight: 600; }
+        
+        /* Стили для iOS-тумблера (Свитчера) */
+        .switch { position: relative; display: inline-block; width: 50px; height: 30px; flex-shrink: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e5e5ea; transition: .3s; border-radius: 30px; }
+        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        input:checked + .slider { background-color: var(--success); }
+        input:checked + .slider:before { transform: translateX(20px); }
+        .item-disabled .item-title, .item-disabled .item-price { color: var(--text-muted); text-decoration: line-through; }
+    </style>
+</head>
+<body>
+
+    <div id="app">
+        <div id="loading" class="loading-screen">
+            <h2>⏳ Загрузка...</h2>
+            <p>Проверяем доступы ресторана</p>
+        </div>
+
+        <div id="error" class="error-screen" style="display: none;">
+            <h2 id="error-title">Доступ закрыт</h2>
+            <p id="error-desc">Вы не являетесь владельцем ресторана или открыли ссылку вне Telegram.</p>
+        </div>
+
+        <div id="panel" style="display: none;">
+            <div class="header">
+                <h1 id="rest-name">Меню ресторана</h1>
+                <p>Управление стоп-листом (наличием блюд)</p>
+            </div>
+            <div class="menu-list" id="menu-container">
+                </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. ИНИЦИАЛИЗАЦИЯ И НАСТРОЙКИ
+        // ==========================================
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        // ⚠️ ВСТАВЬ СВОИ КЛЮЧИ SUPABASE СЮДА! ⚠️
+        const SUPABASE_URL = 'https://dtxybpdjbdmqrvsdwvvk.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHlicGRqYmRtcXJ2c2R3dnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwODI5OTYsImV4cCI6MjA5MTY1ODk5Nn0.WFWBrwvxqEgfR9tzusvFcvfPN_mS4SmwvsWlyH13LEs';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // Таблицы (поменяй, если у тебя они называются иначе)
+        const TABLE_RESTAURANTS = 'restaurants'; 
+        const TABLE_MENU = 'menu'; // или 'products'
+
+        let currentRestaurant = null;
+
+        // ==========================================
+        // 2. АВТОРИЗАЦИЯ И ЗАГРУЗКА
+        // ==========================================
+        async function initPanel() {
+            try {
+                // Получаем ID пользователя из телеграма
+                const ownerId = tg.initDataUnsafe?.user?.id;
+                
+                if (!ownerId) {
+                    showError("Ошибка Telegram", "Пожалуйста, откройте эту панель через бота TamakKG.");
+                    return;
+                }
+
+                // Ищем ресторан, который принадлежит этому юзеру (owner_telegram_id)
+                // Так как ID в базе может быть строкой, приводим ownerId к строке
+                const { data: restaurant, error } = await supabase
+                    .from(TABLE_RESTAURANTS)
+                    .select('*')
+                    .eq('owner_telegram_id', String(ownerId))
+                    .maybeSingle();
+
+                if (error || !restaurant) {
+                    showError("Доступ запрещен", "К вашему Telegram аккаунту не привязан ни один ресторан.");
+                    return;
+                }
+
+                currentRestaurant = restaurant;
+                document.getElementById('rest-name').innerText = restaurant.name || "Ваше меню";
+                
+                await loadMenuItems(restaurant.id);
+
+            } catch (err) {
+                showError("Системная ошибка", err.message);
+            }
+        }
+
+        // ==========================================
+        // 3. ЗАГРУЗКА И ОТРИСОВКА БЛЮД
+        // ==========================================
+        async function loadMenuItems(restId) {
+            const { data: menuItems, error } = await supabase
+                .from(TABLE_MENU)
+                .select('*')
+                .eq('restaurant_id', restId)
+                .order('id', { ascending: true }); // сортировка
+
+            if (error) {
+                showError("Ошибка загрузки", "Не удалось загрузить меню.");
+                return;
+            }
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('panel').style.display = 'block';
+
+            renderMenu(menuItems);
+        }
+
+        function renderMenu(items) {
+            const container = document.getElementById('menu-container');
+            container.innerHTML = ''; // Очищаем
+
+            if (!items || items.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:gray;">В меню пока нет блюд.</p>';
+                return;
+            }
+
+            items.forEach(item => {
+                const isAvail = item.is_available;
+                const card = document.createElement('div');
+                card.className = `menu-item ${!isAvail ? 'item-disabled' : ''}`;
+                card.id = `item-card-${item.id}`;
+
+                card.innerHTML = `
+                    <div class="item-info">
+                        <div class="item-title">${item.name}</div>
+                        <div class="item-price">${item.price} сом</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-${item.id}" ${isAvail ? 'checked' : ''} onchange="toggleItemStatus('${item.id}', this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // ==========================================
+        // 4. ЛОГИКА СТОП-ЛИСТА (ОБНОВЛЕНИЕ В БД)
+        // ==========================================
+        async function toggleItemStatus(itemId, newStatus) {
+            tg.HapticFeedback.impactOccurred('light'); // Вибрация при клике
+            
+            const card = document.getElementById(`item-card-${itemId}`);
+            
+            // Визуально сразу меняем, чтобы юзер не ждал
+            if (newStatus) {
+                card.classList.remove('item-disabled');
+            } else {
+                card.classList.add('item-disabled');
+            }
+
+            // Отправляем запрос в базу
+            const { error } = await supabase
+                .from(TABLE_MENU)
+                .update({ is_available: newStatus })
+                .eq('id', itemId);
+
+            if (error) {
+                // Если база выдала ошибку, возвращаем ползунок назад
+                alert("Ошибка сохранения! Проверьте интернет.");
+                document.getElementById(`toggle-${itemId}`).checked = !newStatus;
+                if (!newStatus) card.classList.remove('item-disabled');
+                else card.classList.add('item-disabled');
+            }
+        }
+
+        // Вспомогательная функция показа ошибок
+        function showError(title, desc) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('panel').style.display = 'none';
+            const errScreen = document.getElementById('error');
+            errScreen.style.display = 'flex';
+            document.getElementById('error-title').innerText = title;
+            document.getElementById('error-desc').innerText = desc;
+        }
+
+        // Запуск
+        initPanel();
+    </script>
+</body>
+</html>
