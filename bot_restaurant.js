@@ -1,7 +1,22 @@
 const { Markup } = require('telegraf');
 
 module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, supabase, ADMIN_GROUP_ID) {
-    
+    // ==========================================
+    // ПАНЕЛЬ УПРАВЛЕНИЯ РЕСТОРАНОМ
+    // ==========================================
+    restBot.command('panel', (ctx) => {
+    ctx.reply('🛠 Управление рестораном\nЗдесь вы можете менять стоп-лист и управлять меню:', {
+        reply_markup: {
+            inline_keyboard: [
+                [{
+                    text: "⚙️ Управление меню",
+                    // ⚠️ ЗАМЕНИ ССЫЛКУ НА СВОЙ РЕАЛЬНЫЙ ДОМЕН!
+                    web_app: { url: "https://superkgapp.vercel.app/" } 
+                }]
+            ]
+        }
+    });
+    });
     // ==========================================
     // 1. СТАРТ И РЕГИСТРАЦИЯ
     // ==========================================
