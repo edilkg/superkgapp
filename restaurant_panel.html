@@ -27,9 +27,6 @@
 
         .loading-screen, .error-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; text-align: center; padding: 20px; }
         .error-screen h2 { margin-bottom: 10px; color: var(--danger); }
-        
-        /* Стили для логов */
-        #log-container { background: #111; color: #0f0; font-family: monospace; font-size: 12px; padding: 10px; border-radius: 8px; margin-top: 20px; width: 100%; text-align: left; max-height: 150px; overflow-y: auto; }
 
         .menu-list { padding: 16px; display: flex; flex-direction: column; gap: 12px; padding-bottom: 40px; }
         
@@ -52,7 +49,6 @@
     <div id="app">
         <div id="loading" class="loading-screen">
             <h2>⏳ Загрузка...</h2>
-            <div id="log-container"></div>
         </div>
 
         <div id="error" class="error-screen" style="display: none;">
@@ -70,23 +66,16 @@
     </div>
 
     <script>
-        // Функция для вывода логов прямо на экран телефона
-        function addLog(text) {
-            console.log(text);
-            var logDiv = document.getElementById('log-container');
-            if (logDiv) {
-                logDiv.innerHTML += "<div>> " + text + "</div>";
-                logDiv.scrollTop = logDiv.scrollHeight; // Автоскролл
-            }
-        }
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
 
-        // Перехват фатальных ошибок
-        window.onerror = function(msg, url, lineNo, columnNo, error) {
-            addLog("КРИТ: " + msg + " (стр: " + lineNo + ")");
-            return false;
-        };
+        const SUPABASE_URL = 'https://dtxybpdjbdmqrvsdwvvk.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHlicGRqYmRtcXJ2c2R3dnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwODI5OTYsImV4cCI6MjA5MTY1ODk5Nn0.WFWBrwvxqEgfR9tzusvFcvfPN_mS4SmwvsWlyH13LEs';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        addLog("Скрипт стартовал");
+        // ДЕЛАЕМ ID ВЛАДЕЛЬЦА ГЛОБАЛЬНЫМ ДЛЯ ПРОВЕРКИ БЕЗОПАСНОСТИ
+        let currentOwnerId = null;
 
         function showError(title, desc) {
             document.getElementById('loading').style.display = 'none';
@@ -98,82 +87,42 @@
 
         async function initPanel() {
             try {
-                addLog("Инициализация Telegram...");
-                const tg = window.Telegram.WebApp;
-                tg.expand();
-                tg.ready();
-                addLog("Telegram готов");
-
-                addLog("Проверка объекта Supabase...");
-                if (!window.supabase) {
-                    throw new Error("window.supabase не существует! CDN заблокирован?");
-                }
-
-                const SUPABASE_URL = 'https://dtxybpdjbdmqrvsdwvvk.supabase.co';
-                const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHlicGRqYmRtcXJ2c2R3dnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwODI5OTYsImV4cCI6MjA5MTY1ODk5Nn0.WFWBrwvxqEgfR9tzusvFcvfPN_mS4SmwvsWlyH13LEs';
-                
-                addLog("Создание клиента Supabase...");
-                const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                addLog("Клиент создан");
-
-                let ownerId = 5521273499; // Значение по умолчанию
-                addLog("Определение пользователя...");
+                currentOwnerId = 5521273499; 
                 if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
-                    ownerId = tg.initDataUnsafe.user.id;
-                    addLog("Пользователь из ТГ: " + ownerId);
-                } else {
-                    addLog("Пользователь не из ТГ, используем тестовый: " + ownerId);
+                    currentOwnerId = tg.initDataUnsafe.user.id;
                 }
 
-                addLog("Запрос в таблицу restaurants...");
                 const { data: restaurant, error: restErr } = await supabaseClient
                     .from('restaurants')
                     .select('*')
-                    .eq('owner_telegram_id', Number(ownerId))
+                    .eq('owner_telegram_id', Number(currentOwnerId))
                     .maybeSingle();
 
-                if (restErr) {
-                    addLog("Ошибка БД (рестораны): " + JSON.stringify(restErr));
-                    throw restErr;
-                }
+                if (restErr) throw restErr;
 
                 if (!restaurant) {
-                    addLog("Ресторан не найден");
-                    showError("Доступ закрыт", "Ваш Telegram ID (" + ownerId + ") не привязан к ресторану.");
+                    showError("Доступ закрыт", "Ваш Telegram ID (" + currentOwnerId + ") не привязан к ресторану.");
                     return;
                 }
-                
-                addLog("Ресторан найден: " + restaurant.name);
+
                 document.getElementById('rest-name').innerText = restaurant.name;
 
-                addLog("Запрос в таблицу menu...");
                 const { data: menuItems, error: menuErr } = await supabaseClient
                     .from('menu')
                     .select('*')
                     .eq('restaurant_id', Number(restaurant.id))
                     .order('id', { ascending: true });
 
-                if (menuErr) {
-                    addLog("Ошибка БД (меню): " + JSON.stringify(menuErr));
-                    throw menuErr;
-                }
-
-                addLog("Найдено блюд: " + (menuItems ? menuItems.length : 0));
-                
-                // Делаем клиент глобальным для функции toggleItemStatus
-                window.supabaseInstance = supabaseClient;
-                window.tgInstance = tg;
+                if (menuErr) throw menuErr;
 
                 renderMenu(menuItems);
 
             } catch (err) {
-                addLog("CATCH ОШИБКА: " + err.message);
                 showError("Системная ошибка", err.message);
             }
         }
 
         function renderMenu(items) {
-            addLog("Начало рендера меню...");
             const container = document.getElementById('menu-container');
             
             if (!items || items.length === 0) {
@@ -208,9 +157,7 @@
         window.toggleItemStatus = async function(itemId, checkboxElement) {
             const newStatus = checkboxElement.checked;
             
-            if (window.tgInstance && window.tgInstance.HapticFeedback) {
-                window.tgInstance.HapticFeedback.impactOccurred('light');
-            }
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
             const card = document.getElementById("item-card-" + itemId);
             if (newStatus) {
@@ -219,10 +166,12 @@
                 card.classList.add('item-disabled');
             }
 
-            const { error } = await window.supabaseInstance
-                .from('menu')
-                .update({ is_available: newStatus })
-                .eq('id', Number(itemId));
+            // МАГИЯ БЕЗОПАСНОСТИ: Вызываем защищенную SQL функцию (RPC)
+            const { data, error } = await supabaseClient.rpc('toggle_menu_item', {
+                p_item_id: Number(itemId),
+                p_is_available: newStatus,
+                p_owner_id: Number(currentOwnerId) // Отправляем наш ID для проверки
+            });
 
             if (error) {
                 alert("Ошибка сохранения: " + error.message);
@@ -232,7 +181,6 @@
             }
         };
 
-        // Запуск
         initPanel();
     </script>
 </body>
