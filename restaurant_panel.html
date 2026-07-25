@@ -5,7 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Панель Ресторана | TamakKG</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        if (!window.supabase) {
+            document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\\/script>');
+        }
+    </script>
+
     <style>
         :root {
             --bg-color: #f4f5f7;
@@ -48,27 +55,27 @@
     <div id="app">
         <div id="loading" class="loading-screen">
             <h2>⏳ Загрузка...</h2>
-            <p id="loading-text" style="color: var(--accent); font-weight: bold; margin-top: 10px;">Запуск приложения...</p>
+            <p id="loading-text" style="color: var(--accent); font-weight: bold; margin-top: 10px;">Подготовка среды...</p>
         </div>
 
         <div id="error" class="error-screen" style="display: none;">
             <h2 id="error-title">Доступ закрыт</h2>
             <p id="error-desc">Вы не являетесь владельцем ресторана.</p>
+            <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Попробовать снова</button>
         </div>
 
         <div id="panel" style="display: none;">
             <div class="header">
                 <h1 id="rest-name">Меню ресторана</h1>
-                <p>Управление стоп-листом (наличием блюд)</p>
+                <p>Управление стоп-листом</p>
             </div>
             <div class="menu-list" id="menu-container"></div>
         </div>
     </div>
 
     <script>
-        // Перехватчик любых ошибок в коде
         window.onerror = function(msg, url, line) {
-            showError("Ошибка JS", msg + " (строка " + line + ")");
+            showError("Сбой скрипта", msg + " (стр: " + line + ")");
         };
 
         function setStatus(text) {
@@ -91,7 +98,19 @@
         var supabase = null;
         var tg = null;
 
-        async function initPanel() {
+        // УМНОЕ ОЖИДАНИЕ БИБЛИОТЕКИ SUPABASE
+        function waitForSupabase(callback, retries = 10) {
+            if (window.supabase) {
+                callback();
+            } else if (retries > 0) {
+                setStatus("Ожидание сети... (" + retries + " попыток)");
+                setTimeout(function() { waitForSupabase(callback, retries - 1); }, 500);
+            } else {
+                showError("Ошибка сети", "Не удалось загрузить базу данных. Возможно, ваш браузер или провайдер блокирует подключение.");
+            }
+        }
+
+        async function startApp() {
             try {
                 setStatus("Инициализация Telegram...");
                 if (window.Telegram && window.Telegram.WebApp) {
@@ -100,20 +119,15 @@
                     tg.ready();
                 }
 
-                setStatus("Подключение к базе Supabase...");
-                if (!window.supabase) {
-                    showError("Ошибка сети", "Библиотека Supabase не загрузилась. Проверьте интернет-соединение.");
-                    return;
-                }
+                setStatus("Подключение к базе...");
                 supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-                setStatus("Проверка владельца заведения...");
-                let ownerId = 5521273499; // Тестовый ID для проверки на ПК
+                setStatus("Проверка владельца...");
+                let ownerId = 5521273499; 
                 if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
                     ownerId = tg.initDataUnsafe.user.id;
                 }
 
-                // Запрос в БД ресторанов (owner_telegram_id как число int8)
                 const { data: restaurant, error: restErr } = await supabase
                     .from('restaurants')
                     .select('*')
@@ -121,18 +135,18 @@
                     .maybeSingle();
 
                 if (restErr) {
-                    showError("Ошибка базы (ресторан)", restErr.message);
+                    showError("Сбой базы", restErr.message);
                     return;
                 }
 
                 if (!restaurant) {
-                    showError("Доступ запрещен", "К вашему Telegram (ID: " + ownerId + ") не привязан ресторан в базе.");
+                    showError("Доступ запрещен", "Вы (ID: " + ownerId + ") не числитесь владельцем ресторана в системе.");
                     return;
                 }
 
                 document.getElementById('rest-name').innerText = restaurant.name || "Ваше меню";
 
-                setStatus("Скачивание блюд из базы...");
+                setStatus("Загрузка блюд...");
                 const { data: menuItems, error: menuErr } = await supabase
                     .from('menu')
                     .select('*')
@@ -140,7 +154,7 @@
                     .order('id', { ascending: true });
 
                 if (menuErr) {
-                    showError("Ошибка базы (меню)", menuErr.message);
+                    showError("Ошибка меню", menuErr.message);
                     return;
                 }
 
@@ -150,7 +164,7 @@
                 renderMenu(menuItems);
 
             } catch (err) {
-                showError("Системная ошибка", err.message || err);
+                showError("Критическая ошибка", err.message || err);
             }
         }
 
@@ -208,12 +222,10 @@
             }
         }
 
-        // Запуск скрипта только после полной готовности HTML-разметки
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initPanel);
-        } else {
-            initPanel();
-        }
+        // Запуск с ожиданием
+        window.onload = function() {
+            waitForSupabase(startApp);
+        };
     </script>
 </body>
 </html>
