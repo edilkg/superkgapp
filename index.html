@@ -1301,6 +1301,18 @@ if (tg.disableVerticalSwipes) {
                 items: [],
                 categories_order: ['Шаурма', 'Бургеры','Курочка', 'Пицца', 'Сеты', 'Напитки', 'Суши']
             },
+            '5521273499': { 
+                lat: 42.650075, lon: 77.086667, city: 'Чолпон-Ата',
+                title: 'ТЕСТ ЗАКАЗ', 
+                phone: '+996505696970',
+                logo: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/KUNJUT%20MINI%20LOG.png', 
+                address: 'ул. Советская, 67в', 
+                hours: '09:00 - 22:00', 
+                img: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/KUNJUT%20BIGLOGO.jpg', 
+                tags: ['burgers', 'sushi', 'shawarma', 'pizza'],
+                items: [],
+                categories_order: []
+            },
             '843389293': { 
                 lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', 
                 title: 'Бай манты', 
@@ -1450,7 +1462,7 @@ function renderRestaurants(searchQuery = '') {
     // ВАЖНО: Задаем порядок ресторанов по ID! Тот ID, который стоит первым, появится на сайте первым.
     // Если добавишь новый ресторан, не забудь дописать его ID сюда.
     // ---------------------------------------------------------
-    const resOrder = ['8958317669', '8905203649', '8709006886', '843389293','1532754022'];
+    const resOrder = ['8958317669', '8905203649', '8709006886', '5521273499','1532754022' ,'1532754022'];
 
     // Перебираем рестораны строго по нашему заданному массиву
     for (let id of resOrder) {
