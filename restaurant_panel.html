@@ -26,6 +26,19 @@
         .header { padding: 16px 16px 10px 16px; }
         .header h1 { font-size: 20px; font-weight: 800; }
         .header p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+        .header-top { display: flex; justify-content: space-between; align-items: center; }
+        .stop-filter-btn { background: #ffe5e5; color: var(--danger); border: none; padding: 8px 12px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 6px; }
+        .stop-filter-btn:active { transform: scale(0.95); }
+        .stop-filter-btn.active { background: var(--danger); color: #fff; }
+        /* --- Стили для поиска --- */
+        .search-icon-btn { flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; border: none; background: #f0f0f0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; transition: 0.2s; }
+        .search-icon-btn:active { transform: scale(0.90); }
+        .search-icon-btn.active { background: var(--accent); color: #fff; box-shadow: 0 4px 10px rgba(255, 140, 0, 0.3); }
+        
+        .search-container { display: none; padding: 0 16px 12px 16px; position: relative; animation: slideDown 0.2s ease-out; }
+        .search-container.active { display: block; }
+        .clear-search { position: absolute; right: 28px; top: 14px; color: #999; cursor: pointer; display: none; padding: 4px; font-size: 14px; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Горизонтальное меню категорий */
         #category-bar { display: flex; overflow-x: auto; white-space: nowrap; padding: 10px 16px; gap: 10px; scrollbar-width: none; }
@@ -95,11 +108,25 @@
         <div id="panel" style="display: none;">
             <div class="sticky-top">
                 <div class="header">
-                    <h1 id="rest-name">Меню ресторана</h1>
-                    <p>Управление стоп-листом и ценами</p>
+                    <div class="header-top">
+                        <div>
+                            <h1 id="rest-name">Меню ресторана</h1>
+                            <p>Управление стоп-листом и ценами</p>
+                        </div>
+                        <button id="stop-filter-btn" class="stop-filter-btn" onclick="toggleStopList()">
+                            🛑 На стопе
+                        </button>
+                    </div>
                 </div>
-                <div id="category-bar">
-                    <!-- Кнопки категорий будут здесь -->
+                <div style="display: flex; align-items: center; padding-left: 16px;">
+                    <button id="search-btn" class="search-icon-btn" onclick="toggleSearch()">🔍</button>
+                    <div id="category-bar" style="padding-left: 8px; flex-grow: 1;">
+                        </div>
+                </div>
+                
+                <div id="search-container" class="search-container">
+                    <input type="text" id="search-input" class="input-field" placeholder="Введите название блюда..." oninput="handleSearch()">
+                    <div id="clear-search-btn" class="clear-search" onclick="clearSearch()">✖</div>
                 </div>
             </div>
             
@@ -160,6 +187,8 @@
 
         let currentOwnerId = null;
         let globalMenuItems = []; 
+        let showOnlyStopped = false; // Флаг для режима "На стопе"
+        let currentSearchText = '';
 
         function showError(title, desc) {
             document.getElementById('loading').style.display = 'none';
@@ -200,14 +229,85 @@
                 if (menuErr) throw menuErr;
 
                 globalMenuItems = menuItems || [];
-                renderMenu(globalMenuItems);
+                applyFilters();
 
             } catch (err) {
                 showError("Системная ошибка", err.message);
             }
         }
 
-        // --- НОВАЯ УМНАЯ ОТРИСОВКА С КАТЕГОРИЯМИ И КАРТИНКАМИ ---
+        // --- УМНЫЙ ФИЛЬТР (ПОИСК + СТОП-ЛИСТ) ---
+        function applyFilters() {
+            let filtered = globalMenuItems;
+
+            // 1. Отсеиваем по стоп-листу (если включено)
+            if (showOnlyStopped) {
+                filtered = filtered.filter(i => i.is_available === false);
+            }
+
+            // 2. Отсеиваем по тексту поиска (если что-то введено)
+            if (currentSearchText !== '') {
+                filtered = filtered.filter(i => 
+                    (i.name && i.name.toLowerCase().includes(currentSearchText)) || 
+                    (i.description && i.description.toLowerCase().includes(currentSearchText))
+                );
+            }
+
+            renderMenu(filtered);
+        }
+
+        // --- ЛОГИКА СТРОКИ ПОИСКА ---
+        window.toggleSearch = function() {
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            const container = document.getElementById('search-container');
+            const btn = document.getElementById('search-btn');
+            
+            if (container.classList.contains('active')) {
+                container.classList.remove('active');
+                btn.classList.remove('active');
+                clearSearch(); // Сбрасываем поиск при закрытии
+            } else {
+                container.classList.add('active');
+                btn.classList.add('active');
+                document.getElementById('search-input').focus();
+            }
+        };
+
+        window.handleSearch = function() {
+            const val = document.getElementById('search-input').value.toLowerCase().trim();
+            currentSearchText = val;
+            
+            // Показываем крестик, если текст есть
+            document.getElementById('clear-search-btn').style.display = val.length > 0 ? 'block' : 'none';
+            
+            applyFilters();
+        };
+
+        window.clearSearch = function() {
+            if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+            document.getElementById('search-input').value = '';
+            currentSearchText = '';
+            document.getElementById('clear-search-btn').style.display = 'none';
+            applyFilters();
+        };
+
+        // --- ФИЛЬТР БЛЮД НА СТОПЕ ---
+        window.toggleStopList = function() {
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            
+            showOnlyStopped = !showOnlyStopped;
+            const btn = document.getElementById('stop-filter-btn');
+
+            if (showOnlyStopped) {
+                btn.classList.add('active');
+                btn.innerHTML = "❌ Показать всё";
+            } else {
+                btn.classList.remove('active');
+                btn.innerHTML = "🛑 На стопе";
+            }
+            
+            applyFilters(); // Вызываем умный фильтр!
+        };
         function renderMenu(items) {
             const container = document.getElementById('menu-container');
             const catBar = document.getElementById('category-bar');
@@ -360,7 +460,7 @@
                 }
                 
                 closeEditModal();
-                renderMenu(globalMenuItems); 
+                applyFilters(); 
             }
         }
 
