@@ -21,27 +21,63 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
         body { background-color: var(--bg-color); color: var(--text-main); -webkit-font-smoothing: antialiased; }
         
-        .header { padding: 20px 16px; background: var(--card-bg); border-bottom: 1px solid #eaeaea; position: sticky; top: 0; z-index: 10; }
-        .header h1 { font-size: 20px; font-weight: 700; }
+        /* Липкая верхняя часть (Шапка + Категории) */
+        .sticky-top { position: sticky; top: 0; z-index: 10; background: var(--card-bg); border-bottom: 1px solid #eaeaea; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+        .header { padding: 16px 16px 10px 16px; }
+        .header h1 { font-size: 20px; font-weight: 800; }
         .header p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+        /* Горизонтальное меню категорий */
+        #category-bar { display: flex; overflow-x: auto; white-space: nowrap; padding: 10px 16px; gap: 10px; scrollbar-width: none; }
+        #category-bar::-webkit-scrollbar { display: none; }
+        .cat-btn { padding: 8px 16px; border-radius: 20px; border: none; background: #f0f0f0; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--text-main); transition: 0.2s; }
+        .cat-btn.active { background: var(--accent); color: #fff; }
 
         .loading-screen, .error-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; text-align: center; padding: 20px; }
         .error-screen h2 { margin-bottom: 10px; color: var(--danger); }
 
         .menu-list { padding: 16px; display: flex; flex-direction: column; gap: 12px; padding-bottom: 40px; }
+        .cat-header { font-size: 18px; font-weight: 800; padding: 16px 0 4px 0; margin: 0; scroll-margin-top: 130px; }
         
+        /* Карточка блюда */
         .menu-item { background: var(--card-bg); border-radius: 16px; padding: 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-        .item-info { flex-grow: 1; padding-right: 12px; }
-        .item-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
-        .item-price { font-size: 14px; color: var(--accent); font-weight: 600; }
+        .item-info-wrap { display: flex; flex-grow: 1; align-items: center; cursor: pointer; padding-right: 12px; }
+        .item-thumb { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; margin-right: 12px; background: #eee; flex-shrink: 0; }
+        .item-info { flex-grow: 1; }
+        .item-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; line-height: 1.2; }
+        .item-price { font-size: 14px; color: var(--accent); font-weight: 800; margin-bottom: 4px; }
+        .item-desc { font-size: 12px; color: var(--text-muted); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         
+        /* Тумблер */
         .switch { position: relative; display: inline-block; width: 50px; height: 30px; flex-shrink: 0; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e5e5ea; transition: .3s; border-radius: 30px; }
         .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         input:checked + .slider { background-color: var(--success); }
         input:checked + .slider:before { transform: translateX(20px); }
-        .item-disabled .item-title, .item-disabled .item-price { color: var(--text-muted); text-decoration: line-through; }
+        .item-disabled .item-title, .item-disabled .item-price, .item-disabled .item-desc { color: var(--text-muted); text-decoration: line-through; }
+        .item-disabled .item-thumb { filter: grayscale(100%) opacity(0.5); }
+
+        /* --- СТИЛИ ДЛЯ МОДАЛЬНОГО ОКНА --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; flex-direction: column; justify-content: flex-end; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-content { background: #fff; border-radius: 24px 24px 0 0; padding: 20px; transform: translateY(100%); transition: transform 0.3s ease-out; display: flex; flex-direction: column; max-height: 90vh; overflow-y: auto; }
+        .modal-overlay.active .modal-content { transform: translateY(0); }
+        
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #eee; padding-bottom: 12px; position: sticky; top: 0; background: #fff; z-index: 2; }
+        .modal-title { font-size: 18px; font-weight: 800; }
+        .close-btn { width: 32px; height: 32px; background: #eee; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; }
+        
+        .modal-img-wrap { width: 100%; height: 200px; border-radius: 16px; overflow: hidden; margin-bottom: 16px; background: #f0f0f0; display: none; }
+        .modal-img { width: 100%; height: 100%; object-fit: cover; }
+
+        .input-group { margin-bottom: 12px; }
+        .input-label { font-size: 12px; color: var(--text-muted); font-weight: 600; margin-bottom: 4px; display: block; }
+        .input-field { width: 100%; background: #f9f9f9; border: 1px solid #ddd; padding: 14px; border-radius: 12px; font-size: 15px; outline: none; font-weight: 500; }
+        .input-field:focus { border-color: var(--accent); background: #fff; }
+        
+        .save-btn { width: 100%; background: var(--accent); color: #fff; border: none; padding: 16px; border-radius: 14px; font-size: 16px; font-weight: 800; margin-top: 12px; margin-bottom: 20px; cursor: pointer; }
+        .save-btn:active { transform: scale(0.98); }
     </style>
 </head>
 <body>
@@ -57,11 +93,59 @@
         </div>
 
         <div id="panel" style="display: none;">
-            <div class="header">
-                <h1 id="rest-name">Меню ресторана</h1>
-                <p>Управление стоп-листом</p>
+            <div class="sticky-top">
+                <div class="header">
+                    <h1 id="rest-name">Меню ресторана</h1>
+                    <p>Управление стоп-листом и ценами</p>
+                </div>
+                <div id="category-bar">
+                    <!-- Кнопки категорий будут здесь -->
+                </div>
             </div>
-            <div class="menu-list" id="menu-container"></div>
+            
+            <div class="menu-list" id="menu-container">
+                <!-- Списки блюд по категориям -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования -->
+    <div id="edit-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Редактировать блюдо</div>
+                <div class="close-btn" onclick="closeEditModal()">✕</div>
+            </div>
+            
+            <input type="hidden" id="edit-id">
+            
+            <!-- БОЛЬШОЕ ФОТО БЛЮДА -->
+            <div id="edit-img-wrap" class="modal-img-wrap">
+                <img id="edit-img" class="modal-img" src="" alt="Фото блюда">
+            </div>
+            
+            <div class="input-group">
+                <span class="input-label">Название</span>
+                <input type="text" id="edit-name" class="input-field" placeholder="Например: Бургер Классика">
+            </div>
+            
+            <div style="display: flex; gap: 12px;">
+                <div class="input-group" style="flex: 1;">
+                    <span class="input-label">Цена (сом)</span>
+                    <input type="number" id="edit-price" class="input-field" placeholder="250">
+                </div>
+                <div class="input-group" style="flex: 1;">
+                    <span class="input-label">Вес/Объем</span>
+                    <input type="text" id="edit-weight" class="input-field" placeholder="300 гр">
+                </div>
+            </div>
+            
+            <div class="input-group">
+                <span class="input-label">Состав / Описание</span>
+                <textarea id="edit-desc" class="input-field" rows="3" placeholder="Котлета, сыр, соус..."></textarea>
+            </div>
+            
+            <button class="save-btn" id="btn-save-edit" onclick="saveItemDetails()">💾 Сохранить изменения</button>
         </div>
     </div>
 
@@ -74,8 +158,8 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHlicGRqYmRtcXJ2c2R3dnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwODI5OTYsImV4cCI6MjA5MTY1ODk5Nn0.WFWBrwvxqEgfR9tzusvFcvfPN_mS4SmwvsWlyH13LEs';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // ДЕЛАЕМ ID ВЛАДЕЛЬЦА ГЛОБАЛЬНЫМ ДЛЯ ПРОВЕРКИ БЕЗОПАСНОСТИ
         let currentOwnerId = null;
+        let globalMenuItems = []; 
 
         function showError(title, desc) {
             document.getElementById('loading').style.display = 'none';
@@ -115,37 +199,71 @@
 
                 if (menuErr) throw menuErr;
 
-                renderMenu(menuItems);
+                globalMenuItems = menuItems || [];
+                renderMenu(globalMenuItems);
 
             } catch (err) {
                 showError("Системная ошибка", err.message);
             }
         }
 
+        // --- НОВАЯ УМНАЯ ОТРИСОВКА С КАТЕГОРИЯМИ И КАРТИНКАМИ ---
         function renderMenu(items) {
             const container = document.getElementById('menu-container');
+            const catBar = document.getElementById('category-bar');
             
             if (!items || items.length === 0) {
+                catBar.innerHTML = '';
                 container.innerHTML = '<p style="text-align:center; color:gray; padding:20px;">Меню пустое.</p>';
             } else {
+                // Извлекаем уникальные категории
+                const categories = [...new Set(items.map(i => i.category ? i.category.trim() : 'Другое'))];
+
+                // Отрисовываем горизонтальное меню категорий
+                catBar.innerHTML = categories.map((cat, i) => 
+                    `<button class="cat-btn ${i === 0 ? 'active' : ''}" onclick="scrollToCategory('${cat}', this)">${cat}</button>`
+                ).join('');
+
                 let html = '';
-                items.forEach(item => {
-                    const isAvail = item.is_available !== false; 
-                    const disabledClass = !isAvail ? " item-disabled" : "";
-                    const checkedAttr = isAvail ? "checked" : "";
+                // Группируем блюда по категориям
+                categories.forEach(cat => {
+                    html += `<h3 id="cat-${cat}" class="cat-header">${cat}</h3>`;
                     
-                    html += `
-                        <div class="menu-item${disabledClass}" id="item-card-${item.id}">
-                            <div class="item-info">
-                                <div class="item-title">${item.name}</div>
-                                <div class="item-price">${item.price} сом</div>
+                    const catItems = items.filter(i => (i.category ? i.category.trim() : 'Другое') === cat);
+                    
+                    catItems.forEach(item => {
+                        const isAvail = item.is_available !== false; 
+                        const disabledClass = !isAvail ? " item-disabled" : "";
+                        const checkedAttr = isAvail ? "checked" : "";
+                        
+                        const weightHtml = item.weight ? `<span style="color:#888; font-weight:normal;">• ${item.weight}</span>` : '';
+                        const descHtml = item.description ? `<div class="item-desc">${item.description}</div>` : '';
+                        
+                        // Если есть фото - выводим, иначе ставим заглушку-эмодзи
+                        const imgHtml = item.img_url 
+                            ? `<img src="${item.img_url}" class="item-thumb" alt="">` 
+                            : `<div class="item-thumb" style="display:flex; align-items:center; justify-content:center; font-size:24px;">🍲</div>`;
+
+                        html += `
+                            <div class="menu-item${disabledClass}" id="item-card-${item.id}">
+                                <div class="item-info-wrap" onclick="openEditModal(${item.id})">
+                                    ${imgHtml}
+                                    <div class="item-info">
+                                        <div class="item-title">
+                                            ${item.name} 
+                                            <span style="font-size:12px; color:#1ea1f2; background:#eef7ff; padding:2px 6px; border-radius:6px; flex-shrink: 0;">✏️</span>
+                                        </div>
+                                        <div class="item-price">${item.price} сом ${weightHtml}</div>
+                                        ${descHtml}
+                                    </div>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="toggle-${item.id}" ${checkedAttr} onchange="toggleItemStatus('${item.id}', this)">
+                                    <span class="slider"></span>
+                                </label>
                             </div>
-                            <label class="switch">
-                                <input type="checkbox" id="toggle-${item.id}" ${checkedAttr} onchange="toggleItemStatus('${item.id}', this)">
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                    `;
+                        `;
+                    });
                 });
                 container.innerHTML = html;
             }
@@ -154,23 +272,112 @@
             document.getElementById('panel').style.display = 'block';
         }
 
+        // --- ПЛАВНЫЙ СКРОЛЛ КАТЕГОРИЙ ---
+        window.scrollToCategory = function(cat, btn) {
+            if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+            
+            // Подсвечиваем кнопку
+            document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+            if(btn) btn.classList.add('active');
+
+            // Плавно скроллим с учетом высоты липкой шапки (чтобы заголовок не уехал под нее)
+            const section = document.getElementById('cat-' + cat);
+            if (section) {
+                const yOffset = -120; 
+                const y = section.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                window.scrollTo({top: y, behavior: 'smooth'});
+            }
+        };
+
+        // --- ЛОГИКА МОДАЛЬНОГО ОКНА ---
+        function openEditModal(itemId) {
+            const item = globalMenuItems.find(i => i.id === itemId);
+            if (!item) return;
+
+            if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+
+            document.getElementById('edit-id').value = item.id;
+            document.getElementById('edit-name').value = item.name || '';
+            document.getElementById('edit-price').value = item.price || '';
+            document.getElementById('edit-weight').value = item.weight || '';
+            document.getElementById('edit-desc').value = item.description || '';
+
+            // Управление большим фото в модалке
+            const imgWrap = document.getElementById('edit-img-wrap');
+            const imgEl = document.getElementById('edit-img');
+            if (item.img_url) {
+                imgEl.src = item.img_url;
+                imgWrap.style.display = 'block';
+            } else {
+                imgEl.src = '';
+                imgWrap.style.display = 'none';
+            }
+
+            document.getElementById('edit-modal').classList.add('active');
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').classList.remove('active');
+        }
+
+        async function saveItemDetails() {
+            const btn = document.getElementById('btn-save-edit');
+            btn.innerText = "⏳ Сохранение...";
+            btn.style.opacity = "0.7";
+            btn.style.pointerEvents = "none";
+
+            const id = document.getElementById('edit-id').value;
+            const newName = document.getElementById('edit-name').value.trim();
+            const newPrice = parseInt(document.getElementById('edit-price').value) || 0;
+            const newWeight = document.getElementById('edit-weight').value.trim();
+            const newDesc = document.getElementById('edit-desc').value.trim();
+
+            const { data, error } = await supabaseClient.rpc('update_menu_item_details', {
+                p_item_id: Number(id),
+                p_name: newName,
+                p_price: newPrice,
+                p_weight: newWeight,
+                p_description: newDesc,
+                p_owner_id: Number(currentOwnerId)
+            });
+
+            btn.innerText = "💾 Сохранить изменения";
+            btn.style.opacity = "1";
+            btn.style.pointerEvents = "auto";
+
+            if (error) {
+                alert("Ошибка сохранения: " + error.message);
+            } else {
+                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                
+                // Обновляем локальные данные и перерисовываем
+                const index = globalMenuItems.findIndex(i => i.id == id);
+                if (index !== -1) {
+                    globalMenuItems[index].name = newName;
+                    globalMenuItems[index].price = newPrice;
+                    globalMenuItems[index].weight = newWeight;
+                    globalMenuItems[index].description = newDesc;
+                }
+                
+                closeEditModal();
+                renderMenu(globalMenuItems); 
+            }
+        }
+
+        // --- ЛОГИКА СТОП-ЛИСТА ---
         window.toggleItemStatus = async function(itemId, checkboxElement) {
             const newStatus = checkboxElement.checked;
             
             if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
             const card = document.getElementById("item-card-" + itemId);
-            if (newStatus) {
-                card.classList.remove('item-disabled');
-            } else {
-                card.classList.add('item-disabled');
-            }
+            if (newStatus) card.classList.remove('item-disabled');
+            else card.classList.add('item-disabled');
 
-            // МАГИЯ БЕЗОПАСНОСТИ: Вызываем защищенную SQL функцию (RPC)
             const { data, error } = await supabaseClient.rpc('toggle_menu_item', {
                 p_item_id: Number(itemId),
                 p_is_available: newStatus,
-                p_owner_id: Number(currentOwnerId) // Отправляем наш ID для проверки
+                p_owner_id: Number(currentOwnerId)
             });
 
             if (error) {
@@ -178,8 +385,16 @@
                 checkboxElement.checked = !newStatus;
                 if (newStatus) card.classList.add('item-disabled');
                 else card.classList.remove('item-disabled');
+            } else {
+                const index = globalMenuItems.findIndex(i => i.id == itemId);
+                if (index !== -1) globalMenuItems[index].is_available = newStatus;
             }
         };
+
+        // Закрытие модалки при клике на темный фон
+        document.getElementById('edit-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeEditModal();
+        });
 
         initPanel();
     </script>
