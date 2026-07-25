@@ -11,7 +11,7 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
                 [{
                     text: "⚙️ Управление меню",
                     // ⚠️ ЗАМЕНИ ССЫЛКУ НА СВОЙ РЕАЛЬНЫЙ ДОМЕН!
-                    web_app: { url: "https://superkgapp.vercel.app/" } 
+                    web_app: { url: "https://tamakkg.vercel.app/restaurant_panel.html" } 
                 }]
             ]
         }
