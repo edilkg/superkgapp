@@ -4,15 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Панель Ресторана | TamakKG</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-        if (!window.supabase) {
-            document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\\/script>');
-        }
-    </script>
-
+    
     <style>
         :root {
             --bg-color: #f4f5f7;
@@ -33,14 +28,13 @@
         .loading-screen, .error-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; text-align: center; padding: 20px; }
         .error-screen h2 { margin-bottom: 10px; color: var(--danger); }
 
-        .menu-list { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+        .menu-list { padding: 16px; display: flex; flex-direction: column; gap: 12px; padding-bottom: 40px; }
         
         .menu-item { background: var(--card-bg); border-radius: 16px; padding: 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
         .item-info { flex-grow: 1; padding-right: 12px; }
         .item-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
         .item-price { font-size: 14px; color: var(--accent); font-weight: 600; }
         
-        /* Стили для iOS-тумблера */
         .switch { position: relative; display: inline-block; width: 50px; height: 30px; flex-shrink: 0; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e5e5ea; transition: .3s; border-radius: 30px; }
@@ -55,13 +49,11 @@
     <div id="app">
         <div id="loading" class="loading-screen">
             <h2>⏳ Загрузка...</h2>
-            <p id="loading-text" style="color: var(--accent); font-weight: bold; margin-top: 10px;">Подготовка среды...</p>
         </div>
 
         <div id="error" class="error-screen" style="display: none;">
-            <h2 id="error-title">Доступ закрыт</h2>
-            <p id="error-desc">Вы не являетесь владельцем ресторана.</p>
-            <button onclick="location.reload()" style="margin-top: 20px; padding: 10px 20px; background: var(--accent); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Попробовать снова</button>
+            <h2 id="error-title">Ошибка</h2>
+            <p id="error-desc"></p>
         </div>
 
         <div id="panel" style="display: none;">
@@ -74,136 +66,109 @@
     </div>
 
     <script>
-        window.onerror = function(msg, url, line) {
-            showError("Сбой скрипта", msg + " (стр: " + line + ")");
-        };
+        // 2. НАСТРОЙКИ СЕТИ БЕЗ ЛИШНИХ ПРОВЕРОК
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
 
-        function setStatus(text) {
-            var el = document.getElementById('loading-text');
-            if (el) el.innerText = text;
-        }
+        const SUPABASE_URL = 'https://dtxybpdjbdmqrvsdwvvk.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHlicGRqYmRtcXJ2c2R3dnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwODI5OTYsImV4cCI6MjA5MTY1ODk5Nn0.WFWBrwvxqEgfR9tzusvFcvfPN_mS4SmwvsWlyH13LEs';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         function showError(title, desc) {
             document.getElementById('loading').style.display = 'none';
             document.getElementById('panel').style.display = 'none';
-            var errScreen = document.getElementById('error');
-            errScreen.style.display = 'flex';
+            document.getElementById('error').style.display = 'flex';
             document.getElementById('error-title').innerText = title;
             document.getElementById('error-desc').innerText = desc;
         }
 
-        const SUPABASE_URL = 'https://dtxybpdjbdmqrvsdwvvk.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHlicGRqYmRtcXJ2c2R3dnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwODI5OTYsImV4cCI6MjA5MTY1ODk5Nn0.WFWBrwvxqEgfR9tzusvFcvfPN_mS4SmwvsWlyH13LEs';
-
-        var supabase = null;
-        var tg = null;
-
-        // УМНОЕ ОЖИДАНИЕ БИБЛИОТЕКИ SUPABASE
-        function waitForSupabase(callback, retries = 10) {
-            if (window.supabase) {
-                callback();
-            } else if (retries > 0) {
-                setStatus("Ожидание сети... (" + retries + " попыток)");
-                setTimeout(function() { waitForSupabase(callback, retries - 1); }, 500);
-            } else {
-                showError("Ошибка сети", "Не удалось загрузить базу данных. Возможно, ваш браузер или провайдер блокирует подключение.");
-            }
-        }
-
-        async function startApp() {
+        // 3. ГЛАВНАЯ ФУНКЦИЯ
+        async function initPanel() {
             try {
-                setStatus("Инициализация Telegram...");
-                if (window.Telegram && window.Telegram.WebApp) {
-                    tg = window.Telegram.WebApp;
-                    tg.expand();
-                    tg.ready();
-                }
-
-                setStatus("Подключение к базе...");
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-                setStatus("Проверка владельца...");
+                // Берем ID. Если зашли не с телефона, подставляем тестовый для удобства разработки
                 let ownerId = 5521273499; 
-                if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+                if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
                     ownerId = tg.initDataUnsafe.user.id;
                 }
 
+                // Запрос к ресторанам (строго Number для int8)
                 const { data: restaurant, error: restErr } = await supabase
                     .from('restaurants')
                     .select('*')
                     .eq('owner_telegram_id', Number(ownerId))
                     .maybeSingle();
 
-                if (restErr) {
-                    showError("Сбой базы", restErr.message);
-                    return;
-                }
+                if (restErr) throw restErr;
 
                 if (!restaurant) {
-                    showError("Доступ запрещен", "Вы (ID: " + ownerId + ") не числитесь владельцем ресторана в системе.");
+                    showError("Доступ закрыт", "Ваш Telegram ID (" + ownerId + ") не привязан к ресторану.");
                     return;
                 }
 
-                document.getElementById('rest-name').innerText = restaurant.name || "Ваше меню";
+                document.getElementById('rest-name').innerText = restaurant.name;
 
-                setStatus("Загрузка блюд...");
+                // Запрос к меню (строго Number для int8)
                 const { data: menuItems, error: menuErr } = await supabase
                     .from('menu')
                     .select('*')
                     .eq('restaurant_id', Number(restaurant.id))
                     .order('id', { ascending: true });
 
-                if (menuErr) {
-                    showError("Ошибка меню", menuErr.message);
-                    return;
-                }
-
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('panel').style.display = 'block';
+                if (menuErr) throw menuErr;
 
                 renderMenu(menuItems);
 
             } catch (err) {
-                showError("Критическая ошибка", err.message || err);
+                showError("Системная ошибка", err.message);
             }
         }
 
+        // 4. ОТРИСОВКА (КАК В INDEX.HTML)
         function renderMenu(items) {
             const container = document.getElementById('menu-container');
-            container.innerHTML = ''; 
-
+            
             if (!items || items.length === 0) {
-                container.innerHTML = '<p style="text-align:center; color:gray; padding:20px;">В меню пока нет блюд.</p>';
-                return;
+                container.innerHTML = '<p style="text-align:center; color:gray; padding:20px;">Меню пустое.</p>';
+            } else {
+                let html = '';
+                items.forEach(item => {
+                    const isAvail = item.is_available !== false; 
+                    const disabledClass = !isAvail ? " item-disabled" : "";
+                    const checkedAttr = isAvail ? "checked" : "";
+                    
+                    html += `
+                        <div class="menu-item${disabledClass}" id="item-card-${item.id}">
+                            <div class="item-info">
+                                <div class="item-title">${item.name}</div>
+                                <div class="item-price">${item.price} сом</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-${item.id}" ${checkedAttr} onchange="toggleItemStatus('${item.id}', this)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
             }
-
-            items.forEach(item => {
-                const isAvail = item.is_available !== false; 
-                const card = document.createElement('div');
-                card.className = "menu-item" + (!isAvail ? " item-disabled" : "");
-                card.id = "item-card-" + item.id;
-
-                card.innerHTML = `
-                    <div class="item-info">
-                        <div class="item-title">${item.name}</div>
-                        <div class="item-price">${item.price} сом</div>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" id="toggle-${item.id}" ${isAvail ? 'checked' : ''} onchange="toggleItemStatus('${item.id}', this.checked)">
-                        <span class="slider"></span>
-                    </label>
-                `;
-                container.appendChild(card);
-            });
+            
+            // Переключаем экраны
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('panel').style.display = 'block';
         }
 
-        async function toggleItemStatus(itemId, newStatus) {
-            if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+        // 5. ИЗМЕНЕНИЕ СТАТУСА
+        window.toggleItemStatus = async function(itemId, checkboxElement) {
+            const newStatus = checkboxElement.checked;
+            
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
             const card = document.getElementById("item-card-" + itemId);
-            if (card) {
-                if (newStatus) card.classList.remove('item-disabled');
-                else card.classList.add('item-disabled');
+            if (newStatus) {
+                card.classList.remove('item-disabled');
+            } else {
+                card.classList.add('item-disabled');
             }
 
             const { error } = await supabase
@@ -213,19 +178,14 @@
 
             if (error) {
                 alert("Ошибка сохранения: " + error.message);
-                var chk = document.getElementById("toggle-" + itemId);
-                if (chk) chk.checked = !newStatus;
-                if (card) {
-                    if (!newStatus) card.classList.remove('item-disabled');
-                    else card.classList.add('item-disabled');
-                }
+                checkboxElement.checked = !newStatus;
+                if (newStatus) card.classList.add('item-disabled');
+                else card.classList.remove('item-disabled');
             }
-        }
-
-        // Запуск с ожиданием
-        window.onload = function() {
-            waitForSupabase(startApp);
         };
+
+        // ПРОСТО ЗАПУСКАЕМ СРАЗУ
+        initPanel();
     </script>
 </body>
 </html>
