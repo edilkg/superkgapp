@@ -27,6 +27,9 @@
 
         .loading-screen, .error-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; text-align: center; padding: 20px; }
         .error-screen h2 { margin-bottom: 10px; color: var(--danger); }
+        
+        /* Стили для логов */
+        #log-container { background: #111; color: #0f0; font-family: monospace; font-size: 12px; padding: 10px; border-radius: 8px; margin-top: 20px; width: 100%; text-align: left; max-height: 150px; overflow-y: auto; }
 
         .menu-list { padding: 16px; display: flex; flex-direction: column; gap: 12px; padding-bottom: 40px; }
         
@@ -49,6 +52,7 @@
     <div id="app">
         <div id="loading" class="loading-screen">
             <h2>⏳ Загрузка...</h2>
+            <div id="log-container"></div>
         </div>
 
         <div id="error" class="error-screen" style="display: none;">
@@ -66,14 +70,23 @@
     </div>
 
     <script>
-        // 2. НАСТРОЙКИ СЕТИ БЕЗ ЛИШНИХ ПРОВЕРОК
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.ready();
+        // Функция для вывода логов прямо на экран телефона
+        function addLog(text) {
+            console.log(text);
+            var logDiv = document.getElementById('log-container');
+            if (logDiv) {
+                logDiv.innerHTML += "<div>> " + text + "</div>";
+                logDiv.scrollTop = logDiv.scrollHeight; // Автоскролл
+            }
+        }
 
-        const SUPABASE_URL = 'https://dtxybpdjbdmqrvsdwvvk.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHlicGRqYmRtcXJ2c2R3dnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwODI5OTYsImV4cCI6MjA5MTY1ODk5Nn0.WFWBrwvxqEgfR9tzusvFcvfPN_mS4SmwvsWlyH13LEs';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // Перехват фатальных ошибок
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            addLog("КРИТ: " + msg + " (стр: " + lineNo + ")");
+            return false;
+        };
+
+        addLog("Скрипт стартовал");
 
         function showError(title, desc) {
             document.getElementById('loading').style.display = 'none';
@@ -83,49 +96,84 @@
             document.getElementById('error-desc').innerText = desc;
         }
 
-        // 3. ГЛАВНАЯ ФУНКЦИЯ
         async function initPanel() {
             try {
-                // Берем ID. Если зашли не с телефона, подставляем тестовый для удобства разработки
-                let ownerId = 5521273499; 
-                if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
-                    ownerId = tg.initDataUnsafe.user.id;
+                addLog("Инициализация Telegram...");
+                const tg = window.Telegram.WebApp;
+                tg.expand();
+                tg.ready();
+                addLog("Telegram готов");
+
+                addLog("Проверка объекта Supabase...");
+                if (!window.supabase) {
+                    throw new Error("window.supabase не существует! CDN заблокирован?");
                 }
 
-                // Запрос к ресторанам (строго Number для int8)
-                const { data: restaurant, error: restErr } = await supabase
+                const SUPABASE_URL = 'https://dtxybpdjbdmqrvsdwvvk.supabase.co';
+                const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHlicGRqYmRtcXJ2c2R3dnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwODI5OTYsImV4cCI6MjA5MTY1ODk5Nn0.WFWBrwvxqEgfR9tzusvFcvfPN_mS4SmwvsWlyH13LEs';
+                
+                addLog("Создание клиента Supabase...");
+                const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                addLog("Клиент создан");
+
+                let ownerId = 5521273499; // Значение по умолчанию
+                addLog("Определение пользователя...");
+                if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+                    ownerId = tg.initDataUnsafe.user.id;
+                    addLog("Пользователь из ТГ: " + ownerId);
+                } else {
+                    addLog("Пользователь не из ТГ, используем тестовый: " + ownerId);
+                }
+
+                addLog("Запрос в таблицу restaurants...");
+                const { data: restaurant, error: restErr } = await supabaseClient
                     .from('restaurants')
                     .select('*')
                     .eq('owner_telegram_id', Number(ownerId))
                     .maybeSingle();
 
-                if (restErr) throw restErr;
+                if (restErr) {
+                    addLog("Ошибка БД (рестораны): " + JSON.stringify(restErr));
+                    throw restErr;
+                }
 
                 if (!restaurant) {
+                    addLog("Ресторан не найден");
                     showError("Доступ закрыт", "Ваш Telegram ID (" + ownerId + ") не привязан к ресторану.");
                     return;
                 }
-
+                
+                addLog("Ресторан найден: " + restaurant.name);
                 document.getElementById('rest-name').innerText = restaurant.name;
 
-                // Запрос к меню (строго Number для int8)
-                const { data: menuItems, error: menuErr } = await supabase
+                addLog("Запрос в таблицу menu...");
+                const { data: menuItems, error: menuErr } = await supabaseClient
                     .from('menu')
                     .select('*')
                     .eq('restaurant_id', Number(restaurant.id))
                     .order('id', { ascending: true });
 
-                if (menuErr) throw menuErr;
+                if (menuErr) {
+                    addLog("Ошибка БД (меню): " + JSON.stringify(menuErr));
+                    throw menuErr;
+                }
+
+                addLog("Найдено блюд: " + (menuItems ? menuItems.length : 0));
+                
+                // Делаем клиент глобальным для функции toggleItemStatus
+                window.supabaseInstance = supabaseClient;
+                window.tgInstance = tg;
 
                 renderMenu(menuItems);
 
             } catch (err) {
+                addLog("CATCH ОШИБКА: " + err.message);
                 showError("Системная ошибка", err.message);
             }
         }
 
-        // 4. ОТРИСОВКА (КАК В INDEX.HTML)
         function renderMenu(items) {
+            addLog("Начало рендера меню...");
             const container = document.getElementById('menu-container');
             
             if (!items || items.length === 0) {
@@ -153,16 +201,16 @@
                 container.innerHTML = html;
             }
             
-            // Переключаем экраны
             document.getElementById('loading').style.display = 'none';
             document.getElementById('panel').style.display = 'block';
         }
 
-        // 5. ИЗМЕНЕНИЕ СТАТУСА
         window.toggleItemStatus = async function(itemId, checkboxElement) {
             const newStatus = checkboxElement.checked;
             
-            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+            if (window.tgInstance && window.tgInstance.HapticFeedback) {
+                window.tgInstance.HapticFeedback.impactOccurred('light');
+            }
             
             const card = document.getElementById("item-card-" + itemId);
             if (newStatus) {
@@ -171,7 +219,7 @@
                 card.classList.add('item-disabled');
             }
 
-            const { error } = await supabase
+            const { error } = await window.supabaseInstance
                 .from('menu')
                 .update({ is_available: newStatus })
                 .eq('id', Number(itemId));
@@ -184,7 +232,7 @@
             }
         };
 
-        // ПРОСТО ЗАПУСКАЕМ СРАЗУ
+        // Запуск
         initPanel();
     </script>
 </body>
