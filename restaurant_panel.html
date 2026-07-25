@@ -33,7 +33,7 @@
         .item-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
         .item-price { font-size: 14px; color: var(--accent); font-weight: 600; }
         
-        /* Стили для iOS-тумблера (Свитчера) */
+        /* Стили для iOS-тумблера */
         .switch { position: relative; display: inline-block; width: 50px; height: 30px; flex-shrink: 0; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #e5e5ea; transition: .3s; border-radius: 30px; }
@@ -48,96 +48,98 @@
     <div id="app">
         <div id="loading" class="loading-screen">
             <h2>⏳ Загрузка...</h2>
-            <p>Проверяем доступы ресторана</p>
+            <p id="loading-text" style="color: var(--accent); font-weight: bold;">Инициализация...</p>
         </div>
 
         <div id="error" class="error-screen" style="display: none;">
             <h2 id="error-title">Доступ закрыт</h2>
-            <p id="error-desc">Вы не являетесь владельцем ресторана или открыли ссылку вне Telegram.</p>
+            <p id="error-desc">Вы не являетесь владельцем ресторана.</p>
         </div>
 
         <div id="panel" style="display: none;">
             <div class="header">
                 <h1 id="rest-name">Меню ресторана</h1>
-                <p>Управление стоп-листом (наличием блюд)</p>
+                <p>Управление стоп-листом</p>
             </div>
-            <div class="menu-list" id="menu-container">
-                </div>
+            <div class="menu-list" id="menu-container"></div>
         </div>
     </div>
 
     <script>
-        // ==========================================
-        // 1. ИНИЦИАЛИЗАЦИЯ И НАСТРОЙКИ
-        // ==========================================
-        // 👉 Защита от ошибки на компе (вне Телеграма)
-        const tg = window.Telegram?.WebApp;
-        if (tg) {
+        // ГЛОБАЛЬНЫЙ ПЕРЕХВАТЧИК ОШИБОК (Покажет на экране, если что-то сломалось)
+        window.onerror = function(msg, url, line) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'flex';
+            document.getElementById('error-title').innerText = "Критическая ошибка JS";
+            document.getElementById('error-desc').innerText = msg + " (строка " + line + ")";
+        };
+
+        // 1. ИНИЦИАЛИЗАЦИЯ (Абсолютно безопасный метод для всех телефонов)
+        document.getElementById('loading-text').innerText = "Запуск Telegram...";
+        var tg = null;
+        if (window.Telegram && window.Telegram.WebApp) {
+            tg = window.Telegram.WebApp;
             tg.expand();
             tg.ready();
         }
 
+        document.getElementById('loading-text').innerText = "Подключение к базе...";
         const SUPABASE_URL = 'https://dtxybpdjbdmqrvsdwvvk.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHlicGRqYmRtcXJ2c2R3dnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwODI5OTYsImV4cCI6MjA5MTY1ODk5Nn0.WFWBrwvxqEgfR9tzusvFcvfPN_mS4SmwvsWlyH13LEs';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        const TABLE_RESTAURANTS = 'restaurants'; // Твоя таблица ресторанов
-        const TABLE_MENU = 'menu'; // Твоя таблица меню
+        const TABLE_RESTAURANTS = 'restaurants'; // Таблица ресторанов
+        const TABLE_MENU = 'menu'; // Таблица блюд
 
-        let currentRestaurant = null;
-
-        // ==========================================
-        // 2. АВТОРИЗАЦИЯ И ЗАГРУЗКА
-        // ==========================================
+        // 2. АВТОРИЗАЦИЯ
         async function initPanel() {
             try {
-                // Если мы в Телеге - берем реальный ID. Если на компе (Live Server) - подставляем твой тестовый ID
-                const ownerId = (tg && tg.initDataUnsafe?.user?.id) ? tg.initDataUnsafe.user.id : 5521273499;
+                document.getElementById('loading-text').innerText = "Проверка прав...";
                 
-                if (!ownerId) {
-                    showError("Ошибка Telegram", "Пожалуйста, откройте эту панель через бота TamakKG.");
-                    return;
+                let ownerId = 5521273499; // Заглушка для теста с локального сервера
+                if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+                    ownerId = tg.initDataUnsafe.user.id;
                 }
 
-                // 👉 Превращаем в Number для int8 колонки в БД
-                const searchOwnerId = Number(ownerId);
-
+                // 👉 Ищем ресторан. В базе owner_telegram_id это скорее всего текст (String)
                 const { data: restaurant, error } = await supabase
                     .from(TABLE_RESTAURANTS)
                     .select('*')
-                    .eq('owner_telegram_id', searchOwnerId)
+                    .eq('owner_telegram_id', String(ownerId))
                     .maybeSingle();
 
                 if (error) throw error;
 
                 if (!restaurant) {
-                    showError("Доступ закрыт", "К вашему аккаунту не привязан ресторан. (ID: " + ownerId + ")");
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('error').style.display = 'flex';
+                    document.getElementById('error-title').innerText = "Доступ запрещен";
+                    document.getElementById('error-desc').innerText = "К вашему Telegram (ID: " + ownerId + ") не привязан ни один ресторан.";
                     return;
                 }
 
-                currentRestaurant = restaurant;
                 document.getElementById('rest-name').innerText = restaurant.name || "Ваше меню";
                 
                 await loadMenuItems(restaurant.id);
 
             } catch (err) {
-                console.error(err);
-                showError("Системная ошибка", err.message);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'flex';
+                document.getElementById('error-title').innerText = "Ошибка ресторанов";
+                document.getElementById('error-desc').innerText = err.message;
             }
         }
 
-        // ==========================================
         // 3. ЗАГРУЗКА И ОТРИСОВКА БЛЮД
-        // ==========================================
         async function loadMenuItems(restId) {
             try {
-                // 👉 Превращаем в Number для int8 колонки в БД
-                const searchRestId = Number(restId);
-
+                document.getElementById('loading-text').innerText = "Загрузка блюд...";
+                
+                // 👉 Ищем блюда. В базе restaurant_id это точно INT8 (число)
                 const { data: menuItems, error } = await supabase
                     .from(TABLE_MENU)
                     .select('*')
-                    .eq('restaurant_id', searchRestId)
+                    .eq('restaurant_id', Number(restId))
                     .order('id', { ascending: true });
 
                 if (error) throw error;
@@ -147,8 +149,10 @@
 
                 renderMenu(menuItems);
             } catch (err) {
-                console.error(err);
-                showError("Ошибка базы", "Не удалось загрузить меню из таблицы.");
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'flex';
+                document.getElementById('error-title').innerText = "Ошибка меню БД";
+                document.getElementById('error-desc').innerText = err.message;
             }
         }
 
@@ -162,11 +166,10 @@
             }
 
             items.forEach(item => {
-                // Если is_available равно null или true, считаем что в наличии
                 const isAvail = item.is_available !== false; 
                 const card = document.createElement('div');
-                card.className = `menu-item ${!isAvail ? 'item-disabled' : ''}`;
-                card.id = `item-card-${item.id}`;
+                card.className = "menu-item" + (!isAvail ? " item-disabled" : "");
+                card.id = "item-card-" + item.id;
 
                 card.innerHTML = `
                     <div class="item-info">
@@ -182,13 +185,11 @@
             });
         }
 
-        // ==========================================
-        // 4. ЛОГИКА СТОП-ЛИСТА (ОБНОВЛЕНИЕ В БД)
-        // ==========================================
+        // 4. ЛОГИКА СТОП-ЛИСТА
         async function toggleItemStatus(itemId, newStatus) {
             if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
-            const card = document.getElementById(`item-card-${itemId}`);
+            const card = document.getElementById("item-card-" + itemId);
             
             if (newStatus) {
                 card.classList.remove('item-disabled');
@@ -196,29 +197,20 @@
                 card.classList.add('item-disabled');
             }
 
-            // Переводим ID блюда тоже в число на всякий случай
             const { error } = await supabase
                 .from(TABLE_MENU)
                 .update({ is_available: newStatus })
                 .eq('id', Number(itemId));
 
             if (error) {
-                alert("Ошибка сохранения! Проверьте интернет.");
-                document.getElementById(`toggle-${itemId}`).checked = !newStatus;
+                alert("Ошибка сохранения: " + error.message);
+                document.getElementById("toggle-" + itemId).checked = !newStatus;
                 if (!newStatus) card.classList.remove('item-disabled');
                 else card.classList.add('item-disabled');
             }
         }
 
-        function showError(title, desc) {
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('panel').style.display = 'none';
-            const errScreen = document.getElementById('error');
-            errScreen.style.display = 'flex';
-            document.getElementById('error-title').innerText = title;
-            document.getElementById('error-desc').innerText = desc;
-        }
-
+        // Запуск
         initPanel();
     </script>
 </body>
