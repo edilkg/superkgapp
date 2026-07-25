@@ -70,18 +70,19 @@
         // ==========================================
         // 1. ИНИЦИАЛИЗАЦИЯ И НАСТРОЙКИ
         // ==========================================
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.ready();
+        // 👉 Защита от ошибки на компе (вне Телеграма)
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.expand();
+            tg.ready();
+        }
 
-        // ⚠️ ВСТАВЬ СВОИ КЛЮЧИ SUPABASE СЮДА! ⚠️
         const SUPABASE_URL = 'https://dtxybpdjbdmqrvsdwvvk.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHlicGRqYmRtcXJ2c2R3dnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwODI5OTYsImV4cCI6MjA5MTY1ODk5Nn0.WFWBrwvxqEgfR9tzusvFcvfPN_mS4SmwvsWlyH13LEs';
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Таблицы (поменяй, если у тебя они называются иначе)
-        const TABLE_RESTAURANTS = 'restaurants'; 
-        const TABLE_MENU = 'menu'; // или 'products'
+        const TABLE_RESTAURANTS = 'restaurants'; // Твоя таблица ресторанов
+        const TABLE_MENU = 'menu'; // Твоя таблица меню
 
         let currentRestaurant = null;
 
@@ -90,24 +91,27 @@
         // ==========================================
         async function initPanel() {
             try {
-                // Получаем ID пользователя из телеграма
-                const ownerId = tg.initDataUnsafe?.user?.id;
+                // Если мы в Телеге - берем реальный ID. Если на компе (Live Server) - подставляем твой тестовый ID
+                const ownerId = (tg && tg.initDataUnsafe?.user?.id) ? tg.initDataUnsafe.user.id : 5521273499;
                 
                 if (!ownerId) {
                     showError("Ошибка Telegram", "Пожалуйста, откройте эту панель через бота TamakKG.");
                     return;
                 }
 
-                // Ищем ресторан, который принадлежит этому юзеру (owner_telegram_id)
-                // Так как ID в базе может быть строкой, приводим ownerId к строке
+                // 👉 Превращаем в Number для int8 колонки в БД
+                const searchOwnerId = Number(ownerId);
+
                 const { data: restaurant, error } = await supabase
                     .from(TABLE_RESTAURANTS)
                     .select('*')
-                    .eq('owner_telegram_id', String(ownerId))
+                    .eq('owner_telegram_id', searchOwnerId)
                     .maybeSingle();
 
-                if (error || !restaurant) {
-                    showError("Доступ запрещен", "К вашему Telegram аккаунту не привязан ни один ресторан.");
+                if (error) throw error;
+
+                if (!restaurant) {
+                    showError("Доступ закрыт", "К вашему аккаунту не привязан ресторан. (ID: " + ownerId + ")");
                     return;
                 }
 
@@ -117,6 +121,7 @@
                 await loadMenuItems(restaurant.id);
 
             } catch (err) {
+                console.error(err);
                 showError("Системная ошибка", err.message);
             }
         }
@@ -125,26 +130,31 @@
         // 3. ЗАГРУЗКА И ОТРИСОВКА БЛЮД
         // ==========================================
         async function loadMenuItems(restId) {
-            const { data: menuItems, error } = await supabase
-                .from(TABLE_MENU)
-                .select('*')
-                .eq('restaurant_id', restId)
-                .order('id', { ascending: true }); // сортировка
+            try {
+                // 👉 Превращаем в Number для int8 колонки в БД
+                const searchRestId = Number(restId);
 
-            if (error) {
-                showError("Ошибка загрузки", "Не удалось загрузить меню.");
-                return;
+                const { data: menuItems, error } = await supabase
+                    .from(TABLE_MENU)
+                    .select('*')
+                    .eq('restaurant_id', searchRestId)
+                    .order('id', { ascending: true });
+
+                if (error) throw error;
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('panel').style.display = 'block';
+
+                renderMenu(menuItems);
+            } catch (err) {
+                console.error(err);
+                showError("Ошибка базы", "Не удалось загрузить меню из таблицы.");
             }
-
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('panel').style.display = 'block';
-
-            renderMenu(menuItems);
         }
 
         function renderMenu(items) {
             const container = document.getElementById('menu-container');
-            container.innerHTML = ''; // Очищаем
+            container.innerHTML = ''; 
 
             if (!items || items.length === 0) {
                 container.innerHTML = '<p style="text-align:center; color:gray;">В меню пока нет блюд.</p>';
@@ -152,7 +162,8 @@
             }
 
             items.forEach(item => {
-                const isAvail = item.is_available;
+                // Если is_available равно null или true, считаем что в наличии
+                const isAvail = item.is_available !== false; 
                 const card = document.createElement('div');
                 card.className = `menu-item ${!isAvail ? 'item-disabled' : ''}`;
                 card.id = `item-card-${item.id}`;
@@ -175,25 +186,23 @@
         // 4. ЛОГИКА СТОП-ЛИСТА (ОБНОВЛЕНИЕ В БД)
         // ==========================================
         async function toggleItemStatus(itemId, newStatus) {
-            tg.HapticFeedback.impactOccurred('light'); // Вибрация при клике
+            if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
             
             const card = document.getElementById(`item-card-${itemId}`);
             
-            // Визуально сразу меняем, чтобы юзер не ждал
             if (newStatus) {
                 card.classList.remove('item-disabled');
             } else {
                 card.classList.add('item-disabled');
             }
 
-            // Отправляем запрос в базу
+            // Переводим ID блюда тоже в число на всякий случай
             const { error } = await supabase
                 .from(TABLE_MENU)
                 .update({ is_available: newStatus })
-                .eq('id', itemId);
+                .eq('id', Number(itemId));
 
             if (error) {
-                // Если база выдала ошибку, возвращаем ползунок назад
                 alert("Ошибка сохранения! Проверьте интернет.");
                 document.getElementById(`toggle-${itemId}`).checked = !newStatus;
                 if (!newStatus) card.classList.remove('item-disabled');
@@ -201,7 +210,6 @@
             }
         }
 
-        // Вспомогательная функция показа ошибок
         function showError(title, desc) {
             document.getElementById('loading').style.display = 'none';
             document.getElementById('panel').style.display = 'none';
@@ -211,7 +219,6 @@
             document.getElementById('error-desc').innerText = desc;
         }
 
-        // Запуск
         initPanel();
     </script>
 </body>
