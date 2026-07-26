@@ -87,10 +87,16 @@
         .modal-title { font-size: 18px; font-weight: 800; }
         .close-btn { width: 32px; height: 32px; background: #eee; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; }
         
-        /* Загрузка фото */
-        .modal-img-wrap { width: 100%; height: 180px; border-radius: 16px; overflow: hidden; margin-bottom: 16px; background: #f0f0f0; display: none; position: relative; cursor: pointer; }
+        /* Загрузка и управление фото */
+        .modal-img-wrap { width: 100%; height: 180px; border-radius: 16px; overflow: hidden; margin-bottom: 16px; background: #f0f0f0; display: none; position: relative; }
         .modal-img { width: 100%; height: 100%; object-fit: cover; }
-        .img-overlay { position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+        
+        /* Кнопки "Изменить" и "Удалить" поверх изображения */
+        .img-actions { position: absolute; bottom: 10px; right: 10px; display: flex; gap: 8px; z-index: 3; }
+        .img-act-btn { background: rgba(0,0,0,0.7); color: white; border: none; padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: 700; cursor: pointer; backdrop-filter: blur(4px); transition: 0.2s; }
+        .img-act-btn:active { transform: scale(0.95); }
+        .img-act-btn.delete { background: rgba(255, 59, 48, 0.9); }
+
         .modal-img-placeholder { width: 100%; height: 140px; background: #f9f9f9; border: 2px dashed #ccc; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #888; font-weight: 600; cursor: pointer; margin-bottom: 16px; transition: 0.2s; }
         .modal-img-placeholder:active { background: #eee; }
 
@@ -138,12 +144,10 @@
             </div>
             
             <div class="menu-list" id="menu-container">
-                <!-- Списки блюд будут здесь -->
-            </div>
+                </div>
         </div>
     </div>
 
-    <!-- Универсальное модальное окно -->
     <div id="edit-modal" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
@@ -153,18 +157,19 @@
             
             <input type="hidden" id="edit-id">
             
-            <!-- СКРЫТЫЙ ИНПУТ ДЛЯ ФАЙЛА -->
             <input type="file" id="file-upload" accept="image/jpeg, image/png, image/webp" style="display: none;" onchange="handleImageSelect(event)">
             
-            <!-- ФОТО (Заглушка или Картинка) -->
             <div id="edit-img-placeholder" class="modal-img-placeholder" onclick="document.getElementById('file-upload').click()">
                 <div style="font-size: 32px; margin-bottom: 4px;">📷</div>
-                <div>Загрузить фото</div>
+                <div>Загрузить фото<br>Размер 600x400 px, чтобы у клиентов нормально отображалось а также быстро загружалось<br>тем больше размер фото, тем дольше будет грузиться</div>
             </div>
 
-            <div id="edit-img-wrap" class="modal-img-wrap" onclick="document.getElementById('file-upload').click()">
+            <div id="edit-img-wrap" class="modal-img-wrap">
                 <img id="edit-img" class="modal-img" src="" alt="Фото блюда">
-                <div class="img-overlay">📷 Изменить фото</div>
+                <div class="img-actions">
+                    <button type="button" class="img-act-btn" onclick="document.getElementById('file-upload').click()">📷 Изменить</button>
+                    <button type="button" class="img-act-btn delete" onclick="removeSelectedImage(event)">🗑 Удалить</button>
+                </div>
             </div>
             
             <div class="input-group">
@@ -210,7 +215,7 @@
         let globalMenuItems = []; 
         let showOnlyStopped = false;
         let currentSearchText = '';
-        let selectedImageFile = null; // Файл для загрузки
+        let selectedImageFile = null; 
 
         function showError(title, desc) {
             document.getElementById('loading').style.display = 'none';
@@ -309,7 +314,6 @@
             
             let html = '';
 
-            // БОЛЬШАЯ КНОПКА СТОП-ЛИСТА ВМЕСТО КНОПКИ ДОБАВИТЬ
             if (showOnlyStopped) {
                 html += `<button class="stop-filter-btn-large active" onclick="toggleStopList()">❌ Показать все блюда</button>`;
             } else {
@@ -380,7 +384,7 @@
             }
         };
 
-        // --- ЛОГИКА ЗАГРУЗКИ ФОТО ---
+        // --- ВЫБОР И УДАЛЕНИЕ ФОТО ---
         window.handleImageSelect = function(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -395,6 +399,21 @@
             reader.readAsDataURL(file);
         };
 
+        window.removeSelectedImage = function(event) {
+            if (event) event.stopPropagation(); // Чтобы не срабатывал клик выбора файла
+            if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+
+            selectedImageFile = null;
+            document.getElementById('file-upload').value = '';
+            
+            const imgEl = document.getElementById('edit-img');
+            imgEl.src = '';
+            imgEl.dataset.originalUrl = ''; // Очищаем ссылку на старое фото
+
+            document.getElementById('edit-img-wrap').style.display = 'none';
+            document.getElementById('edit-img-placeholder').style.display = 'flex';
+        };
+
         window.openAddModal = function() {
             if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
             
@@ -405,13 +424,16 @@
             document.getElementById('edit-weight').value = "";
             document.getElementById('edit-desc').value = "";
             
-            const catBtn = document.querySelector('.cat-btn');
-            document.getElementById('edit-category').value = catBtn ? catBtn.innerText : "Горячие блюда";
+            // 👉 ТЕПЕРЬ ПОЛЕ КАТЕГОРИИ ЧИСТОЕ (показывает только серый подсказчик/placeholder)
+            document.getElementById('edit-category').value = "";
 
             // Сброс фото
             selectedImageFile = null;
             document.getElementById('file-upload').value = '';
-            document.getElementById('edit-img').dataset.originalUrl = '';
+            const imgEl = document.getElementById('edit-img');
+            imgEl.src = '';
+            imgEl.dataset.originalUrl = '';
+            
             document.getElementById('edit-img-wrap').style.display = 'none';
             document.getElementById('edit-img-placeholder').style.display = 'flex';
 
@@ -434,13 +456,14 @@
             // Работа с фото
             selectedImageFile = null;
             document.getElementById('file-upload').value = '';
-            document.getElementById('edit-img').dataset.originalUrl = item.img_url || '';
+            
+            const imgEl = document.getElementById('edit-img');
+            imgEl.dataset.originalUrl = item.img_url || '';
             
             const imgWrap = document.getElementById('edit-img-wrap');
             const placeholder = document.getElementById('edit-img-placeholder');
-            const imgEl = document.getElementById('edit-img');
             
-            if (item.img_url) {
+            if (item.img_url && item.img_url.trim() !== '') {
                 imgEl.src = item.img_url;
                 imgWrap.style.display = 'block';
                 placeholder.style.display = 'none';
@@ -472,9 +495,10 @@
             btn.style.opacity = "0.7";
             btn.style.pointerEvents = "none";
 
-            // 1. Загрузка фото в Supabase (если было выбрано новое)
+            // Определяем итоговую ссылку на изображение
             let finalImageUrl = document.getElementById('edit-img').dataset.originalUrl || '';
 
+            // 1. Если выбрано новое фото с устройства — загружаем в Supabase Storage
             if (selectedImageFile) {
                 btn.innerText = "⏳ Загрузка фото...";
                 const fileExt = selectedImageFile.name.split('.').pop();
@@ -485,7 +509,7 @@
                     .upload(fileName, selectedImageFile, { cacheControl: '3600', upsert: false });
                     
                 if (uploadErr) {
-                    alert("Ошибка загрузки фото: " + uploadErr.message + "\n\nУбедитесь, что вы создали Storage Bucket с именем 'menu_images' и сделали его Public.");
+                    alert("Ошибка загрузки фото: " + uploadErr.message + "\n\nПроверьте, создан ли Storage Bucket 'menu_images' (Public).");
                     btn.innerText = "💾 Сохранить";
                     btn.style.opacity = "1";
                     btn.style.pointerEvents = "auto";
@@ -499,8 +523,8 @@
                 finalImageUrl = publicUrlData.publicUrl;
             }
 
-            // 2. Сохранение в базу
-            btn.innerText = "⏳ Сохранение в БД...";
+            // 2. Сохраняем все данные в базу данных
+            btn.innerText = "⏳ Сохранение...";
             let requestError = null;
 
             if (id) {

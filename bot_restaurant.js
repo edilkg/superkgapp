@@ -32,10 +32,13 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
 
             if (!rest.is_approved) return ctx.reply("⏳ Ваша заявка находится на проверке у администратора.");
 
-            // 👉 ДОБАВЛЕНО: Постоянная кнопка внизу экрана для одобренных ресторанов
+            // 👉 Добавили постоянную кнопку Web App "Управление меню" рядом с вызовом курьера
             ctx.reply(`✅ Кабинет ресторана "${rest.name}" активен!\nСюда будут приходить новые заказы.`,
                 Markup.keyboard([
-                    ['🚕 Вызвать курьера (Вручную)']
+                    [
+                        Markup.button.webApp('⚙️ Управление меню', 'https://superkgapp.vercel.app/restaurant_panel.html'),
+                        '🚕 Вызвать курьера (Вручную)'
+                    ]
                 ]).resize()
             );
         } catch (err) {
@@ -76,11 +79,14 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
         // --- ЛОГИКА РУЧНОГО ВЫЗОВА (КНОПКИ ВНИЗУ) ---
         if (rest.is_approved) {
             // Менеджер нажал кнопку вызова
-            if (text === '🚕 Вызвать курьера (Вручную)') {
-                await supabase.from('restaurants').update({ step: 'ask_manual_data' }).eq('id', id);
-                return ctx.reply("📝 Отправьте данные клиента (например: 0555123456, ул. Советская 45):",
+            if (text === '❌ Отмена') {
+                await supabase.from('restaurants').update({ step: 'active' }).eq('id', id);
+                return ctx.reply("Действие отменено.", 
                     Markup.keyboard([
-                        ['❌ Отмена']
+                        [
+                            Markup.button.webApp('⚙️ Управление меню', 'https://superkgapp.vercel.app/restaurant_panel.html'),
+                            '🚕 Вызвать курьера (Вручную)'
+                        ]
                     ]).resize()
                 );
             }
@@ -114,7 +120,10 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
                     // Отвечаем менеджеру
                     ctx.reply(`✅ Заказ отправлен курьерам!\nДанные клиента: ${text}`, 
                         Markup.keyboard([
-                            ['🚕 Вызвать курьера (Вручную)']
+                            [
+                                Markup.button.webApp('⚙️ Управление меню', 'https://superkgapp.vercel.app/restaurant_panel.html'),
+                                '🚕 Вызвать курьера (Вручную)'
+                            ]
                         ]).resize()
                     );
 
@@ -136,7 +145,10 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
                     console.error("Ошибка создания ручного заказа:", err);
                     return ctx.reply("❌ Ошибка базы данных при создании заказа.",
                         Markup.keyboard([
-                            ['🚕 Вызвать курьера (Вручную)']
+                            [
+                                Markup.button.webApp('⚙️ Управление меню', 'https://superkgapp.vercel.app/restaurant_panel.html'),
+                                '🚕 Вызвать курьера (Вручную)'
+                            ]
                         ]).resize()
                     );
                 }
