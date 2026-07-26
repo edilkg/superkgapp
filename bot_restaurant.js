@@ -1,22 +1,29 @@
 const { Markup } = require('telegraf');
 
 module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, supabase, ADMIN_GROUP_ID) {
-    // ==========================================
-    // ПАНЕЛЬ УПРАВЛЕНИЯ РЕСТОРАНОМ
-    // ==========================================
+    
+    // Команда /panel (на всякий случай)
     restBot.command('panel', (ctx) => {
-    ctx.reply('🛠 Управление рестораном\nЗдесь вы можете менять стоп-лист и управлять меню:', {
-        reply_markup: {
-            inline_keyboard: [
-                [{
-                    text: "⚙️ Управление меню",
-                    // ⚠️ ЗАМЕНИ ССЫЛКУ НА СВОЙ РЕАЛЬНЫЙ ДОМЕН!
-                    web_app: { url: "https://superkgapp.vercel.app/restaurant_panel.html" } 
-                }]
-            ]
-        }
+        ctx.reply('🛠 Управление рестораном\nЗдесь вы можете менять стоп-лист и управлять меню:', {
+            reply_markup: {
+                inline_keyboard: [
+                    [{
+                        text: "⚙️ Управление меню",
+                        web_app: { url: "https://superkgapp.vercel.app/restaurant_panel.html" } 
+                    }]
+                ]
+            }
+        });
     });
-    });
+
+    // Функция для генерации нашей новой "лесенки" кнопок
+    const getMainMenuKeyboard = () => {
+        return Markup.keyboard([
+            [Markup.button.webApp('⚙️ Управление меню', 'https://superkgapp.vercel.app/restaurant_panel.html')],
+            ['🚕 Вызвать курьера (Вручную)']
+        ]).resize();
+    };
+
     // ==========================================
     // 1. СТАРТ И РЕГИСТРАЦИЯ
     // ==========================================
@@ -32,15 +39,8 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
 
             if (!rest.is_approved) return ctx.reply("⏳ Ваша заявка находится на проверке у администратора.");
 
-            // 👉 Добавили постоянную кнопку Web App "Управление меню" рядом с вызовом курьера
-            ctx.reply(`✅ Кабинет ресторана "${rest.name}" активен!\nСюда будут приходить новые заказы.`,
-                Markup.keyboard([
-                    [
-                        Markup.button.webApp('⚙️ Управление меню', 'https://superkgapp.vercel.app/restaurant_panel.html'),
-                        '🚕 Вызвать курьера (Вручную)'
-                    ]
-                ]).resize()
-            );
+            // Выдаем главное меню с кнопками по вертикали
+            ctx.reply(`✅ Кабинет ресторана "${rest.name}" активен!\nСюда будут приходить новые заказы.`, getMainMenuKeyboard());
         } catch (err) {
             console.error("Ошибка при старте ресторана:", err);
         }
@@ -73,20 +73,17 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
                     Markup.inlineKeyboard([[Markup.button.callback('✅ ОДОБРИТЬ РЕСТОРАН', `approve_rest_${id}`)]])
                 );
             }
-            return; // Если заявка ждет одобрения, игнорируем другой текст
+            return;
         }
 
-        // --- ЛОГИКА РУЧНОГО ВЫЗОВА (КНОПКИ ВНИЗУ) ---
+        // --- ЛОГИКА РУЧНОГО ВЫЗОВА ---
         if (rest.is_approved) {
             // Менеджер нажал кнопку вызова
-            if (text === '❌ Отмена') {
-                await supabase.from('restaurants').update({ step: 'active' }).eq('id', id);
-                return ctx.reply("Действие отменено.", 
+            if (text === '🚕 Вызвать курьера (Вручную)') {
+                await supabase.from('restaurants').update({ step: 'ask_manual_data' }).eq('id', id);
+                return ctx.reply("📝 Отправьте данные клиента (например: 0555123456, ул. Советская 45):",
                     Markup.keyboard([
-                        [
-                            Markup.button.webApp('⚙️ Управление меню', 'https://superkgapp.vercel.app/restaurant_panel.html'),
-                            '🚕 Вызвать курьера (Вручную)'
-                        ]
+                        ['❌ Отмена']
                     ]).resize()
                 );
             }
@@ -94,70 +91,47 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
             // Менеджер передумал и нажал отмену
             if (text === '❌ Отмена') {
                 await supabase.from('restaurants').update({ step: 'active' }).eq('id', id);
-                return ctx.reply("Действие отменено.", 
-                    Markup.keyboard([
-                        ['🚕 Вызвать курьера (Вручную)']
-                    ]).resize()
-                );
+                return ctx.reply("Действие отменено.", getMainMenuKeyboard());
             }
 
             // Менеджер отправил данные клиента
             if (rest.step === 'ask_manual_data') {
-                // Возвращаем ресторан в активный статус
                 await supabase.from('restaurants').update({ step: 'active' }).eq('id', id);
                 
                 try {
-                    // Создаем заказ в БД с пометкой is_manual = true
                     const { data: newOrder, error } = await supabase.from('orders').insert([{
                         restaurant: rest.name,
-                        address: text, // Скрытые данные, которые увидит только победитель
-                        status: 'pending', // Ждет курьера
+                        address: text,
+                        status: 'pending',
                         is_manual: true
                     }]).select().single();
 
                     if (error) throw error;
 
-                    // Отвечаем менеджеру
-                    ctx.reply(`✅ Заказ отправлен курьерам!\nДанные клиента: ${text}`, 
-                        Markup.keyboard([
-                            [
-                                Markup.button.webApp('⚙️ Управление меню', 'https://superkgapp.vercel.app/restaurant_panel.html'),
-                                '🚕 Вызвать курьера (Вручную)'
-                            ]
-                        ]).resize()
-                    );
+                    ctx.reply(`✅ Заказ отправлен курьерам!\nДанные клиента: ${text}`, getMainMenuKeyboard());
 
-                    // 👉 ИСПРАВЛЕНО: Краткое сообщение для общей группы (БЕЗ ДАННЫХ И КОМИССИИ)
-                    const COURIER_GROUP_ID = '-1004348705428'; // Твоя группа курьеров
+                    const COURIER_GROUP_ID = '-1004348705428';
                     
                     return courierBot.telegram.sendMessage(COURIER_GROUP_ID,
                         `🚨 <b>РУЧНОЙ ВЫЗОВ (от ресторана)</b>\n\n` +
-                        `📍 Забрать: <b>${rest.name}</b>`, // Только имя ресторана, больше ничего
+                        `📍 Забрать: <b>${rest.name}</b>`,
                         { 
                             parse_mode: 'HTML',
                             reply_markup: {
-                                // Кнопка, на которую нажмет курьер
                                 inline_keyboard: [[{ text: '🚕 Принять заказ', callback_data: `courier_take_${newOrder.id}` }]]
                             }
                         }
                     );
                 } catch (err) {
                     console.error("Ошибка создания ручного заказа:", err);
-                    return ctx.reply("❌ Ошибка базы данных при создании заказа.",
-                        Markup.keyboard([
-                            [
-                                Markup.button.webApp('⚙️ Управление меню', 'https://superkgapp.vercel.app/restaurant_panel.html'),
-                                '🚕 Вызвать курьера (Вручную)'
-                            ]
-                        ]).resize()
-                    );
+                    return ctx.reply("❌ Ошибка базы данных при создании заказа.", getMainMenuKeyboard());
                 }
             }
         }
     });
 
     // ==========================================
-    // 3. ЛОГИКА ЗАКАЗОВ (РЕСТОРАН - БЕЗ ЛИШНИХ КНОПОК)
+    // 3. ЛОГИКА ЗАКАЗОВ
     // ==========================================
     restBot.action(/rest_accept_(.+)/, async (ctx) => {
         const orderId = ctx.match[1];
@@ -171,21 +145,17 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
                 return ctx.editMessageText(`❌ Заказ #${String(orderId).slice(0,5)} УЖЕ передан курьеру (или завершен)!\nВам не нужно его принимать.`).catch(()=>{});
             }
 
-            // Меняем статус на "Готовится"
             await supabase.from('orders').update({ status: 'cooking' }).eq('id', orderId);
             
-            // 👉 СОХРАНЯЕМ ВЕСЬ ТЕКСТ (С БЛЮДАМИ И ДЕТАЛЯМИ)
             const oldText = ctx.callbackQuery.message.text || '';
             let newText = '';
             
-            // Меняем только верхнюю строчку, остальное остается на месте!
             if (oldText.includes('🍔 НОВЫЙ ЗАКАЗ')) {
                 newText = oldText.replace(/🍔 НОВЫЙ ЗАКАЗ(.*)/, '✅ ЗАКАЗ$1 ПРИНЯТ (Готовится на кухне)');
             } else {
                 newText = `✅ ЗАКАЗ #${String(orderId).slice(0,5)} ПРИНЯТ (Готовится)\n\n` + oldText;
             }
             
-            // Обновляем сообщение и УБИРАЕМ кнопки (кнопка "Отдано курьеру" больше не нужна)
             await ctx.editMessageText(newText).catch(() => {});
             await ctx.answerCbQuery("✅ Заказ успешно принят на кухню!");
 
@@ -195,31 +165,6 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
         }
     });
 
-    // Обработка кнопки "Отклонить" (тоже сохраняем текст блюд)
-    restBot.action(/rest_decline_(.+)/, async (ctx) => {
-        const orderId = ctx.match[1];
-        try {
-            // 👉 Сохраняем весь текст заказа для истории
-            const oldText = ctx.callbackQuery.message.text || '';
-            let newText = '';
-
-            if (oldText.includes('🍔 НОВЫЙ ЗАКАЗ')) {
-                newText = oldText.replace(/🍔 НОВЫЙ ЗАКАЗ(.*)/, '❌ ЗАКАЗ$1 ОТКЛОНЕН РЕСТОРАНОМ');
-            } else {
-                newText = `❌ ЗАКАЗ #${String(orderId).slice(0,5)} ОТКЛОНЕН\n\n` + oldText;
-            }
-
-            await supabase.from('orders').update({ status: 'canceled' }).eq('id', orderId);
-            await ctx.editMessageText(newText).catch(() => {});
-            await ctx.answerCbQuery("❌ Заказ отменен", { show_alert: true }).catch(() => {});
-        } catch (err) {
-            console.error("Ошибка ресторана при отмене:", err);
-        }
-    });
-
-    // ==========================================
-    // 4. Кнопка: ОТКЛОНИТЬ ЗАКАЗ (С УМНЫМИ УВЕДОМЛЕНИЯМИ)
-    // ==========================================
     restBot.action(/rest_decline_(.+)/, async (ctx) => {
         const orderId = ctx.match[1].trim();
         try {
@@ -246,7 +191,7 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
             const cid = order.client_id;
             if (cid && String(cid) !== '111' && String(cid) !== 'null' && String(cid) !== 'undefined') {
                 const clientMsg = `❌ <b>Заказ #${String(orderId).slice(0,5)} отменен рестораном.</b>\n\n` +
-                                  `Возможно, большая загрузка на кухне или закончились нужные продукты).\n\n` +
+                                  `Возможно, большая загрузка на кухне или закончились нужные продукты.\n\n` +
                                   `Пожалуйста, вернитесь в меню и выберите другой ресторан. Приносим извинения за неудобства!😔 Поддержка: @foodkg_admin`;
                 try {
                     await clientBot.telegram.sendMessage(cid, clientMsg, { parse_mode: 'HTML' });
