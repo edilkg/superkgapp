@@ -29,8 +29,42 @@ setupCourierBot(courierBot, bot, restBot, supabase, ADMIN_GROUP_ID);
 setupRestaurantBot(restBot, courierBot, bot, supabase, ADMIN_GROUP_ID);
 const adminActions = setupAdminBot(bot, restBot, courierBot, supabase, ADMIN_GROUP_ID);
 
+// ГЛОБАЛЬНЫЙ КЭШ ТОКЕНА В ПАМЯТИ СЕРВЕРА
+let cachedBakaiToken = process.env.BAKAI_TOKEN || null;
+
+// ФУНКЦИЯ АВТОМАТИЧЕСКОГО ПОЛУЧЕНИЯ СВЕЖЕГО ТОКЕНА
+async function getValidBakaiToken(forceRefresh = false) {
+    if (cachedBakaiToken && !forceRefresh) {
+        return cachedBakaiToken;
+    }
+
+    const login = process.env.BAKAI_LOGIN;
+    const password = process.env.BAKAI_PASSWORD;
+
+    if (!login || !password) {
+        throw new Error("В Render Environment не заполнены BAKAI_LOGIN и BAKAI_PASSWORD!");
+    }
+
+    console.log("🔄 Запрашиваем свежий API-токен у Бакай Банка...");
+    const response = await fetch('https://openbanking-api.bakai.kg/Auth/Login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login, password })
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.token) {
+        console.error("❌ Ошибка авторизации в банке:", data);
+        throw new Error("Не удалось получить токен авторизации");
+    }
+
+    cachedBakaiToken = data.token;
+    console.log("🔑 Свежий токен Бакай Банка успешно получен и сохранен!");
+    return cachedBakaiToken;
+}
+
 // ==========================================
-// 1. СОЗДАНИЕ ЗАКАЗА (СО СТАТУСОМ 'waiting_payment')
+// 1. СОЗДАНИЕ ЗАКАЗА В БАЗЕ (status: 'waiting_payment')
 // ==========================================
 app.post('/web-data', async (req, res) => {
     try {
@@ -64,13 +98,12 @@ app.post('/web-data', async (req, res) => {
             total_price: totalPrice,
             comment: extraDetails.join(' | '), 
             items: items,
-            status: 'waiting_payment' // Заказ пока только ждет оплаты!
+            status: 'waiting_payment'
         }]).select();
 
         if (dbError) throw dbError;
         const newOrder = orderData[0];
 
-        // ⚠️ ВАЖНО: Мы больше не отправляем заказ админу здесь! Он отправится только после оплаты.
         res.status(200).json({ success: true, orderId: newOrder.id });
 
     } catch (err) {
@@ -80,12 +113,12 @@ app.post('/web-data', async (req, res) => {
 });
 
 // ==========================================
-// 2. ГЕНЕРАЦИЯ QR-КОДА
+// 2. ГЕНЕРАЦИЯ QR-КОДА С САМОЛЕЧЕНИЕМ ТОКЕНА (УМНЫЙ 401 RETRY)
 // ==========================================
 app.post('/api/create-qr', async (req, res) => {
     try {
         const { amount, orderId } = req.body;
-        const operationID = "ORDER_" + orderId; // Жестко привязываем QR к ID заказа!
+        const operationID = "ORDER_" + orderId;
 
         const bakaiPayload = {
             accountNo: "1240040003285038", 
@@ -96,18 +129,39 @@ app.post('/api/create-qr', async (req, res) => {
             qrTtl: 15                      
         };
 
-        const response = await fetch('https://openbanking-api.bakai.kg/api/Qr/GenerateQR', {
+        // Берем актуальный токен
+        let token = await getValidBakaiToken();
+
+        let response = await fetch('https://openbanking-api.bakai.kg/api/Qr/GenerateQR', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.BAKAI_TOKEN}` 
+                'Authorization': `Bearer ${token}` 
             },
             body: JSON.stringify(bakaiPayload)
         });
 
+        // 🛡️ САМОЛЕЧЕНИЕ: Если банк ответил 401 (токен истек), принудительно обкатываем логин и повторно делаем запрос!
+        if (response.status === 401) {
+            console.warn("⚠️ Токен сгорел (401). Автоматически обновляем токен и повторяем генерацию QR...");
+            token = await getValidBakaiToken(true); // forceRefresh = true
+
+            response = await fetch('https://openbanking-api.bakai.kg/api/Qr/GenerateQR', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify(bakaiPayload)
+            });
+        }
+
         const data = await response.json();
 
-        if (!response.ok) return res.status(response.status).json({ error: "Ошибка банка при создании QR", details: data });
+        if (!response.ok) {
+            console.error("❌ Ошибка банка при создании QR:", data);
+            return res.status(response.status).json({ error: "Ошибка банка при создании QR", details: data });
+        }
 
         res.json({ status: "success", operationID: operationID, bakaiResponse: data });
 
@@ -118,24 +172,20 @@ app.post('/api/create-qr', async (req, res) => {
 });
 
 // ==========================================
-// 3. ВЕБХУК ОТ БАНКА (АВТОМАТИКА)
+// 3. ВЕБХУК ОТ БАНКА
 // ==========================================
 app.post('/api/bakai-webhook', async (req, res) => {
     try {
         console.log("🔔 ВЕБХУК ОТ БАКАЙ БАНКА:", req.body);
         
-        // Банк пришлет нам обратно operationID, который мы ему дали
         const operationID = req.body.operationID || req.body.OperationId || req.body.operationId;
         const status = req.body.status || req.body.Status || "SUCCESS";
 
-        // Если пришел успешный статус и есть ID
         if (operationID && (status.toUpperCase() === "SUCCESS" || status === "COMPLETED" || req.body.isPaid === true)) {
-            const orderId = operationID.replace("ORDER_", ""); // Достаем чистый ID заказа (например "123")
+            const orderId = operationID.replace("ORDER_", "");
 
-            // Проверяем статус в базе
             const { data: existingOrder } = await supabase.from('orders').select('status').eq('id', orderId).single();
 
-            // Если заказ ждал оплаты, меняем на ОПЛАЧЕНО
             if (existingOrder && existingOrder.status === 'waiting_payment') {
                 const { data: updatedOrders, error } = await supabase
                     .from('orders')
@@ -144,14 +194,13 @@ app.post('/api/bakai-webhook', async (req, res) => {
                     .select();
 
                 if (!error && updatedOrders && updatedOrders.length > 0) {
-                    // 🎉 ДЕНЬГИ ПРИШЛИ! ТЕПЕРЬ ОТПРАВЛЯЕМ ЗАКАЗ АДМИНУ И В РЕСТОРАН!
                     adminActions.sendOrderToAdmin(updatedOrders[0]);
                     console.log(`✅ ЗАКАЗ №${orderId} УСПЕШНО ОПЛАЧЕН И УШЕЛ В РАБОТУ!`);
                 }
             }
         }
         
-        res.status(200).json({ status: "ok" }); // Обязательно отвечаем банку ОК
+        res.status(200).json({ status: "ok" });
     } catch (err) {
         console.error("❌ Ошибка вебхука:", err);
         res.status(200).send("OK");

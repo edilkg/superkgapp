@@ -2855,7 +2855,6 @@ function confirmAddressFromModal() {
 // ПОЛНЫЙ ЦИКЛ ОФОРМЛЕНИЯ ЗАКАЗА И ГЕНЕРАЦИИ QR (АВТОМАТИКА)
 // =========================================================
 async function openPaymentScreen() {
-    // 1. ПРОВЕРКИ И ЗАЩИТА
     let activeOrders = JSON.parse(localStorage.getItem('tamak_active_order_ids') || '[]');
     if (activeOrders.length >= 2) return alert("⚠️ Лимит: максимум 2 заказа одновременно!");
     if (!orderAddressData.street && currentDeliveryFee > 0) return alert("Пожалуйста, выберите адрес на карте!");
@@ -2863,7 +2862,6 @@ async function openPaymentScreen() {
     const clientPhone = document.getElementById('client-phone').value;
     if (!clientPhone) return alert("Пожалуйста, укажите ваш номер телефона для курьера!");
 
-    // Сохраняем локальные данные
     localStorage.setItem('tamak_client_phone', clientPhone);
     if (clientLat && clientLon) {
         localStorage.setItem('tamak_last_lat', clientLat);
@@ -2871,7 +2869,6 @@ async function openPaymentScreen() {
         localStorage.setItem('tamak_last_street', orderAddressData.street || '');
     }
 
-    // 2. ЗАМОРОЗКА ГЛАВНОЙ КНОПКИ В КОРЗИНЕ
     const mainPayBtn = document.getElementById('main-pay-btn');
     let originalText = mainPayBtn ? mainPayBtn.innerText : "Оплатить";
     if (mainPayBtn) {
@@ -2881,7 +2878,6 @@ async function openPaymentScreen() {
     }
 
     try {
-        // 3. СБОРКА ДАННЫХ ДЛЯ БД
         let tabTotalSum = 0; 
         for(let k in cartItems) { 
             if(cartItems[k].resId === cartActiveTabResId) tabTotalSum += (cartItems[k].pricePerUnit * cartItems[k].count); 
@@ -2919,7 +2915,7 @@ async function openPaymentScreen() {
 
         haptic('selection');
 
-        // 4. СОХРАНЯЕМ ЗАКАЗ В БД (Получаем ID)
+        // 1. Создаем черновик заказа в базе
         const dbResponse = await fetch('https://tamak-backend.onrender.com/web-data', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2930,16 +2926,7 @@ async function openPaymentScreen() {
         if (!dbResponse.ok) throw new Error(dbResult.error || "Сбой создания заказа в БД");
         const createdOrderId = dbResult.orderId;
 
-        // Фиксируем заказ локально и чистим корзину
-        if (!activeOrders.includes(createdOrderId)) {
-            activeOrders.push(createdOrderId);
-            localStorage.setItem('tamak_active_order_ids', JSON.stringify(activeOrders));
-        }
-        if (typeof checkActiveOrder === 'function') checkActiveOrder();
-        for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
-        if (typeof recalcTotal === 'function') recalcTotal();
-
-        // 5. ПОЛУЧАЕМ QR-КОД ИМЕННО ДЛЯ ЭТОГО ЗАКАЗА
+        // 2. Запрашиваем QR-код
         if (mainPayBtn) mainPayBtn.innerText = '⏳ Генерация QR...';
 
         const qrResponse = await fetch('https://tamak-backend.onrender.com/api/create-qr', {
@@ -2951,33 +2938,39 @@ async function openPaymentScreen() {
 
         if (qrResponse.ok && qrResult.status === "success" && qrResult.bakaiResponse) {
             
-            // Выводим картинку на экран
+            // 💡 ЗАЩИТА: Записываем в активные заказы ТОЛЬКО КОГДА СГЕНЕРИРОВАЛСЯ QR!
+            if (!activeOrders.includes(createdOrderId)) {
+                activeOrders.push(createdOrderId);
+                localStorage.setItem('tamak_active_order_ids', JSON.stringify(activeOrders));
+            }
+            if (typeof checkActiveOrder === 'function') checkActiveOrder();
+            for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
+            if (typeof recalcTotal === 'function') recalcTotal();
+
+            // Рисуем QR и переводим на экран оплаты
             document.getElementById('payment-total-amount').innerText = finalTotal + " сом";
             const qrImageElement = document.getElementById('custom-qr-code');
             
             const rawBase64 = qrResult.bakaiResponse.qrImageWithFrame || qrResult.bakaiResponse.qrImage;
             qrImageElement.src = 'data:image/jpeg;base64,' + rawBase64;
             
-            // Фишка: Переход в банковское приложение по клику
             if (qrResult.bakaiResponse.qrLink) {
                 qrImageElement.onclick = function() { window.location.href = qrResult.bakaiResponse.qrLink; };
             }
 
-            // Открываем экран оплаты
             history.pushState({screen: 'payment'}, '');
             showScreen('payment');
 
-            // 🚀 ЗАПУСКАЕМ СКРЫТЫЙ ПОИСКОВИК (АВТОМАТИКА)
+            // Запускаем фоновый авто-просмотр оплаты
             startPaymentAutoCheck(createdOrderId);
 
         } else {
-            throw new Error("Банк не выдал QR-код");
+            throw new Error(qrResult.error || "Не удалось получить QR от банка");
         }
 
     } catch (e) {
         alert("Ошибка при заказе: " + e.message);
     } finally {
-        // Размораживаем кнопку корзины (вдруг юзер закроет оплату и захочет переделать)
         if (mainPayBtn) {
             mainPayBtn.innerText = originalText;
             mainPayBtn.style.pointerEvents = 'auto';
