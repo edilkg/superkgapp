@@ -22,54 +22,39 @@ const restBot = new Telegraf(process.env.REST_BOT_TOKEN);
 const ADMIN_GROUP_ID = process.env.ADMIN_CHAT_ID; 
 
 // ==========================================
-// ИНИЦИАЛИЗАЦИЯ БОТОВ (ИСПРАВЛЕННЫЙ ПОРЯДОК)
+// ИНИЦИАЛИЗАЦИЯ БОТОВ
 // ==========================================
 setupClientBot(bot, supabase, ADMIN_GROUP_ID);
-
-// ВАЖНО: Теперь мы правильно передаем restBot в курьерского бота!
 setupCourierBot(courierBot, bot, restBot, supabase, ADMIN_GROUP_ID);
-
 setupRestaurantBot(restBot, courierBot, bot, supabase, ADMIN_GROUP_ID);
-
 const adminActions = setupAdminBot(bot, restBot, courierBot, supabase, ADMIN_GROUP_ID);
 
 // ==========================================
-// ПРИЕМ ЗАКАЗОВ С САЙТА
+// 1. СОЗДАНИЕ ЗАКАЗА (СО СТАТУСОМ 'waiting_payment')
 // ==========================================
 app.post('/web-data', async (req, res) => {
     try {
-        // 👉 1. ДОБАВИЛИ restaurantAddress в прием данных
         const { type, user, phone, address, restaurantName, restaurantAddress, totalPrice, comment, resComment, isDoorDelivery, cutlery, items, dest_lat, dest_lon } = req.body;
         
         if (type !== 'food') return res.status(400).json({ error: 'Тип не еда' });
 
-        // 👉 БРОНЕЖИЛЕТ ОТ СПАМА 
         if (user && user.id && user.id != 111) {
             const { data: activeUserOrders } = await supabase
-                .from('orders')
-                .select('id')
-                .eq('client_id', user.id)
+                .from('orders').select('id').eq('client_id', user.id)
                 .in('status', ['waiting_payment', 'paid', 'cooking', 'delivery']);
-            
             if (activeUserOrders && activeUserOrders.length >= 2) {
                 return res.status(400).json({ error: 'У вас уже есть 2 активных заказа! Дождитесь их завершения.' });
             }
         }
 
         let extraDetails = [];
-        // 👉 2. СОХРАНЯЕМ АДРЕС В БАЗУ ДАННЫХ
         if (restaurantAddress) extraDetails.push(`🏪 Адрес ресторана: ${restaurantAddress}`); 
         if (isDoorDelivery) extraDetails.push("🚪 Доставка до двери");
         if (cutlery > 0) extraDetails.push(`🍴 Приборы: ${cutlery}`);
         if (comment) extraDetails.push(`📍 Ориентир: ${comment}`);
         if (resComment) extraDetails.push(`💬 Кухне: ${resComment}`);
+        if (dest_lat && dest_lon) extraDetails.push(`🗺 2ГИС: https://2gis.kg/geo/${dest_lon},${dest_lat}`);
 
-        // 🗺 ДОБАВЛЯЕМ ССЫЛКУ НА 2ГИС 
-        if (dest_lat && dest_lon) {
-            extraDetails.push(`🗺 2ГИС: https://2gis.kg/geo/${dest_lon},${dest_lat}`);
-        }
-
-        // Сохраняем в базу данных Supabase
         const { data: orderData, error: dbError } = await supabase.from('orders').insert([{
             client_id: user?.id || null,
             client_name: user?.first_name || 'Гость',
@@ -79,115 +64,97 @@ app.post('/web-data', async (req, res) => {
             total_price: totalPrice,
             comment: extraDetails.join(' | '), 
             items: items,
-            status: 'waiting_payment'
+            status: 'waiting_payment' // Заказ пока только ждет оплаты!
         }]).select();
 
         if (dbError) throw dbError;
         const newOrder = orderData[0];
 
-        // Моментально отвечаем фронтенду
+        // ⚠️ ВАЖНО: Мы больше не отправляем заказ админу здесь! Он отправится только после оплаты.
         res.status(200).json({ success: true, orderId: newOrder.id });
-
-        // 👉 3. ПЕРЕДАЕМ АДРЕС АДМИН-БОТУ ДЛЯ КРАСИВОГО ОТОБРАЖЕНИЯ
-        adminActions.sendOrderToAdmin({ ...newOrder, restaurantAddress });
 
     } catch (err) {
         console.error(err);
-        if (!res.headersSent) {
-            res.status(500).json({ error: err.message });
-        }
+        if (!res.headersSent) res.status(500).json({ error: err.message });
     }
 });
 
 // ==========================================
-// ГЕНЕРАЦИЯ QR-КОДА ПО СХЕМЕ GenerateQrRequestDto (БЕЗ КОММЕНТАРИЕВ)
+// 2. ГЕНЕРАЦИЯ QR-КОДА
 // ==========================================
 app.post('/api/create-qr', async (req, res) => {
     try {
-        const { amount } = req.body;
-        const operationID = "ORDER_" + Date.now();
+        const { amount, orderId } = req.body;
+        const operationID = "ORDER_" + orderId; // Жестко привязываем QR к ID заказа!
 
-        // Строго твоя схема из документации Бакая: accountNo, currencyId, amount, operationID, qrTtlUnits, qrTtl
         const bakaiPayload = {
-            accountNo: "1240040003285038", // Твой проверенный расчетный счет
-            currencyId: 417,               // Код сома
-            amount: amount || 100,         // Сумма
-            operationID: operationID,      // Уникальный ID операции
-            qrTtlUnits: 1,                 // Минуты
-            qrTtl: 15                      // 15 минут время жизни
+            accountNo: "1240040003285038", 
+            currencyId: 417,               
+            amount: amount || 100,         
+            operationID: operationID,      
+            qrTtlUnits: 1,                 
+            qrTtl: 15                      
         };
 
         const response = await fetch('https://openbanking-api.bakai.kg/api/Qr/GenerateQR', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.BAKAI_TOKEN}` // Подтягиваем токен, который ты сохранил в Render
+                'Authorization': `Bearer ${process.env.BAKAI_TOKEN}` 
             },
             body: JSON.stringify(bakaiPayload)
         });
 
         const data = await response.json();
 
-        if (!response.ok) {
-            console.error("❌ Ошибка генерации QR от Бакай Банка:", data);
-            return res.status(response.status).json({ 
-                error: "Ошибка банка при создании QR", 
-                status: response.status,
-                details: data 
-            });
-        }
+        if (!response.ok) return res.status(response.status).json({ error: "Ошибка банка при создании QR", details: data });
 
-        // Если банк успешно вернул QR-коды
-        res.json({
-            status: "success",
-            message: "QR-код успешно сгенерирован по схеме GenerateQrRequestDto!",
-            operationID: operationID,
-            bakaiResponse: data 
-        });
+        res.json({ status: "success", operationID: operationID, bakaiResponse: data });
 
     } catch (error) {
         console.error("❌ Ошибка сервера:", error);
         res.status(500).json({ error: error.message });
     }
 });
+
 // ==========================================
-// ПРИЕМНИК УВЕДОМЛЕНИЙ ОБ ОПЛАТЕ (WEBHOOK БАКАЙ БАНКА)
+// 3. ВЕБХУК ОТ БАНКА (АВТОМАТИКА)
 // ==========================================
 app.post('/api/bakai-webhook', async (req, res) => {
     try {
-        console.log("🔔 ПРИШЛО УВЕДОМЛЕНИЕ ОТ БАКАЙ БАНКА:", req.body);
+        console.log("🔔 ВЕБХУК ОТ БАКАЙ БАНКА:", req.body);
+        
+        // Банк пришлет нам обратно operationID, который мы ему дали
+        const operationID = req.body.operationID || req.body.OperationId || req.body.operationId;
+        const status = req.body.status || req.body.Status || "SUCCESS";
 
-        // Достаем данные платежа от банка
-        const { operationID, status } = req.body; 
+        // Если пришел успешный статус и есть ID
+        if (operationID && (status.toUpperCase() === "SUCCESS" || status === "COMPLETED" || req.body.isPaid === true)) {
+            const orderId = operationID.replace("ORDER_", ""); // Достаем чистый ID заказа (например "123")
 
-        // Если платеж успешен
-        if (status === "SUCCESS" || status === "COMPLETED" || req.body.success) {
-            
-            // Вытаскиваем ID заказа из operationID (было "ORDER_777" -> станет "777")
-            const orderId = operationID ? operationID.replace("ORDER_", "") : null;
+            // Проверяем статус в базе
+            const { data: existingOrder } = await supabase.from('orders').select('status').eq('id', orderId).single();
 
-            if (orderId) {
-                // 1. Меняем статус заказа в Supabase на 'paid'
-                const { data: updatedOrder, error } = await supabase
+            // Если заказ ждал оплаты, меняем на ОПЛАЧЕНО
+            if (existingOrder && existingOrder.status === 'waiting_payment') {
+                const { data: updatedOrders, error } = await supabase
                     .from('orders')
                     .update({ status: 'paid' })
                     .eq('id', orderId)
                     .select();
 
-                if (!error && updatedOrder && updatedOrder[0]) {
-                    // 2. Автоматически отправляем заказ Админу/Ресторану
-                    adminActions.sendOrderToAdmin(updatedOrder[0]);
-                    console.log(`✅ Заказ №${orderId} автоматически оплачен и отправлен в работу!`);
+                if (!error && updatedOrders && updatedOrders.length > 0) {
+                    // 🎉 ДЕНЬГИ ПРИШЛИ! ТЕПЕРЬ ОТПРАВЛЯЕМ ЗАКАЗ АДМИНУ И В РЕСТОРАН!
+                    adminActions.sendOrderToAdmin(updatedOrders[0]);
+                    console.log(`✅ ЗАКАЗ №${orderId} УСПЕШНО ОПЛАЧЕН И УШЕЛ В РАБОТУ!`);
                 }
             }
         }
-
-        // Обязательно отвечаем банку 200 OK, чтобы он понял, что мы приняли чек
-        res.status(200).json({ status: "ok" });
-
+        
+        res.status(200).json({ status: "ok" }); // Обязательно отвечаем банку ОК
     } catch (err) {
-        console.error("❌ Ошибка при обработке вебхука:", err.message);
-        res.status(200).send("OK"); // Все равно отвечаем 200, чтобы банк не спамил повторами
+        console.error("❌ Ошибка вебхука:", err);
+        res.status(200).send("OK");
     }
 });
 
