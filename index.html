@@ -1135,7 +1135,7 @@ function calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon) {
     
     if (distKm <= 0.5) {
         // До 500 метров
-        baseFee = 130; 
+        baseFee = 1; 
     } else if (distKm <= 1) {
         // От 500 метров до 1 км
         baseFee = 150; 
