@@ -100,31 +100,54 @@ app.post('/web-data', async (req, res) => {
 });
 
 // ==========================================
-// ОДНОРАЗОВАЯ ВЫЖИМАЛКА ТОКЕНА БАКАЙ БАНКА
+// ГЕНЕРАЦИЯ QR-КОДА ПО СХЕМЕ GenerateQrRequestDto (БЕЗ КОММЕНТАРИЕВ)
 // ==========================================
-app.get('/api/get-bakai-token', async (req, res) => {
+app.post('/api/create-qr', async (req, res) => {
     try {
-        const response = await fetch('https://openbanking-api.bakai.kg/Auth/Login', {
+        const { amount } = req.body;
+        const operationID = "ORDER_" + Date.now();
+
+        // Строго твоя схема из документации Бакая: accountNo, currencyId, amount, operationID, qrTtlUnits, qrTtl
+        const bakaiPayload = {
+            accountNo: "1240040003285038", // Твой проверенный расчетный счет
+            currencyId: 417,               // Код сома
+            amount: amount || 100,         // Сумма
+            operationID: operationID,      // Уникальный ID операции
+            qrTtlUnits: 1,                 // Минуты
+            qrTtl: 15                      // 15 минут время жизни
+        };
+
+        const response = await fetch('https://openbanking-api.bakai.kg/api/Qr/GenerateQR', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                login: "PqaDGkbp", // ⚠️ ВСТАВЬ СЮДА НОВЫЙ ЛОГИН ИЗ НОВОГО PDF
-                password: "JkNp4xBS" // ⚠️ ВСТАВЬ СЮДА НОВЫЙ ПАРОЛЬ ИЗ НОВОГО PDF
-            })
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.BAKAI_TOKEN}` // Подтягиваем токен, который ты сохранил в Render
+            },
+            body: JSON.stringify(bakaiPayload)
         });
+
         const data = await response.json();
-        
+
         if (!response.ok) {
-            return res.status(response.status).json({ error: "Банк отклонил запрос. Проверь логин/пароль.", details: data });
+            console.error("❌ Ошибка генерации QR от Бакай Банка:", data);
+            return res.status(response.status).json({ 
+                error: "Ошибка банка при создании QR", 
+                status: response.status,
+                details: data 
+            });
         }
 
-        res.json({ 
-            status: "🔥 УСПЕШНО!", 
-            message: "ТВОЙ НОВЫЙ ТОКЕН НИЖЕ (Скопируй строку token и сохрани в Render Environment как BAKAI_TOKEN):", 
-            token: data.token 
+        // Если банк успешно вернул QR-коды
+        res.json({
+            status: "success",
+            message: "QR-код успешно сгенерирован по схеме GenerateQrRequestDto!",
+            operationID: operationID,
+            bakaiResponse: data 
         });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+
+    } catch (error) {
+        console.error("❌ Ошибка сервера:", error);
+        res.status(500).json({ error: error.message });
     }
 });
 
