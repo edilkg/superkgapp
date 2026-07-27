@@ -32,43 +32,11 @@ setupCourierBot(courierBot, bot, restBot, supabase, ADMIN_GROUP_ID);
 setupRestaurantBot(restBot, courierBot, bot, supabase, ADMIN_GROUP_ID);
 
 const adminActions = setupAdminBot(bot, restBot, courierBot, supabase, ADMIN_GROUP_ID);
+
 // ==========================================
 // ПРИЕМ ЗАКАЗОВ С САЙТА
 // ==========================================
-// ==========================================
-// ОДНОРАЗОВАЯ ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ ТОКЕНА БАКАЙ БАНКА (ОТЛАДКА)
-// ==========================================
-app.get('/api/init-bakai', async (req, res) => {
-    try {
-        const response = await fetch('https://openbanking-api.bakai.kg/Auth/Login', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                login: "cATPLMUA",
-                password: "ke7PV4DU"
-            })
-        });
-        
-        // Читаем ответ не как JSON, а как сырой текст (чтобы поймать HTML)
-        const rawText = await response.text();
-        
-        // Выводим прямо в браузер красивую формочку с ответом банка
-        res.send(`
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <div style="font-family: sans-serif; padding: 20px;">
-                <h2>Отладка Бакай Банка 🛠</h2>
-                <p><b>HTTP Статус:</b> ${response.status} ${response.statusText}</p>
-                <p><b>Ответ от банка:</b></p>
-                <textarea style="width: 100%; height: 300px; padding: 10px; background: #eee; border: 1px solid #ccc; border-radius: 8px;">${rawText}</textarea>
-            </div>
-        `);
-    } catch (error) {
-        res.status(500).send(`Ошибка на нашем сервере: ${error.message}`);
-    }
-});
+
 app.post('/web-data', async (req, res) => {
     try {
         // 👉 1. ДОБАВИЛИ restaurantAddress в прием данных
@@ -131,6 +99,57 @@ app.post('/web-data', async (req, res) => {
         }
     }
 });
+
+
+// ==========================================
+// ГЕНЕРАЦИЯ QR-КОДА ДЛЯ ОПЛАТЫ (БАКАЙ БАНК)
+// ==========================================
+app.post('/api/create-qr', async (req, res) => {
+    try {
+        const { amount } = req.body;
+        const operationID = "ORDER_" + Date.now();
+
+        const bakaiPayload = {
+            accountNo: "1240040003285038", // ⚠️ ВАЖНО: Замени на свой реальный 16/20-значный расчетный счет в Бакай Банке!
+            currencyId: 417, 
+            amount: amount || 100, 
+            operationID: operationID,
+            qrTtlUnits: 1, 
+            qrTtl: 15      
+        };
+
+        const response = await fetch('https://openbanking-api.bakai.kg/api/Qr/GenerateQR', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.BAKAI_TOKEN}`
+            },
+            body: JSON.stringify(bakaiPayload)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.error("❌ Ошибка от Бакай Банка:", data);
+            return res.status(response.status).json({ error: "Ошибка банка", details: data });
+        }
+
+        res.json({
+            status: "success",
+            message: "QR-код успешно сгенерирован!",
+            operationID: operationID,
+            bakaiResponse: data 
+        });
+
+    } catch (error) {
+        console.error("❌ Ошибка сервера:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==========================================
+// ЗАПУСК СЕРВЕРА И БОТОВ
+// ==========================================
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Сервер на порту ${PORT}`));
