@@ -150,6 +150,46 @@ app.post('/api/create-qr', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// ==========================================
+// ПРИЕМНИК УВЕДОМЛЕНИЙ ОБ ОПЛАТЕ (WEBHOOK БАКАЙ БАНКА)
+// ==========================================
+app.post('/api/bakai-webhook', async (req, res) => {
+    try {
+        console.log("🔔 ПРИШЛО УВЕДОМЛЕНИЕ ОТ БАКАЙ БАНКА:", req.body);
+
+        // Достаем данные платежа от банка
+        const { operationID, status } = req.body; 
+
+        // Если платеж успешен
+        if (status === "SUCCESS" || status === "COMPLETED" || req.body.success) {
+            
+            // Вытаскиваем ID заказа из operationID (было "ORDER_777" -> станет "777")
+            const orderId = operationID ? operationID.replace("ORDER_", "") : null;
+
+            if (orderId) {
+                // 1. Меняем статус заказа в Supabase на 'paid'
+                const { data: updatedOrder, error } = await supabase
+                    .from('orders')
+                    .update({ status: 'paid' })
+                    .eq('id', orderId)
+                    .select();
+
+                if (!error && updatedOrder && updatedOrder[0]) {
+                    // 2. Автоматически отправляем заказ Админу/Ресторану
+                    adminActions.sendOrderToAdmin(updatedOrder[0]);
+                    console.log(`✅ Заказ №${orderId} автоматически оплачен и отправлен в работу!`);
+                }
+            }
+        }
+
+        // Обязательно отвечаем банку 200 OK, чтобы он понял, что мы приняли чек
+        res.status(200).json({ status: "ok" });
+
+    } catch (err) {
+        console.error("❌ Ошибка при обработке вебхука:", err.message);
+        res.status(200).send("OK"); // Все равно отвечаем 200, чтобы банк не спамил повторами
+    }
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Сервер на порту ${PORT}`));
