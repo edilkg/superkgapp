@@ -36,30 +36,37 @@ const adminActions = setupAdminBot(bot, restBot, courierBot, supabase, ADMIN_GRO
 // ПРИЕМ ЗАКАЗОВ С САЙТА
 // ==========================================
 // ==========================================
-// ОДНОРАЗОВАЯ ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ ТОКЕНА БАКАЙ БАНКА
+// ОДНОРАЗОВАЯ ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ ТОКЕНА БАКАЙ БАНКА (ОТЛАДКА)
 // ==========================================
 app.get('/api/init-bakai', async (req, res) => {
     try {
-        // Делаем запрос к Бакай Банку
         const response = await fetch('https://openbanking-api.bakai.kg/Auth/Login', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json-patch+json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
             body: JSON.stringify({
                 login: "cATPLMUA",
                 password: "ke7PV4DU"
             })
         });
         
-        const data = await response.json();
+        // Читаем ответ не как JSON, а как сырой текст (чтобы поймать HTML)
+        const rawText = await response.text();
         
-        // Выводим токен прямо тебе на экран телефона
-        res.json({ 
-            status: "🔥 УСПЕШНО!", 
-            message: "Обязательно скопируй токен ниже и сохрани его в надежное место (в заметки):",
-            bakai_response: data 
-        });
+        // Выводим прямо в браузер красивую формочку с ответом банка
+        res.send(`
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <div style="font-family: sans-serif; padding: 20px;">
+                <h2>Отладка Бакай Банка 🛠</h2>
+                <p><b>HTTP Статус:</b> ${response.status} ${response.statusText}</p>
+                <p><b>Ответ от банка:</b></p>
+                <textarea style="width: 100%; height: 300px; padding: 10px; background: #eee; border: 1px solid #ccc; border-radius: 8px;">${rawText}</textarea>
+            </div>
+        `);
     } catch (error) {
-        res.status(500).json({ status: "Ошибка", error: error.message });
+        res.status(500).send(`Ошибка на нашем сервере: ${error.message}`);
     }
 });
 app.post('/web-data', async (req, res) => {
