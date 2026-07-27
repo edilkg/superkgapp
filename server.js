@@ -108,8 +108,8 @@ app.get('/api/get-bakai-token', async (req, res) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                login: "cATPLMUA", // ⚠️ ВСТАВЬ СЮДА НОВЫЙ ЛОГИН ИЗ НОВОГО PDF
-                password: "ke7PV4DU" // ⚠️ ВСТАВЬ СЮДА НОВЫЙ ПАРОЛЬ ИЗ НОВОГО PDF
+                login: "PqaDGkbp", // ⚠️ ВСТАВЬ СЮДА НОВЫЙ ЛОГИН ИЗ НОВОГО PDF
+                password: "JkNp4xBS" // ⚠️ ВСТАВЬ СЮДА НОВЫЙ ПАРОЛЬ ИЗ НОВОГО PDF
             })
         });
         const data = await response.json();
