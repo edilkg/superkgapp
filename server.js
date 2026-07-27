@@ -36,7 +36,6 @@ const adminActions = setupAdminBot(bot, restBot, courierBot, supabase, ADMIN_GRO
 // ==========================================
 // ПРИЕМ ЗАКАЗОВ С САЙТА
 // ==========================================
-
 app.post('/web-data', async (req, res) => {
     try {
         // 👉 1. ДОБАВИЛИ restaurantAddress в прием данных
@@ -100,74 +99,34 @@ app.post('/web-data', async (req, res) => {
     }
 });
 
-
 // ==========================================
-// ГЕНЕРАЦИЯ QR-КОДА ДЛЯ ОПЛАТЫ (С АВТО-ОБНОВЛЕНИЕМ ТОКЕНА)
+// ОДНОРАЗОВАЯ ВЫЖИМАЛКА ТОКЕНА БАКАЙ БАНКА
 // ==========================================
-app.post('/api/create-qr', async (req, res) => {
+app.get('/api/get-bakai-token', async (req, res) => {
     try {
-        const { amount } = req.body;
-        const operationID = "ORDER_" + Date.now();
-
-        // 1. ПОЛУЧАЕМ СВЕЖИЙ ТОКЕН ОТ БАНКА (Живет недолго)
-        const authResponse = await fetch('https://openbanking-api.bakai.kg/Auth/Login', {
+        const response = await fetch('https://openbanking-api.bakai.kg/Auth/Login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                login: "cATPLMUA", // Твой логин из PDF
-                password: "ke7PV4DU" // Твой пароль из PDF
+                login: "cATPLMUA", // ⚠️ ВСТАВЬ СЮДА НОВЫЙ ЛОГИН ИЗ НОВОГО PDF
+                password: "ke7PV4DU" // ⚠️ ВСТАВЬ СЮДА НОВЫЙ ПАРОЛЬ ИЗ НОВОГО PDF
             })
         });
-
-        if (!authResponse.ok) {
-            throw new Error("Банк не выдал токен. Возможно, не прошла минута с прошлого запроса.");
+        const data = await response.json();
+        
+        if (!response.ok) {
+            return res.status(response.status).json({ error: "Банк отклонил запрос. Проверь логин/пароль.", details: data });
         }
 
-        const authData = await authResponse.json();
-        const freshToken = authData.token; // Вот он, новенький пропуск!
-
-        // 2. ГЕНЕРИРУЕМ QR-КОД СО СВЕЖИМ ТОКЕНОМ
-        const bakaiPayload = {
-            accountNo: "1240040003285038", // Твой правильный счет!
-            currencyId: 417, 
-            amount: amount || 100, 
-            operationID: operationID,
-            qrTtlUnits: 1, 
-            qrTtl: 15      
-        };
-
-        const qrResponse = await fetch('https://openbanking-api.bakai.kg/api/Qr/GenerateQR', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${freshToken}` // Используем свежий токен!
-            },
-            body: JSON.stringify(bakaiPayload)
+        res.json({ 
+            status: "🔥 УСПЕШНО!", 
+            message: "ТВОЙ НОВЫЙ ТОКЕН НИЖЕ (Скопируй строку token и сохрани в Render Environment как BAKAI_TOKEN):", 
+            token: data.token 
         });
-
-        const qrData = await qrResponse.json();
-
-        if (!qrResponse.ok) {
-            console.error("❌ Ошибка генерации QR:", qrData);
-            return res.status(qrResponse.status).json({ error: "Ошибка банка при создании QR", details: qrData });
-        }
-
-        res.json({
-            status: "success",
-            message: "QR-код успешно сгенерирован!",
-            operationID: operationID,
-            bakaiResponse: qrData 
-        });
-
-    } catch (error) {
-        console.error("❌ Ошибка сервера:", error);
-        res.status(500).json({ error: error.message });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
-
-// ==========================================
-// ЗАПУСК СЕРВЕРА И БОТОВ
-// ==========================================
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Сервер на порту ${PORT}`));
