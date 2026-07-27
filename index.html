@@ -3045,6 +3045,29 @@ function confirmAddressFromModal() {
         alert("Ошибка сети. Проверьте интернет и попробуйте еще раз.");
         qrImageElement.style.opacity = '1';
     }
+    // Переменная для таймера проверки
+let paymentCheckInterval = null;
+
+function startPaymentAutoCheck(createdOrderId) {
+    // Очищаем прошлый таймер, если был
+    if (paymentCheckInterval) clearInterval(paymentCheckInterval);
+
+    // Каждые 3 секунды спрашиваем у базы данных статус заказа
+    paymentCheckInterval = setInterval(async () => {
+        const { data: order } = await supabase
+            .from('orders')
+            .select('status')
+            .eq('id', createdOrderId)
+            .single();
+
+        if (order && order.status === 'paid') {
+            clearInterval(paymentCheckInterval); // Останавливаем проверку
+            haptic('success');
+            alert("🎉 Оплата успешно получена! Готовим ваш заказ.");
+            openOrderStatus(createdOrderId); // САМИ ПЕРЕВОДИМ НА ЭКРАН СТАТУСА!
+        }
+    }, 3000);
+}
 }
 
         function openOtherQRs() {
