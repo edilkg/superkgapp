@@ -35,6 +35,33 @@ const adminActions = setupAdminBot(bot, restBot, courierBot, supabase, ADMIN_GRO
 // ==========================================
 // ПРИЕМ ЗАКАЗОВ С САЙТА
 // ==========================================
+// ==========================================
+// ОДНОРАЗОВАЯ ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ ТОКЕНА БАКАЙ БАНКА
+// ==========================================
+app.get('/api/init-bakai', async (req, res) => {
+    try {
+        // Делаем запрос к Бакай Банку
+        const response = await fetch('https://openbanking-api.bakai.kg/Auth/Login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json-patch+json' },
+            body: JSON.stringify({
+                login: "cATPLMUA",
+                password: "ke7PV4DU"
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Выводим токен прямо тебе на экран телефона
+        res.json({ 
+            status: "🔥 УСПЕШНО!", 
+            message: "Обязательно скопируй токен ниже и сохрани его в надежное место (в заметки):",
+            bakai_response: data 
+        });
+    } catch (error) {
+        res.status(500).json({ status: "Ошибка", error: error.message });
+    }
+});
 app.post('/web-data', async (req, res) => {
     try {
         // 👉 1. ДОБАВИЛИ restaurantAddress в прием данных
