@@ -1149,7 +1149,7 @@ function calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon) {
     
     // Если время от 22:00 (вечер) до 06:00 (утро) — накидываем 50 сом
     if (currentHour >= 22 || currentHour < 6) {
-        baseFee += 50; 
+        baseFee += 1; 
     }
 
     // 5. МАТЕМАТИКА: Считаем итоговую сумму
