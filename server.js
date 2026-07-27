@@ -102,15 +102,33 @@ app.post('/web-data', async (req, res) => {
 
 
 // ==========================================
-// ГЕНЕРАЦИЯ QR-КОДА ДЛЯ ОПЛАТЫ (БАКАЙ БАНК)
+// ГЕНЕРАЦИЯ QR-КОДА ДЛЯ ОПЛАТЫ (С АВТО-ОБНОВЛЕНИЕМ ТОКЕНА)
 // ==========================================
 app.post('/api/create-qr', async (req, res) => {
     try {
         const { amount } = req.body;
         const operationID = "ORDER_" + Date.now();
 
+        // 1. ПОЛУЧАЕМ СВЕЖИЙ ТОКЕН ОТ БАНКА (Живет недолго)
+        const authResponse = await fetch('https://openbanking-api.bakai.kg/Auth/Login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                login: "cATPLMUA", // Твой логин из PDF
+                password: "ke7PV4DU" // Твой пароль из PDF
+            })
+        });
+
+        if (!authResponse.ok) {
+            throw new Error("Банк не выдал токен. Возможно, не прошла минута с прошлого запроса.");
+        }
+
+        const authData = await authResponse.json();
+        const freshToken = authData.token; // Вот он, новенький пропуск!
+
+        // 2. ГЕНЕРИРУЕМ QR-КОД СО СВЕЖИМ ТОКЕНОМ
         const bakaiPayload = {
-            accountNo: "1240040003285038", // ⚠️ ВАЖНО: Замени на свой реальный 16/20-значный расчетный счет в Бакай Банке!
+            accountNo: "1240040003285038", // Твой правильный счет!
             currencyId: 417, 
             amount: amount || 100, 
             operationID: operationID,
@@ -118,27 +136,27 @@ app.post('/api/create-qr', async (req, res) => {
             qrTtl: 15      
         };
 
-        const response = await fetch('https://openbanking-api.bakai.kg/api/Qr/GenerateQR', {
+        const qrResponse = await fetch('https://openbanking-api.bakai.kg/api/Qr/GenerateQR', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.BAKAI_TOKEN}`
+                'Authorization': `Bearer ${freshToken}` // Используем свежий токен!
             },
             body: JSON.stringify(bakaiPayload)
         });
 
-        const data = await response.json();
+        const qrData = await qrResponse.json();
 
-        if (!response.ok) {
-            console.error("❌ Ошибка от Бакай Банка:", data);
-            return res.status(response.status).json({ error: "Ошибка банка", details: data });
+        if (!qrResponse.ok) {
+            console.error("❌ Ошибка генерации QR:", qrData);
+            return res.status(qrResponse.status).json({ error: "Ошибка банка при создании QR", details: qrData });
         }
 
         res.json({
             status: "success",
             message: "QR-код успешно сгенерирован!",
             operationID: operationID,
-            bakaiResponse: data 
+            bakaiResponse: qrData 
         });
 
     } catch (error) {
