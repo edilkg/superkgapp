@@ -2975,37 +2975,77 @@ function confirmAddressFromModal() {
         const MY_QR_IMAGE_URL = "https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/MBNKQR.jpeg"; 
         const MY_PAYMENT_NUMBER = "500402002"; 
 
-        function openPaymentScreen() {
-            // 👉 ЗАЩИТА: Ограничение на 2 активных заказа
-            let activeOrders = JSON.parse(localStorage.getItem('tamak_active_order_ids') || '[]');
-            if (activeOrders.length >= 2) {
-                return alert("⚠️ У вас уже есть 2 активных заказа!\nПожалуйста, дождитесь их доставки, прежде чем делать новый.");
-            }
+        async function openPaymentScreen() {
+    // 👉 ЗАЩИТА: Ограничение на 2 активных заказа
+    let activeOrders = JSON.parse(localStorage.getItem('tamak_active_order_ids') || '[]');
+    if (activeOrders.length >= 2) {
+        return alert("⚠️ У вас уже есть 2 активных заказа!\nПожалуйста, дождитесь их доставки, прежде чем делать новый.");
+    }
 
-            // 1. ЗАЩИТА: Проверяем данные ДО оплаты
-            if (!orderAddressData.street && currentDeliveryFee > 0) return alert("Пожалуйста, выберите адрес на карте!");
-            
-            const clientPhone = document.getElementById('client-phone').value;
-            if (!clientPhone) return alert("Пожалуйста, укажите ваш номер телефона для курьера!");
+    // 1. ЗАЩИТА: Проверяем данные ДО оплаты
+    if (!orderAddressData.street && currentDeliveryFee > 0) return alert("Пожалуйста, выберите адрес на карте!");
+    
+    const clientPhone = document.getElementById('client-phone').value;
+    if (!clientPhone) return alert("Пожалуйста, укажите ваш номер телефона для курьера!");
 
-            // 2. Считаем итоговую сумму (Товары + Доставка)
-            let tabTotalSum = 0; 
-            for(let k in cartItems) { 
-                if(cartItems[k].resId === cartActiveTabResId) {
-                    tabTotalSum += (cartItems[k].pricePerUnit * cartItems[k].count); 
-                }
-            }
-            let finalDeliveryFee = currentDeliveryFee > 0 ? (currentDeliveryFee + doorDeliveryFee) : 0;
-            let finalTotal = tabTotalSum + finalDeliveryFee;
-
-            // 3. Выводим сумму на экран оплаты
-            document.getElementById('payment-total-amount').innerText = finalTotal + " сом";
-
-            // 4. Открываем экран
-            document.getElementById('custom-qr-code').src = MY_QR_IMAGE_URL;
-            history.pushState({screen: 'payment'}, '');
-            showScreen('payment');
+    // 2. Считаем итоговую сумму (Товары + Доставка)
+    let tabTotalSum = 0; 
+    for(let k in cartItems) { 
+        if(cartItems[k].resId === cartActiveTabResId) {
+            tabTotalSum += (cartItems[k].pricePerUnit * cartItems[k].count); 
         }
+    }
+    let finalDeliveryFee = currentDeliveryFee > 0 ? (currentDeliveryFee + doorDeliveryFee) : 0;
+    let finalTotal = tabTotalSum + finalDeliveryFee;
+
+    // 3. Выводим сумму на экран оплаты
+    document.getElementById('payment-total-amount').innerText = finalTotal + " сом";
+
+    // 4. Открываем экран с эффектом "Загрузки" QR-кода
+    const qrImageElement = document.getElementById('custom-qr-code');
+    // Можно поставить ссылку на красивую GIF-ку загрузки, пока ждем ответа:
+    qrImageElement.src = "https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/loading.gif"; // Замени на свою гифку если есть, или оставь пустой
+    qrImageElement.style.opacity = '0.3'; // Делаем бледным
+    qrImageElement.style.pointerEvents = 'none'; // Отключаем клики на время загрузки
+
+    history.pushState({screen: 'payment'}, '');
+    showScreen('payment');
+
+    // 5. СТУЧИМСЯ НА НАШ СЕРВЕР ЗА БОЕВЫМ QR-КОДОМ
+    try {
+        const response = await fetch('https://tamak-backend.onrender.com/api/create-qr', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: finalTotal }) // Передаем реальную сумму заказа!
+        });
+
+        const result = await response.json(); 
+
+        if (result.status === "success" && result.bakaiResponse) {
+            // Магия Base64: Добавляем префикс, чтобы браузер понял, что это JPEG картинка
+            const base64Image = 'data:image/jpeg;base64,' + result.bakaiResponse.qrImageWithFrame;
+            
+            // Вставляем готовую картинку с рамкой
+            qrImageElement.src = base64Image;
+            qrImageElement.style.opacity = '1';
+            qrImageElement.style.pointerEvents = 'auto'; // Возвращаем клики
+
+            // 🚀 СУПЕР-ФИШКА (Deep Link): Делаем QR кликабельным для мобилок!
+            if (result.bakaiResponse.qrLink) {
+                qrImageElement.onclick = function() {
+                    window.location.href = result.bakaiResponse.qrLink;
+                };
+            }
+        } else {
+            alert("Не удалось сгенерировать QR-код. Попробуйте обновить страницу.");
+            qrImageElement.style.opacity = '1';
+        }
+    } catch (e) {
+        console.error("Ошибка при получении QR:", e);
+        alert("Ошибка сети. Проверьте интернет и попробуйте еще раз.");
+        qrImageElement.style.opacity = '1';
+    }
+}
 
         function openOtherQRs() {
     if(tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
