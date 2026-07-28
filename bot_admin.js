@@ -3,171 +3,151 @@ const { Markup } = require('telegraf');
 module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase, ADMIN_GROUP_ID) {
     
     // ==========================================
-    // 1. КНОПКА: ОДОБРИТЬ ОПЛАТУ ЗАКАЗА (ЕДИНАЯ ЛОГИКА)
-    // ==========================================
-    adminBot.action(/approve_order_(.+)/, async (ctx) => {
-        const orderId = ctx.match[1].trim(); 
-        console.log(`[АДМИН] Нажата кнопка Оплата получена для заказа: #${orderId}`);
-        
-        try {
-            await ctx.answerCbQuery("Одобряем...").catch(() => {});
+// СТАРЫЕ РУЧНЫЕ КНОПКИ ЗАКОММЕНТИРОВАНЫ (ОСТАВЛЕНЫ НА БУДУЩЕЕ)
+// ==========================================
+/*
+adminBot.action(/approve_order_(.+)/, async (ctx) => { ... });
+adminBot.action(/reject_order_(.+)/, async (ctx) => { ... });
+*/
 
-            const { data: order, error: fetchErr } = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
-            if (fetchErr || !order) return ctx.answerCbQuery("❌ Заказ не найден", { show_alert: true }).catch(() => {});
+// ==========================================
+// НОВАЯ ФУНКЦИЯ: АВТОМАТИЧЕСКОЕ РАСПРЕДЕЛЕНИЕ ОПЛАЧЕННОГО ЗАКАЗА
+// Вызывается из server.js (вебхуком) сразу после успешной оплаты
+// ==========================================
+const sendOrderToAdmin = async (order) => {
+    // 1. Crash-proof: строгая проверка на наличие данных
+    if (!order || !order.id) return;
+    
+    const orderId = order.id;
+    console.log(`[АВТОМАТИКА] Распределение оплаченного заказа #${orderId}...`);
 
-            if (order.status === 'paid') {
-                return ctx.answerCbQuery("⚠️ Этот заказ уже одобрен!", { show_alert: true }).catch(() => {});
-            }
-
-            // 1. Меняем статус в БД
-            await supabase.from('orders').update({ status: 'paid' }).eq('id', orderId);
-
-            // 2. Уведомляем клиента и сохраняем кнопку для админа
-            const buttons = [];
-            const cid = order.client_id;
-            if (cid && String(cid) !== '111' && String(cid) !== 'null' && String(cid) !== 'undefined') {
-                buttons.push([Markup.button.url("💬 Написать клиенту", `tg://user?id=${cid}`)]);
-                
-                try { 
-                    await adminBot.telegram.sendMessage(
-                        cid, 
-                        `✅ <b>Оплата успешно получена!</b>\n\nВаш заказ <b>#${String(orderId).slice(0,5)}</b> передан в ресторан и курьеру🚀`, 
-                        { parse_mode: 'HTML' }
-                    ); 
-                } catch(e) {
-                    console.error("Ошибка при отправке уведомления клиенту об оплате:", e);
-                }
-            }
-
-            // 👉 3. ОБНОВЛЯЕМ СООБЩЕНИЕ АДМИНА (СОХРАНЯЕМ ВЕСЬ ТЕКСТ)
-            const oldText = ctx.callbackQuery.message.text || '';
-            let newText = '';
-            
-            if (oldText.includes('🚨 НОВЫЙ ЗАКАЗ')) {
-                newText = oldText.replace(
-                    '🚨 НОВЫЙ ЗАКАЗ НА ПРОВЕРКУ ОПЛАТЫ!', 
-                    `✅ ЗАКАЗ #${String(orderId).slice(0,5)} ОДОБРЕН (Оплата получена)`
+    try {
+        // 2. УВЕДОМЛЯЕМ КЛИЕНТА ОБ УСПЕШНОЙ ОПЛАТЕ (Исключаем ID 111)
+        const cid = order.client_id;
+        if (cid && String(cid) !== '111' && String(cid) !== 'null' && String(cid) !== 'undefined') {
+            try {
+                await bot.telegram.sendMessage(
+                    cid,
+                    `✅ <b>Оплата успешно получена!</b>\n\nВаш заказ <b>#${String(orderId).slice(0,5)}</b> передан в ресторан и курьеру🚀`,
+                    { parse_mode: 'HTML' }
                 );
-            } else {
-                let addressSuffix = '';
-                if (order.comment && order.comment.includes('🏪 Адрес ресторана:')) {
-                    const parts = order.comment.split(' | ');
-                    const addrPart = parts.find(p => p.includes('🏪 Адрес ресторана:'));
-                    if (addrPart) {
-                        addressSuffix = ` (${addrPart.replace('🏪 Адрес ресторана:', '').trim()})`;
-                    }
-                }
-                const fullRestName = `${order.restaurant || 'Не указан'}${addressSuffix}`;
-                newText = `✅ ЗАКАЗ #${String(orderId).slice(0,5)} ОДОБРЕН (Оплата получена)\n🏢 Ресторан: ${fullRestName}\n💰 Сумма: ${order.total_price} сом`;
+            } catch(e) { 
+                console.error("Ошибка уведомления клиента:", e); 
             }
+        }
 
-            // Применяем новый текст и НОВУЮ клавиатуру
-            await ctx.editMessageText(newText, buttons.length > 0 ? Markup.inlineKeyboard(buttons) : undefined).catch(() => {});
+        // 3. ОТПРАВЛЯЕМ ИНФО АДМИНАМ (Просто для отчетности, без кнопок подтверждения)
+        let addressSuffix = '';
+        if (order.comment && order.comment.includes('🏪 Адрес ресторана:')) {
+            const parts = order.comment.split(' | ');
+            const addrPart = parts.find(p => p.includes('🏪 Адрес ресторана:'));
+            if (addrPart) addressSuffix = ` (${addrPart.replace('🏪 Адрес ресторана:', '').trim()})`;
+        }
+        const fullRestName = `${order.restaurant || 'Не указан'}${addressSuffix}`;
+        const adminMsg = `✅ АВТО-ОПЛАТА: ЗАКАЗ #${String(orderId).slice(0,5)}\n🏢 Ресторан: ${fullRestName}\n💰 Сумма: ${order.total_price} сом`;
+        
+        try { 
+            await bot.telegram.sendMessage(ADMIN_GROUP_ID, adminMsg); 
+        } catch(e) {
+            console.error("Ошибка отправки админам:", e);
+        }
 
-            // 👉 4. ОТПРАВКА В РЕСТОРАН
-            if (order.restaurant) {
-                const { data: restData, error: restErr } = await supabase.from('restaurants').select('id, name, is_approved').ilike('name', order.restaurant).maybeSingle();
+        // 4. ОТПРАВЛЯЕМ ЗАКАЗ В РЕСТОРАН
+        if (order.restaurant) {
+            const { data: restData, error: restErr } = await supabase
+                .from('restaurants')
+                .select('id, name, is_approved')
+                .ilike('name', order.restaurant)
+                .maybeSingle();
+            
+            if (restData && restData.is_approved) {
+                let itemsArr = [];
+                try { 
+                    itemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]'); 
+                } catch(e) {}
                 
-                if (restErr) {
-                    await ctx.reply(`❌ Ошибка БД при поиске ресторана: ${restErr.message}`);
-                } else if (!restData) {
-                    await ctx.reply(`⚠️ ВНИМАНИЕ: Ресторан "${order.restaurant}" не найден в базе данных! Бот не смог переслать им этот заказ.`);
-                } else if (!restData.is_approved) {
-                    await ctx.reply(`⚠️ ВНИМАНИЕ: Ресторан "${order.restaurant}" не прошел модерацию (is_approved = false). Заказ не отправлен!`);
-                } else {
-                    let itemsArr = [];
-                    try { itemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]'); } catch(e) {}
-                    
-                    let foodOnlyTotal = 0;
-                    itemsArr.forEach(i => {
-                        const price = Number(i.price || (i.item ? i.item.price : 0)) || 0;
-                        const count = Number(i.count) || 0;
-                        foodOnlyTotal += price * count;
-                    });
+                let foodOnlyTotal = 0;
+                itemsArr.forEach(i => {
+                    const price = Number(i.price || (i.item ? i.item.price : 0)) || 0;
+                    const count = Number(i.count) || 0;
+                    foodOnlyTotal += price * count;
+                });
 
-                    const itemsText = itemsArr.map(i => {
-                        const name = i.item ? i.item.name : i.name;
-                        return `▫️ ${name.replace(/</g, '&lt;').replace(/>/g, '&gt;')} x${i.count}`;
-                    }).join('\n');
-                    
-                    const clientName = (order.client_name || 'Гость').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    const clientPhone = order.phone || 'Не указан';
-                    
-                    let restDetails = 'Нет';
-                    if (order.comment) {
-                        const parts = order.comment.split(' | ');
-                        const filteredParts = parts.filter(p => p.includes('🍴 Приборы') || p.includes('💬 Кухне'));
-                        if (filteredParts.length > 0) {
-                            restDetails = filteredParts.join(' | ');
-                        }
-                    }
-                    
-                    let msgRest = `🍔 НОВЫЙ ЗАКАЗ <b>#${String(orderId).slice(0,5)}</b>\n\n` +
-                                  `👤 Клиент: <b>${clientName}</b>\n` +
-                                  `📞 Номер: ${clientPhone}\n` +
-                                  `💬 Детали: <b>${restDetails}</b>\n\n` +
-                                  `🛒 Заказ:\n${itemsText}\n\n` +
-                                  `💰 Сумма: ${foodOnlyTotal} сом`; 
-                    
+                const itemsText = itemsArr.map(i => {
+                    const name = i.item ? i.item.name : i.name;
+                    return `▫️ ${name.replace(/</g, '&lt;').replace(/>/g, '&gt;')} x${i.count}`;
+                }).join('\n');
+                
+                const clientName = (order.client_name || 'Гость').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                const clientPhone = order.phone || 'Не указан';
+                
+                let restDetails = 'Нет';
+                if (order.comment) {
+                    const parts = order.comment.split(' | ');
+                    const filteredParts = parts.filter(p => p.includes('🍴 Приборы') || p.includes('💬 Кухне'));
+                    if (filteredParts.length > 0) restDetails = filteredParts.join(' | ');
+                }
+                
+                let msgRest = `🍔 НОВЫЙ ЗАКАЗ <b>#${String(orderId).slice(0,5)}</b>\n\n` +
+                              `👤 Клиент: <b>${clientName}</b>\n` +
+                              `📞 Номер: ${clientPhone}\n` +
+                              `💬 Детали: <b>${restDetails}</b>\n\n` +
+                              `🛒 Заказ:\n${itemsText}\n\n` +
+                              `💰 Сумма: ${foodOnlyTotal} сом`; 
+                
+                try {
                     await restBot.telegram.sendMessage(restData.id, msgRest, {
                         parse_mode: 'HTML',
                         ...Markup.inlineKeyboard([
                             [Markup.button.callback('✅ Принять', `rest_accept_${orderId}`)],
                             [Markup.button.callback('❌ Отклонить', `rest_decline_${orderId}`)]
                         ])
-                    }).catch(async (e) => {
-                        console.error("Ошибка отправки в ресторан:", e.message);
-                        await ctx.reply(`❌ Ошибка отправки заказа в ресторан "${order.restaurant}".\nПричина: ${e.message}`);
                     });
+                } catch(e) { 
+                    console.error("Ошибка отправки в ресторан:", e.message); 
                 }
             }
-
-            // 👉 5. ОТПРАВКА КУРЬЕРАМ В ОБЩУЮ ГРУППУ
-            const COURIER_GROUP_ID = '-1004348705428'; 
-            
-            let courierItemsArr = [];
-            try { courierItemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]'); } catch(e) {}
-            
-            let foodPrice = 0;
-            courierItemsArr.forEach(i => {
-                const price = Number(i.price || (i.item ? i.item.price : 0)) || 0;
-                const count = Number(i.count) || 0;
-                foodPrice += price * count;
-            });
-
-            const deliveryPrice = Math.max(0, (order.total_price || 0) - foodPrice);
-
-            let addressSuffixCourier = '';
-            if (order.comment && order.comment.includes('🏪 Адрес ресторана:')) {
-                const parts = order.comment.split(' | ');
-                const addrPart = parts.find(p => p.includes('🏪 Адрес ресторана:'));
-                if (addrPart) {
-                    addressSuffixCourier = ` (${addrPart.replace('🏪 Адрес ресторана:', '').trim()})`;
-                }
-            }
-            const fullRestNameCourier = `${order.restaurant || 'Не указан'}${addressSuffixCourier}`;
-
-            let msgCourier = `🔥 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n` +
-                             `🏢 Ресторан: <b>${fullRestNameCourier}</b>\n` + 
-                             `💰 Доставка: <b>${deliveryPrice} сом</b>\n\n` +
-                             `Кто заберет?`;
-            
-            try {
-                await courierBot.telegram.sendMessage(COURIER_GROUP_ID, msgCourier, {
-                    parse_mode: 'HTML',
-                    ...Markup.inlineKeyboard([
-                        [Markup.button.callback('🙋‍♂️ Я возьму', `courier_take_${orderId}`)]
-                    ])
-                });
-            } catch (e) {
-                console.error("❌ Ошибка отправки заказа в общую группу курьеров:", e);
-            }
-
-        } catch (err) {
-            console.error("[АДМИН] Ошибка при одобрении заказа:", err);
-            try { await ctx.answerCbQuery("❌ Произошла ошибка на сервере", { show_alert: true }); } catch(e){}
         }
-    });
+
+        // 5. ОТПРАВЛЯЕМ КУРЬЕРАМ В ГРУППУ
+        const COURIER_GROUP_ID = '-1004348705428'; 
+        let courierItemsArr = [];
+        try { 
+            courierItemsArr = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]'); 
+        } catch(e) {}
+        
+        let foodPrice = 0;
+        courierItemsArr.forEach(i => {
+            const price = Number(i.price || (i.item ? i.item.price : 0)) || 0;
+            const count = Number(i.count) || 0;
+            foodPrice += price * count;
+        });
+
+        const deliveryPrice = Math.max(0, (order.total_price || 0) - foodPrice);
+        
+        let msgCourier = `🔥 НОВЫЙ ЗАКАЗ #${String(orderId).slice(0,5)}!\n\n` +
+                         `🏢 Ресторан: <b>${fullRestName}</b>\n` + 
+                         `💰 Доставка: <b>${deliveryPrice} сом</b>\n\n` +
+                         `Кто заберет?`;
+        
+        try {
+            await courierBot.telegram.sendMessage(COURIER_GROUP_ID, msgCourier, {
+                parse_mode: 'HTML',
+                ...Markup.inlineKeyboard([
+                    [Markup.button.callback('🙋‍♂️ Я возьму', `courier_take_${orderId}`)]
+                ])
+            });
+        } catch (e) { 
+            console.error("Ошибка отправки курьерам:", e); 
+        }
+
+    } catch (err) {
+        console.error("[АВТОМАТИКА] Глобальная ошибка обработки заказа:", err);
+    }
+};
+
+// Не забудь убедиться, что функция экспортируется (если это необходимо в твоей архитектуре):
+// module.exports = { sendOrderToAdmin, ... };
 
     // ==========================================
     // 2. КНОПКА: ОТКЛОНИТЬ ОПЛАТУ
