@@ -2850,10 +2850,6 @@ function confirmAddressFromModal() {
             }
             updateReceipt(); // Сразу обновляем чек
         }
-
-        // =========================================================
-// ПОЛНЫЙ ЦИКЛ ОФОРМЛЕНИЯ ЗАКАЗА И ГЕНЕРАЦИИ QR (АВТОМАТИКА)
-// =========================================================
 // =========================================================
 // ПОЛНЫЙ ЦИКЛ ОФОРМЛЕНИЯ ЗАКАЗА И ПЕРЕХОД ПО ПЛАТЕЖНОЙ ССЫЛКЕ
 // =========================================================
@@ -2952,19 +2948,35 @@ async function openPaymentScreen() {
             for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
             if (typeof recalcTotal === 'function') recalcTotal();
 
-            // Ищем саму ссылку в ответе банка (обычно это поле url, link или payLink)
+            // Ищем саму ссылку в ответе банка
             const payUrl = linkResult.bakaiResponse.url || linkResult.bakaiResponse.link || linkResult.bakaiResponse.payLink || linkResult.bakaiResponse.Url;
 
             if (payUrl) {
-                // 🚀 МАГИЯ: ПЕРЕНАПРАВЛЯЕМ КЛИЕНТА ПРЯМО НА ОПЛАТУ!
-                window.location.href = payUrl; 
+                // 🚀 МАГИЯ: Открываем банк поверх приложения!
+                if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) {
+                    window.Telegram.WebApp.openLink(payUrl);
+                } else {
+                    window.open(payUrl, '_blank');
+                }
+
+                // Пока юзер платит в новом окне, мы на фоне переводим его на экран статуса
+                if (typeof checkActiveOrder === 'function') {
+                    checkActiveOrder(); // Эта функция сама поймет, что есть заказ и откроет статус
+                } else {
+                    history.pushState({screen: 'status'}, '');
+                    showScreen('status');
+                }
+
+                // И запускаем тот самый интервал! Он будет опрашивать базу.
+                // Как только наш вебхук обновит статус на paid, экран сам поменяется на "Передаем на кухню"
+                if (typeof startPaymentAutoCheck === 'function') {
+                    startPaymentAutoCheck(createdOrderId);
+                }
+
             } else {
                 console.error("Странный ответ от банка, нет ссылки:", linkResult.bakaiResponse);
                 throw new Error("Банк не вернул ссылку на оплату");
             }
-
-        } else {
-            throw new Error(linkResult.error || "Не удалось получить ссылку от банка");
         }
 
     } catch (e) {
