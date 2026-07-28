@@ -112,7 +112,7 @@ if (user && user.id && user.id != 111) {
 });
 
 // ==========================================
-// 2. ГЕНЕРАЦИЯ ПЛАТЕЖНОЙ ССЫЛКИ (С ОТЛАДКОЙ ТОКЕНА)
+// 2. ГЕНЕРАЦИЯ ПЛАТЕЖНОЙ ССЫЛКИ (ФИНАЛЬНАЯ ВЕРСИЯ)
 // ==========================================
 app.post('/api/create-paylink', async (req, res) => {
     try {
@@ -133,35 +133,33 @@ app.post('/api/create-paylink', async (req, res) => {
             return res.status(500).json({ error: "BAKAI_TOKEN не найден в Render" });
         }
 
-        // 🕵️ ШПИОН: Смотрим, какой именно токен сервер пытается отправить (первые 15 символов)
-        console.log(`🔑 ШПИОН ТОКЕНА: Начинается на -> ${token.substring(0, 15)} | Длина: ${token.length} символов`);
         console.log("📤 Отправляем в Бакай Банк:", bakaiPayload);
 
         const response = await fetch('https://openbanking-api.bakai.kg/api/PayLink/CreatePayLink', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token.trim()}` // trim() на всякий случай удалит пробелы
+                'Authorization': `Bearer ${token.trim()}` 
             },
             body: JSON.stringify(bakaiPayload)
         });
 
+        // БЕРЕМ ОТВЕТ КАК ПРОСТОЙ ТЕКСТ
         const textData = await response.text();
-        let data;
-        try { data = JSON.parse(textData); } catch (e) {
-            console.error("❌ Банк вернул не JSON:", textData);
-            return res.status(response.status).json({ error: "Банк вернул текст вместо JSON", details: textData });
-        }
 
         if (!response.ok) {
-            console.error("❌ Ошибка при создании ссылки:", data);
-            return res.status(response.status).json({ 
-                error: data.message || data.title || JSON.stringify(data) || "Ошибка банка", 
-                details: data 
-            });
+            console.error("❌ Ошибка при создании ссылки:", textData);
+            return res.status(response.status).json({ error: textData || "Ошибка банка" });
         }
 
-        res.json({ status: "success", transactionID: transactionID, bakaiResponse: data });
+        console.log("✅ Банк УСПЕШНО сгенерировал ссылку:", textData);
+
+        // Упаковываем голую ссылку в JSON, чтобы фронтенд ее понял!
+        res.json({ 
+            status: "success", 
+            transactionID: transactionID, 
+            bakaiResponse: { url: textData } // <-- Передаем ссылку в поле url
+        });
 
     } catch (error) {
         console.error("❌ Ошибка сервера:", error);
