@@ -2854,7 +2854,11 @@ function confirmAddressFromModal() {
         // =========================================================
 // ПОЛНЫЙ ЦИКЛ ОФОРМЛЕНИЯ ЗАКАЗА И ГЕНЕРАЦИИ QR (АВТОМАТИКА)
 // =========================================================
+// =========================================================
+// ПОЛНЫЙ ЦИКЛ ОФОРМЛЕНИЯ ЗАКАЗА И ПЕРЕХОД ПО ПЛАТЕЖНОЙ ССЫЛКЕ
+// =========================================================
 async function openPaymentScreen() {
+    // 1. ПРОВЕРКИ И ЗАЩИТА
     let activeOrders = JSON.parse(localStorage.getItem('tamak_active_order_ids') || '[]');
     if (activeOrders.length >= 2) return alert("⚠️ Лимит: максимум 2 заказа одновременно!");
     if (!orderAddressData.street && currentDeliveryFee > 0) return alert("Пожалуйста, выберите адрес на карте!");
@@ -2862,6 +2866,7 @@ async function openPaymentScreen() {
     const clientPhone = document.getElementById('client-phone').value;
     if (!clientPhone) return alert("Пожалуйста, укажите ваш номер телефона для курьера!");
 
+    // Сохраняем локальные данные
     localStorage.setItem('tamak_client_phone', clientPhone);
     if (clientLat && clientLon) {
         localStorage.setItem('tamak_last_lat', clientLat);
@@ -2869,21 +2874,23 @@ async function openPaymentScreen() {
         localStorage.setItem('tamak_last_street', orderAddressData.street || '');
     }
 
+    // 2. ЗАМОРОЗКА ГЛАВНОЙ КНОПКИ В КОРЗИНЕ
     const mainPayBtn = document.getElementById('main-pay-btn');
     let originalText = mainPayBtn ? mainPayBtn.innerText : "Оплатить";
     if (mainPayBtn) {
-        mainPayBtn.innerText = '⏳ Создаем заказ...';
+        mainPayBtn.innerText = '⏳ Соединение с банком...';
         mainPayBtn.style.pointerEvents = 'none';
         mainPayBtn.style.opacity = '0.7';
     }
 
     try {
+        // 3. СБОРКА ДАННЫХ ДЛЯ БД
         let tabTotalSum = 0; 
         for(let k in cartItems) { 
             if(cartItems[k].resId === cartActiveTabResId) tabTotalSum += (cartItems[k].pricePerUnit * cartItems[k].count); 
         }
         let finalDeliveryFee = currentDeliveryFee > 0 ? (currentDeliveryFee + doorDeliveryFee) : 0;
-        let finalTotal = tabTotalSum + finalDeliveryFee;
+        let finalTotal = tabTotalSum + finalDeliveryFee; // ЭТА СУММА УЙДЕТ В БАНК И БУДЕТ ЗАМОРОЖЕНА!
 
         let fullAddress = orderAddressData.street;
         if(orderAddressData.kv) fullAddress += ` (${orderAddressData.kv})`;
@@ -2915,7 +2922,7 @@ async function openPaymentScreen() {
 
         haptic('selection');
 
-        // 1. Создаем черновик заказа в базе
+        // 4. СОХРАНЯЕМ ЗАКАЗ В БД (Получаем ID)
         const dbResponse = await fetch('https://tamak-backend.onrender.com/web-data', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2926,19 +2933,17 @@ async function openPaymentScreen() {
         if (!dbResponse.ok) throw new Error(dbResult.error || "Сбой создания заказа в БД");
         const createdOrderId = dbResult.orderId;
 
-        // 2. Запрашиваем QR-код
-        if (mainPayBtn) mainPayBtn.innerText = '⏳ Генерация QR...';
-
-        const qrResponse = await fetch('https://tamak-backend.onrender.com/api/create-qr', {
+        // 5. ЗАПРАШИВАЕМ ПЛАТЕЖНУЮ ССЫЛКУ У НАШЕГО СЕРВЕРА
+        const linkResponse = await fetch('https://tamak-backend.onrender.com/api/create-paylink', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ amount: finalTotal, orderId: createdOrderId })
         });
-        const qrResult = await qrResponse.json();
+        const linkResult = await linkResponse.json();
 
-        if (qrResponse.ok && qrResult.status === "success" && qrResult.bakaiResponse) {
+        if (linkResponse.ok && linkResult.status === "success" && linkResult.bakaiResponse) {
             
-            // 💡 ЗАЩИТА: Записываем в активные заказы ТОЛЬКО КОГДА СГЕНЕРИРОВАЛСЯ QR!
+            // 💡 ЗАЩИТА: Записываем в активные заказы и чистим корзину только если банк дал ссылку!
             if (!activeOrders.includes(createdOrderId)) {
                 activeOrders.push(createdOrderId);
                 localStorage.setItem('tamak_active_order_ids', JSON.stringify(activeOrders));
@@ -2947,30 +2952,25 @@ async function openPaymentScreen() {
             for(let k in cartItems) { if(cartItems[k].resId === cartActiveTabResId) delete cartItems[k]; }
             if (typeof recalcTotal === 'function') recalcTotal();
 
-            // Рисуем QR и переводим на экран оплаты
-            document.getElementById('payment-total-amount').innerText = finalTotal + " сом";
-            const qrImageElement = document.getElementById('custom-qr-code');
-            
-            const rawBase64 = qrResult.bakaiResponse.qrImageWithFrame || qrResult.bakaiResponse.qrImage;
-            qrImageElement.src = 'data:image/jpeg;base64,' + rawBase64;
-            
-            if (qrResult.bakaiResponse.qrLink) {
-                qrImageElement.onclick = function() { window.location.href = qrResult.bakaiResponse.qrLink; };
+            // Ищем саму ссылку в ответе банка (обычно это поле url, link или payLink)
+            const payUrl = linkResult.bakaiResponse.url || linkResult.bakaiResponse.link || linkResult.bakaiResponse.payLink || linkResult.bakaiResponse.Url;
+
+            if (payUrl) {
+                // 🚀 МАГИЯ: ПЕРЕНАПРАВЛЯЕМ КЛИЕНТА ПРЯМО НА ОПЛАТУ!
+                window.location.href = payUrl; 
+            } else {
+                console.error("Странный ответ от банка, нет ссылки:", linkResult.bakaiResponse);
+                throw new Error("Банк не вернул ссылку на оплату");
             }
 
-            history.pushState({screen: 'payment'}, '');
-            showScreen('payment');
-
-            // Запускаем фоновый авто-просмотр оплаты
-            startPaymentAutoCheck(createdOrderId);
-
         } else {
-            throw new Error(qrResult.error || "Не удалось получить QR от банка");
+            throw new Error(linkResult.error || "Не удалось получить ссылку от банка");
         }
 
     } catch (e) {
         alert("Ошибка при заказе: " + e.message);
     } finally {
+        // Размораживаем кнопку, если произошла ошибка
         if (mainPayBtn) {
             mainPayBtn.innerText = originalText;
             mainPayBtn.style.pointerEvents = 'auto';
