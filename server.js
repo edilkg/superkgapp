@@ -29,9 +29,8 @@ setupCourierBot(courierBot, bot, restBot, supabase, ADMIN_GROUP_ID);
 setupRestaurantBot(restBot, courierBot, bot, supabase, ADMIN_GROUP_ID);
 const adminActions = setupAdminBot(bot, restBot, courierBot, supabase, ADMIN_GROUP_ID);
 
-
 // ==========================================
-// 0. ОДНОРАЗОВАЯ ВЫЖИМАЛКА ТОКЕНА (ДЛЯ ПЛАТЕЖНЫХ ССЫЛОК)
+// 0. ОДНОРАЗОВАЯ ВЫЖИМАЛКА ТОКЕНА 
 // ==========================================
 app.get('/api/get-bakai-token', async (req, res) => {
     try {
@@ -39,8 +38,8 @@ app.get('/api/get-bakai-token', async (req, res) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                login: "hhMAnbHQ",     // Твой новый одноразовый логин
-                password: "dvPD9BNM"   // Твой новый одноразовый пароль
+                login: "m8kCCNSV",    // Твой новый логин
+                password: "57FcUKMn"  // Твой новый пароль
             })
         });
         const data = await response.json();
@@ -51,14 +50,13 @@ app.get('/api/get-bakai-token', async (req, res) => {
 
         res.json({ 
             status: "🔥 УСПЕШНО!", 
-            message: "СОХРАНИ ЭТОТ ТОКЕН В RENDER КАК BAKAI_TOKEN", 
+            message: "СОХРАНИ ЭТОТ ТОКЕН В RENDER В ПЕРЕМЕННУЮ BAKAI_TOKEN", 
             token: data.token 
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
-
 
 // ==========================================
 // 1. СОЗДАНИЕ ЗАКАЗА В БАЗЕ (status: 'waiting_payment')
@@ -69,6 +67,7 @@ app.post('/web-data', async (req, res) => {
         
         if (type !== 'food') return res.status(400).json({ error: 'Тип не еда' });
 
+        // Защита от спама (не больше 2 активных заказов)
         if (user && user.id && user.id != 111) {
             const { data: activeUserOrders } = await supabase
                 .from('orders').select('id').eq('client_id', user.id)
@@ -86,6 +85,7 @@ app.post('/web-data', async (req, res) => {
         if (resComment) extraDetails.push(`💬 Кухне: ${resComment}`);
         if (dest_lat && dest_lon) extraDetails.push(`🗺 2ГИС: https://2gis.kg/geo/${dest_lon},${dest_lat}`);
 
+        // Сохраняем заказ как waiting_payment
         const { data: orderData, error: dbError } = await supabase.from('orders').insert([{
             client_id: user?.id || null,
             client_name: user?.first_name || 'Гость',
@@ -110,26 +110,26 @@ app.post('/web-data', async (req, res) => {
 });
 
 // ==========================================
-// 2. ГЕНЕРАЦИЯ ПЛАТЕЖНОЙ ССЫЛКИ (ПО СХЕМЕ CreatePayLink)
+// 2. ГЕНЕРАЦИЯ ПЛАТЕЖНОЙ ССЫЛКИ (СХЕМА CreatePayLink)
 // ==========================================
 app.post('/api/create-paylink', async (req, res) => {
     try {
         const { amount, orderId } = req.body;
         const transactionID = "ORDER_" + orderId;
 
-        // Новая схема Бакай Банка для платежных ссылок
+        // Формируем строгий запрос для банка по твоей схеме
         const bakaiPayload = {
-            amount: amount || 100,         
-            transactionID: transactionID,  
-            comment: `Оплата заказа №${orderId} в TamakKG`, 
-            redirectURL: "https://t.me/Tamak_kg_bot", // Ссылка, куда вернется юзер после оплаты (поменяй на свою при необходимости)
-            ttlUnits: 1,                 
-            ttl: 15                      
+            amount: amount,                 // Строго фиксированная сумма из корзины!
+            transactionID: transactionID,   // Уникальный ID платежа
+            comment: `Оплата заказа №${orderId}`, // Комментарий в чеке
+            redirectURL: "https://t.me/Tamak_kg_bot", // Куда вернуть клиента
+            ttlUnits: 1,                    // В минутах
+            ttl: 15                         // Ссылка живет 15 минут
         };
 
-        const token = process.env.BAKAI_TOKEN;
+        const token = process.env.BAKAI_TOKEN; // Достаем токен из Render
         if (!token) {
-            return res.status(500).json({ error: "BAKAI_TOKEN не найден в Render" });
+            return res.status(500).json({ error: "Токен Бакай Банка не найден (BAKAI_TOKEN)" });
         }
 
         const response = await fetch('https://openbanking-api.bakai.kg/api/PayLink/CreatePayLink', {
@@ -141,21 +141,19 @@ app.post('/api/create-paylink', async (req, res) => {
             body: JSON.stringify(bakaiPayload)
         });
 
-        // Защита от не-JSON ответов
         const textData = await response.text();
         let data;
-        try {
-            data = JSON.parse(textData);
-        } catch (e) {
+        try { data = JSON.parse(textData); } catch (e) {
             console.error("❌ Банк вернул не JSON:", textData);
             return res.status(response.status).json({ error: "Странный ответ банка", details: textData });
         }
 
         if (!response.ok) {
-            console.error("❌ Ошибка банка при создании ссылки:", data);
-            return res.status(response.status).json({ error: "Ошибка банка при создании ссылки", details: data });
+            console.error("❌ Ошибка при создании ссылки:", data);
+            return res.status(response.status).json({ error: "Ошибка банка", details: data });
         }
 
+        // Возвращаем ссылку на фронтенд!
         res.json({ status: "success", transactionID: transactionID, bakaiResponse: data });
 
     } catch (error) {
@@ -171,7 +169,6 @@ app.post('/api/bakai-webhook', async (req, res) => {
     try {
         console.log("🔔 ВЕБХУК ОТ БАКАЙ БАНКА:", req.body);
         
-        // В разных сервисах банк может присылать ID по-разному, ловим все варианты
         const incomingID = req.body.transactionID || req.body.operationID || req.body.TransactionId || req.body.OperationId;
         const status = req.body.status || req.body.Status || "SUCCESS";
 
@@ -189,7 +186,7 @@ app.post('/api/bakai-webhook', async (req, res) => {
 
                 if (!error && updatedOrders && updatedOrders.length > 0) {
                     adminActions.sendOrderToAdmin(updatedOrders[0]);
-                    console.log(`✅ ЗАКАЗ №${orderId} УСПЕШНО ОПЛАЧЕН И УШЕЛ В РАБОТУ!`);
+                    console.log(`✅ ЗАКАЗ №${orderId} ОПЛАЧЕН ПО ССЫЛКЕ! ОТПРАВЛЕН В РАБОТУ!`);
                 }
             }
         }
