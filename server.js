@@ -112,7 +112,7 @@ if (user && user.id && user.id != 111) {
 });
 
 // ==========================================
-// 2. ГЕНЕРАЦИЯ ПЛАТЕЖНОЙ ССЫЛКИ (ФИНАЛЬНАЯ ВЕРСИЯ)
+// 2. ГЕНЕРАЦИЯ ПЛАТЕЖНОЙ ССЫЛКИ
 // ==========================================
 app.post('/api/create-paylink', async (req, res) => {
     try {
@@ -123,17 +123,14 @@ app.post('/api/create-paylink', async (req, res) => {
             amount: Number(amount),         
             transactionID: transactionID,   
             comment: `Oplata zakaza #${orderId}`, 
-            redirectURL: "https://t.me/Tamak_kg_bot", 
+            // 🌟 МЕНЯЕМ ССЫЛКУ: Теперь клиент не улетит в бота, а увидит красивую страницу успеха!
+            redirectURL: "https://tamak-backend.onrender.com/success", 
             ttlUnits: 1,                    
             ttl: 15                         
         };
 
         const token = process.env.BAKAI_TOKEN;
-        if (!token) {
-            return res.status(500).json({ error: "BAKAI_TOKEN не найден в Render" });
-        }
-
-        console.log("📤 Отправляем в Бакай Банк:", bakaiPayload);
+        if (!token) return res.status(500).json({ error: "BAKAI_TOKEN не найден" });
 
         const response = await fetch('https://openbanking-api.bakai.kg/api/PayLink/CreatePayLink', {
             method: 'POST',
@@ -144,26 +141,57 @@ app.post('/api/create-paylink', async (req, res) => {
             body: JSON.stringify(bakaiPayload)
         });
 
-        // БЕРЕМ ОТВЕТ КАК ПРОСТОЙ ТЕКСТ
         const textData = await response.text();
+        if (!response.ok) return res.status(response.status).json({ error: textData || "Ошибка банка" });
 
-        if (!response.ok) {
-            console.error("❌ Ошибка при создании ссылки:", textData);
-            return res.status(response.status).json({ error: textData || "Ошибка банка" });
-        }
-
-        console.log("✅ Банк УСПЕШНО сгенерировал ссылку:", textData);
-
-        // Упаковываем голую ссылку в JSON, чтобы фронтенд ее понял!
-        res.json({ 
-            status: "success", 
-            transactionID: transactionID, 
-            bakaiResponse: { url: textData } // <-- Передаем ссылку в поле url
-        });
-
+        res.json({ status: "success", transactionID: transactionID, bakaiResponse: { url: textData } });
     } catch (error) {
-        console.error("❌ Ошибка сервера:", error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// ==========================================
+// 3. ЭКРАН УСПЕШНОЙ ОПЛАТЫ (ДЛЯ БАНКА)
+// ==========================================
+app.get('/success', (req, res) => {
+    res.send('<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;background:#f0f8ff;text-align:center;margin:0;"><div><h1 style="color:#4CAF50;font-size:50px;margin:0;">✅</h1><h2>Оплата прошла успешно!</h2><p style="color:#555;">Пожалуйста, закройте это окно (нажмите крестик) и вернитесь в приложение TamakKG.</p></div></body></html>');
+});
+
+// ==========================================
+// 4. ВЕБХУК ОТ БАНКА (ПОЧИНЕННЫЙ)
+// ==========================================
+app.post('/api/bakai-webhook', async (req, res) => {
+    try {
+        console.log("🔔 ВЕБХУК ОТ БАКАЙ БАНКА:", req.body);
+        
+        const incomingID = req.body.transactionID || req.body.operationID || req.body.TransactionId || req.body.OperationId;
+        const status = req.body.status || req.body.Status || "SUCCESS";
+
+        if (incomingID && (status.toUpperCase() === "SUCCESS" || status === "COMPLETED" || req.body.isPaid === true)) {
+            
+            // 🐛 ИСПРАВЛЕНИЕ БАГА: Убираем "ORDER" без подчеркивания, чтобы сервер нашел ID в базе!
+            const orderId = incomingID.replace("ORDER", "");
+
+            const { data: existingOrder } = await supabase.from('orders').select('status').eq('id', orderId).single();
+
+            if (existingOrder && existingOrder.status === 'waiting_payment') {
+                const { data: updatedOrders, error } = await supabase
+                    .from('orders')
+                    .update({ status: 'paid' })
+                    .eq('id', orderId)
+                    .select();
+
+                if (!error && updatedOrders && updatedOrders.length > 0) {
+                    // ТЕПЕРЬ ЗАКАЗ ТОЧНО УЛЕТИТ В РЕСТОРАН!
+                    adminActions.sendOrderToAdmin(updatedOrders[0]);
+                    console.log(`✅ ЗАКАЗ №${orderId} ОПЛАЧЕН ПО ССЫЛКЕ! ОТПРАВЛЕН В РАБОТУ!`);
+                }
+            }
+        }
+        res.status(200).json({ status: "ok" });
+    } catch (err) {
+        console.error("❌ Ошибка вебхука:", err);
+        res.status(200).send("OK");
     }
 });
 
