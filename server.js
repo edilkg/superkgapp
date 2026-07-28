@@ -112,18 +112,17 @@ if (user && user.id && user.id != 111) {
 });
 
 // ==========================================
-// 2. ГЕНЕРАЦИЯ ПЛАТЕЖНОЙ ССЫЛКИ (С ОТЛАДКОЙ ОШИБОК)
+// 2. ГЕНЕРАЦИЯ ПЛАТЕЖНОЙ ССЫЛКИ (С ОТЛАДКОЙ ТОКЕНА)
 // ==========================================
 app.post('/api/create-paylink', async (req, res) => {
     try {
         const { amount, orderId } = req.body;
-        // Уберем подчеркивание на всякий случай, некоторые банки любят только цифры и буквы
         const transactionID = "ORDER" + orderId; 
 
         const bakaiPayload = {
-            amount: Number(amount),         // Принудительно делаем числом
+            amount: Number(amount),         
             transactionID: transactionID,   
-            comment: `Oplata zakaza #${orderId}`, // Используем латиницу без спецсимволов для безопасности
+            comment: `Oplata zakaza #${orderId}`, 
             redirectURL: "https://t.me/Tamak_kg_bot", 
             ttlUnits: 1,                    
             ttl: 15                         
@@ -134,13 +133,15 @@ app.post('/api/create-paylink', async (req, res) => {
             return res.status(500).json({ error: "BAKAI_TOKEN не найден в Render" });
         }
 
+        // 🕵️ ШПИОН: Смотрим, какой именно токен сервер пытается отправить (первые 15 символов)
+        console.log(`🔑 ШПИОН ТОКЕНА: Начинается на -> ${token.substring(0, 15)} | Длина: ${token.length} символов`);
         console.log("📤 Отправляем в Бакай Банк:", bakaiPayload);
 
         const response = await fetch('https://openbanking-api.bakai.kg/api/PayLink/CreatePayLink', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}` 
+                'Authorization': `Bearer ${token.trim()}` // trim() на всякий случай удалит пробелы
             },
             body: JSON.stringify(bakaiPayload)
         });
@@ -154,7 +155,6 @@ app.post('/api/create-paylink', async (req, res) => {
 
         if (!response.ok) {
             console.error("❌ Ошибка при создании ссылки:", data);
-            // ПЕРЕДАЕМ ТОЧНУЮ ОШИБКУ БАНКА НА ФРОНТЕНД!
             return res.status(response.status).json({ 
                 error: data.message || data.title || JSON.stringify(data) || "Ошибка банка", 
                 details: data 
