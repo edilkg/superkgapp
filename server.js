@@ -68,14 +68,16 @@ app.post('/web-data', async (req, res) => {
         if (type !== 'food') return res.status(400).json({ error: 'Тип не еда' });
 
         // Защита от спама (не больше 2 активных заказов)
-        if (user && user.id && user.id != 111) {
-            const { data: activeUserOrders } = await supabase
-                .from('orders').select('id').eq('client_id', user.id)
-                .in('status', ['waiting_payment', 'paid', 'cooking', 'delivery']);
-            if (activeUserOrders && activeUserOrders.length >= 2) {
-                return res.status(400).json({ error: 'У вас уже есть 2 активных заказа! Дождитесь их завершения.' });
-            }
-        }
+if (user && user.id && user.id != 111) {
+    const { data: activeUserOrders } = await supabase
+        .from('orders').select('id').eq('client_id', user.id)
+        // 👇 УБРАЛИ waiting_payment отсюда!
+        .in('status', ['paid', 'cooking', 'delivery']); 
+        
+    if (activeUserOrders && activeUserOrders.length >= 2) {
+        return res.status(400).json({ error: 'У вас уже есть 2 готовящихся заказа! Дождитесь их доставки.' });
+    }
+}
 
         let extraDetails = [];
         if (restaurantAddress) extraDetails.push(`🏪 Адрес ресторана: ${restaurantAddress}`); 
