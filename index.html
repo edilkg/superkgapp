@@ -2994,38 +2994,46 @@ async function openPaymentScreen() {
 // =========================================================
 // АВТО-ОПРОС СТАТУСА ИЗ БАЗЫ (РАБОТАЕТ В ФОНЕ)
 // =========================================================
-let paymentCheckInterval = null;
-
-let paymentCheckInterval;
 
 function startPaymentAutoCheck(orderId) {
-    // Если таймер уже запущен - останавливаем старый, чтобы не было дублей
-    if (paymentCheckInterval) clearInterval(paymentCheckInterval);
-    
-    // Запускаем новый опрос каждые 3 секунды
-    paymentCheckInterval = setInterval(async () => {
+    // 1. Crash-proof: проверка на null и undefined
+    if (!orderId) return;
+
+    // 2. Строго без новых глобальных переменных (используем window)
+    if (window.paymentCheckInterval) {
+        clearInterval(window.paymentCheckInterval);
+    }
+
+    window.paymentCheckInterval = setInterval(async () => {
         try {
-            // Обращаемся к нашему новому "мосту" на бэкенде
+            // 3. Сетевой запрос внутри try/catch
             const response = await fetch(`https://tamak-backend.onrender.com/api/check-status/${orderId}`);
-            const result = await response.json();
             
-            // Если статус изменился с "ожидает оплаты" на что-то другое (например, paid)
-            if (result.status && result.status !== 'waiting_payment') {
-                console.log("✅ Оплата прошла! Статус изменился на:", result.status);
-                
-                // Останавливаем таймер, больше проверять не нужно
-                clearInterval(paymentCheckInterval); 
-                
-                // Перерисовываем экран (твоя функция сама покажет "Передаем на кухню")
+            // Защита от ответов не в формате JSON или 500-х ошибок сервера
+            if (!response.ok) {
+                console.error("Сетевая ошибка при проверке статуса");
+                return; 
+            }
+
+            const result = await response.json();
+
+            // 4. Crash-proof: строгая проверка наличия полей перед чтением
+            if (result && result.status && result.status !== 'waiting_payment') {
+                console.log("✅ Оплата подтверждена! Новый статус:", result.status);
+
+                clearInterval(window.paymentCheckInterval);
+                window.paymentCheckInterval = undefined;
+
                 if (typeof checkActiveOrder === 'function') {
-                    checkActiveOrder(); 
+                    checkActiveOrder();
                 }
             }
         } catch (e) {
-            console.log("Ошибка авто-опроса:", e);
+            console.error("Ошибка авто-опроса:", e);
         }
-    }, 3000); 
+    }, 3000);
 }
+
 // ==========================================
         // ЛОГИКА ЭКРАНА ОПЛАТЫ
         // ==========================================
