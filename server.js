@@ -110,27 +110,29 @@ app.post('/web-data', async (req, res) => {
 });
 
 // ==========================================
-// 2. ГЕНЕРАЦИЯ ПЛАТЕЖНОЙ ССЫЛКИ (СХЕМА CreatePayLink)
+// 2. ГЕНЕРАЦИЯ ПЛАТЕЖНОЙ ССЫЛКИ (С ОТЛАДКОЙ ОШИБОК)
 // ==========================================
 app.post('/api/create-paylink', async (req, res) => {
     try {
         const { amount, orderId } = req.body;
-        const transactionID = "ORDER_" + orderId;
+        // Уберем подчеркивание на всякий случай, некоторые банки любят только цифры и буквы
+        const transactionID = "ORDER" + orderId; 
 
-        // Формируем строгий запрос для банка по твоей схеме
         const bakaiPayload = {
-            amount: amount,                 // Строго фиксированная сумма из корзины!
-            transactionID: transactionID,   // Уникальный ID платежа
-            comment: `Оплата заказа №${orderId}`, // Комментарий в чеке
-            redirectURL: "https://t.me/Tamak_kg_bot", // Куда вернуть клиента
-            ttlUnits: 1,                    // В минутах
-            ttl: 15                         // Ссылка живет 15 минут
+            amount: Number(amount),         // Принудительно делаем числом
+            transactionID: transactionID,   
+            comment: `Oplata zakaza #${orderId}`, // Используем латиницу без спецсимволов для безопасности
+            redirectURL: "https://t.me/Tamak_kg_bot", 
+            ttlUnits: 1,                    
+            ttl: 15                         
         };
 
-        const token = process.env.BAKAI_TOKEN; // Достаем токен из Render
+        const token = process.env.BAKAI_TOKEN;
         if (!token) {
-            return res.status(500).json({ error: "Токен Бакай Банка не найден (BAKAI_TOKEN)" });
+            return res.status(500).json({ error: "BAKAI_TOKEN не найден в Render" });
         }
+
+        console.гlog("📤 Отправляем в Бакай Банк:", bakaiPayload);
 
         const response = await fetch('https://openbanking-api.bakai.kg/api/PayLink/CreatePayLink', {
             method: 'POST',
@@ -145,15 +147,18 @@ app.post('/api/create-paylink', async (req, res) => {
         let data;
         try { data = JSON.parse(textData); } catch (e) {
             console.error("❌ Банк вернул не JSON:", textData);
-            return res.status(response.status).json({ error: "Странный ответ банка", details: textData });
+            return res.status(response.status).json({ error: "Банк вернул текст вместо JSON", details: textData });
         }
 
         if (!response.ok) {
             console.error("❌ Ошибка при создании ссылки:", data);
-            return res.status(response.status).json({ error: "Ошибка банка", details: data });
+            // ПЕРЕДАЕМ ТОЧНУЮ ОШИБКУ БАНКА НА ФРОНТЕНД!
+            return res.status(response.status).json({ 
+                error: data.message || data.title || JSON.stringify(data) || "Ошибка банка", 
+                details: data 
+            });
         }
 
-        // Возвращаем ссылку на фронтенд!
         res.json({ status: "success", transactionID: transactionID, bakaiResponse: data });
 
     } catch (error) {
