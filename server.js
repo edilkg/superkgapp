@@ -134,7 +134,7 @@ app.post('/api/create-paylink', async (req, res) => {
             return res.status(500).json({ error: "BAKAI_TOKEN не найден в Render" });
         }
 
-        console.гlog("📤 Отправляем в Бакай Банк:", bakaiPayload);
+        console.log("📤 Отправляем в Бакай Банк:", bakaiPayload);
 
         const response = await fetch('https://openbanking-api.bakai.kg/api/PayLink/CreatePayLink', {
             method: 'POST',
