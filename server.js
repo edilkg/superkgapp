@@ -232,6 +232,18 @@ app.post('/api/bakai-webhook', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+// ==========================================
+// 5. ПРОВЕРКА СТАТУСА ЗАКАЗА ДЛЯ ФРОНТЕНДА
+// ==========================================
+app.get('/api/check-status/:id', async (req, res) => {
+    try {
+        const { data, error } = await supabase.from('orders').select('status').eq('id', req.params.id).single();
+        if (error) throw error;
+        res.json({ status: data.status });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 app.listen(PORT, () => console.log(`🚀 Сервер на порту ${PORT}`));
 
 const startBots = async () => {
