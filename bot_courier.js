@@ -115,7 +115,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
 
             let newBalance = courierCheck.balance || 0;
 
-            // 👉 ЛОГИКА НАЗНАЧЕНИЯ В БАЗЕ (Обычный заказ vs Ручной)
+            // 👉 ЛОГИКА НАЗНАЧЕНИЯ В БАЗЕ (Ручной вызов vs Обычный заказ)
             if (orderCheck.is_manual) {
                 // РУЧНОЙ ЗАКАЗ: Сразу завершаем его и списываем 20 сом
                 newBalance -= 20;
@@ -146,7 +146,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             await ctx.editMessageText(groupMsg + `\n\n✅ ЗАКАЗ ВЗЯЛ: ${cName}`, { reply_markup: { inline_keyboard: [] } }).catch(() => {});
             await ctx.answerCbQuery("✅ Вы назначены на заказ! Подробности в ЛС.");
 
-            // 👉 ФОРМИРУЕМ СООБЩЕНИЕ В ЛИЧКУ
+            // 👉 ФОРМИРУЕМ СООБЩЕНИЕ В ЛИЧКУ КУРЬЕРУ
             let privateText = '';
             const buttons = [];
 
@@ -158,12 +158,23 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                               `💸 Комиссия за заказ: 20 сом\n` +
                               `💳 Остаток Баланса: ${newBalance} сом`;
             } else {
-                // ТЕКСТ ДЛЯ ОБЫЧНОГО ЗАКАЗА ИЗ ПРИЛОЖЕНИЯ (С кнопками)
+                // ТЕКСТ ДЛЯ ОБЫЧНОГО ЗАКАЗА ИЗ ПРИЛОЖЕНИЯ (Crash-proof вычисление цены доставки)
                 buttons.push([Markup.button.callback('📦 Я взял заказ (Еду к клиенту)', `courier_picked_up_${orderId}`)]);
 
-                let deliveryPriceText = 'Неизвестно';
-                const priceMatch = groupMsg.match(/💰 Доставка:\s*(\d+)\s*сом/);
-                if (priceMatch && priceMatch[1]) deliveryPriceText = priceMatch[1];
+                // ВЫСЧИТЫВАЕМ СТОИМОСТЬ ДОСТАВКИ ИЗ БД (без багов с регулярными выражениями)
+                let deliveryPriceText = 0;
+                let foodPrice = 0;
+                try { 
+                    const itemsArr = Array.isArray(orderCheck.items) ? orderCheck.items : JSON.parse(orderCheck.items || '[]');
+                    itemsArr.forEach(i => {
+                        const price = Number(i.price || (i.item ? i.item.price : 0)) || 0;
+                        const count = Number(i.count) || 0;
+                        foodPrice += price * count;
+                    });
+                    deliveryPriceText = Math.max(0, (orderCheck.total_price || 0) - foodPrice);
+                } catch(e) {
+                    console.error("Ошибка парсинга цены доставки", e);
+                }
 
                 let addressSuffix = '';
                 let displayComment = orderCheck.comment || 'Нет комментариев';
@@ -179,7 +190,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 const fullRestName = `${orderCheck.restaurant || 'Не указан'}${addressSuffix}`;
 
                 privateText = `📦 <b>Детали заказа #${String(orderId).slice(0,5)}</b>\n\n` +
-                              `💰 <b>Оплата:</b> <u>${deliveryPriceText} сом</u>\n\n` +
+                              `💰 <b>Заработок за доставку:</b> <u>${deliveryPriceText} сом</u>\n\n` +
                               `📍 Ресторан: <b>${safeHtml(fullRestName)}</b>\n\n` + 
                               `👤 <b>Клиент:</b> ${safeHtml(orderCheck.client_name || 'Гость')}\n` +
                               `📞 <b>Номер:</b> <code>${safeHtml(orderCheck.phone || 'Не указан')}</code>\n` +
@@ -199,7 +210,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 }
             }
 
-            // Отправляем в личку
+            // Отправляем в личку курьеру
             await courierBot.telegram.sendMessage(courierId, privateText, {
                 parse_mode: 'HTML',
                 ...(buttons.length > 0 ? Markup.inlineKeyboard(buttons) : {})
@@ -274,7 +285,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 } catch(e) {}
                 
                 const deliveryPrice = Math.max(0, (order.total_price || 0) - foodPrice);
-                commission = Math.round(deliveryPrice * 0.10); 
+                commission = Math.round(deliveryPrice * 0.10); // Удерживаем 10% с цены доставки
             }
 
             const { data: cData } = await supabase.from('couriers').select('balance').eq('id', courierId).maybeSingle();
