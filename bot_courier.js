@@ -146,7 +146,8 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
 
             // Обновляем сообщение в общей группе
             const groupMsg = ctx.callbackQuery.message.text || '';
-            await ctx.editMessageText(groupMsg + `\n\n✅ ЗАКАЗ ВЗЯЛ: ${cName}`, { reply_markup: { inline_keyboard: [] } }).catch(() => {});
+            // Правильное удаление инлайн-кнопок без багов
+            await ctx.editMessageText(groupMsg + `\n\n✅ ЗАКАЗ ВЗЯЛ: ${cName}`);
             await ctx.answerCbQuery("✅ Вы назначены на заказ! Подробности в ЛС.");
 
             // 👉 ФОРМИРУЕМ СООБЩЕНИЕ В ЛИЧКУ КУРЬЕРУ
@@ -303,7 +304,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             }
 
             const oldText = ctx.callbackQuery.message.text || '';
-            await ctx.editMessageText(oldText + `\n\n🎉 ЗАКАЗ УСПЕШНО ДОСТАВЛЕН!`, { reply_markup: { inline_keyboard: [] } });
+            await ctx.editMessageText(oldText + `\n\n🎉 ЗАКАЗ УСПЕШНО ДОСТАВЛЕН!`);
             await ctx.answerCbQuery("Отличная работа!");
         } catch (err) {
             console.error("Ошибка при статусе 'доставлен':", err);
