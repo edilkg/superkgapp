@@ -227,11 +227,15 @@
 
         async function initPanel() {
             try {
-                currentOwnerId = 5521273499; 
+                // 1. ЖЕСТКАЯ ПРОВЕРКА: Берем ID ТОЛЬКО из Телеграма
                 if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
                     currentOwnerId = tg.initDataUnsafe.user.id;
+                } else {
+                    // Если кто-то открыл ссылку в браузере или Телега затупила
+                    return showError("Ошибка авторизации", "Не удалось получить ваш ID. Пожалуйста, откройте панель внутри Telegram.");
                 }
 
+                // 2. Ищем ресторан в базе по ЭТОМУ ID
                 const { data: restaurant, error: restErr } = await supabaseClient
                     .from('restaurants')
                     .select('*')
@@ -239,7 +243,11 @@
                     .maybeSingle();
 
                 if (restErr) throw restErr;
-                if (!restaurant) return showError("Доступ закрыт", "Ваш Telegram не привязан к ресторану.");
+                
+                // Если ресторан с таким ID не найден (например, зашел левый человек)
+                if (!restaurant) {
+                    return showError("Доступ закрыт", `Ваш Telegram ID (${currentOwnerId}) не привязан ни к одному ресторану.`);
+                }
 
                 document.getElementById('rest-name').innerText = restaurant.name;
 
