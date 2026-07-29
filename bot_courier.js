@@ -8,7 +8,10 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
     // ==========================================
     // 0. СТАРТ И ПРОФИЛЬ
     // ==========================================
-    courierBot.start(async (ctx) => {
+    // ==========================================
+    // 1. КУРЬЕР БЕРЕТ ЗАКАЗ ИЗ ОБЩЕЙ ГРУППЫ
+    // ==========================================
+    courierBot.action(/(?:courier_take_|take_order_)(.+)/, async (ctx) => {
         try {
             const id = ctx.from?.id;
             if (!id) return;
