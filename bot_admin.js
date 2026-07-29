@@ -104,7 +104,6 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
     return {
         sendOrderToAdmin: async (orderData) => {
             try {
-                // 1. Формируем красивый чек для тебя (в админ-группу)
                 const itemsArr = Array.isArray(orderData.items) ? orderData.items : (JSON.parse(orderData.items || '[]'));
                 const itemsText = itemsArr.map(i => {
                     const name = i.item ? i.item.name : i.name;
@@ -130,7 +129,6 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
 
                 const fullRestName = `${orderData.restaurant || 'Не указан'}${addressSuffix}`;
 
-                // Убрали кнопки оплаты, оставили только кнопку "Написать клиенту", если нужно
                 const message = `✅ ОПЛАЧЕННЫЙ ЗАКАЗ В РАБОТЕ!\nID: #${String(orderData.id).slice(0,5)}\n💰 Сумма: ${orderData.total_price} сом\n\n👤 Клиент: ${orderData.client_name || 'Гость'}\n📞 Номер: ${orderData.phone || 'Не указан'}\n📍 Адрес: ${orderData.address || 'Не указан'}\n💬 Комментарий: ${displayComment}\n\n🏢 Ресторан: ${fullRestName}\n\n🛒 Блюда:\n${itemsText}`;
 
                 const buttons = [];
@@ -139,16 +137,10 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                     buttons.push([Markup.button.url("💬 Написать клиенту", `tg://user?id=${cid}`)]);
                 }
 
-                // Отправляем тебе инфо-сообщение
                 await adminBot.telegram.sendMessage(ADMIN_GROUP_ID, message, Markup.inlineKeyboard(buttons));
 
-                // ==========================================
-                // 🚀 АВТОМАТИЧЕСКАЯ РАССЫЛКА (МАГИЯ!)
-                // ==========================================
-                
                 // 1. Отправляем в ресторан
                 try {
-                    // Ищем Telegram ID ресторана в базе по имени
                     const { data: restData } = await supabase
                         .from('restaurants')
                         .select('id')
@@ -166,16 +158,16 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                                 ]]
                             }
                         });
-                    } else {
-                        console.warn(`⚠️ Ресторан ${orderData.restaurant} не найден в базе для отправки заказа.`);
                     }
                 } catch (e) {
                     console.error("❌ Ошибка отправки в ресторан:", e.message);
                 }
 
-                // 2. Отправляем курьерам в общую группу
+                // 2. Отправляем курьерам в общую группу (ПРЯМО ТУДА ЖЕ, ГДЕ АДМИНЫ)
                 try {
-                    const COURIER_GROUP_ID = process.env.COURIER_CHAT_ID; // Убедись, что эта переменная есть в Render
+                    // 👉 МАГИЯ ЗДЕСЬ: Мы просто берем ID админской группы, как это и было раньше!
+                    const COURIER_GROUP_ID = ADMIN_GROUP_ID; 
+
                     if (COURIER_GROUP_ID) {
                         const courierText = `🚕 <b>НОВЫЙ ЗАКАЗ #${orderData.id}</b>\n\nОткуда: ${fullRestName}\nКуда: ${orderData.address}\n\nСумма заказа: ${orderData.total_price} сом`;
                         
