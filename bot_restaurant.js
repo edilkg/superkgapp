@@ -4,12 +4,16 @@ module.exports = function setupRestaurantBot(restBot, courierBot, clientBot, sup
     
     // Команда /panel (на всякий случай)
     restBot.command('panel', (ctx) => {
+        // Берем ID того, кто нажал на команду
+        const currentId = ctx.from.id; 
+
         ctx.reply('🛠 Управление рестораном\nЗдесь вы можете менять стоп-лист и управлять меню:', {
             reply_markup: {
                 inline_keyboard: [
                     [{
                         text: "⚙️ Управление меню",
-                        web_app: { url: "https://superkgapp.vercel.app/restaurant_panel.html" } 
+                        // 👉 МАГИЯ ЗДЕСЬ: Используем обратные кавычки ` ` и передаем ?id=...
+                        web_app: { url: `https://superkgapp.vercel.app/restaurant_panel.html?id=${currentId}` } 
                     }]
                 ]
             }
