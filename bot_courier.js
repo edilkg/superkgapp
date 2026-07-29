@@ -8,10 +8,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
     // ==========================================
     // 0. СТАРТ И ПРОФИЛЬ
     // ==========================================
-    // ==========================================
-    // 1. КУРЬЕР БЕРЕТ ЗАКАЗ ИЗ ОБЩЕЙ ГРУППЫ
-    // ==========================================
-    courierBot.action(/(?:courier_take_|take_order_)(.+)/, async (ctx) => {
+    courierBot.start(async (ctx) => {
         try {
             const id = ctx.from?.id;
             if (!id) return;
@@ -89,14 +86,20 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
     // ==========================================
     // 1. КУРЬЕР БЕРЕТ ЗАКАЗ ИЗ ОБЩЕЙ ГРУППЫ
     // ==========================================
-    courierBot.action(/courier_take_(.+)/, async (ctx) => {
-        const orderId = ctx.match[1].trim(); 
+    courierBot.action(/(?:courier_take_|take_order_)(.+)/, async (ctx) => {
+        // Очищаем ID от любых случайных пробелов или скрытых символов!
+        const orderId = String(ctx.match[1]).trim(); 
         const courierId = ctx.from.id;
+
+        console.log(`[КУРЬЕР] Попытка взять заказ. ID заказа: ${orderId}, ID курьера: ${courierId}`);
 
         try {
             // Проверка баланса курьера
             const { data: courierCheck } = await supabase.from('couriers').select('balance').eq('id', courierId).maybeSingle();
-            if (!courierCheck) return ctx.answerCbQuery("❌ Ошибка: курьер не найден", { show_alert: true });
+            if (!courierCheck) {
+                console.log("[КУРЬЕР] Ошибка: Курьер не найден в БД.");
+                return ctx.answerCbQuery("❌ Ошибка: курьер не найден", { show_alert: true });
+            }
             
             if ((courierCheck.balance || 0) <= 0) {
                 return ctx.answerCbQuery("❌ Ваш баланс 0 или ниже! Пополните счет, чтобы брать заказы.", { show_alert: true });
@@ -104,50 +107,52 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
 
             // Проверка статуса заказа
             const { data: orderCheck, error: checkErr } = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
-            if (checkErr || !orderCheck) return ctx.answerCbQuery("❌ Заказ не найден", { show_alert: true });
+            if (checkErr || !orderCheck) {
+                console.error("[КУРЬЕР] Ошибка поиска заказа:", checkErr);
+                return ctx.answerCbQuery("❌ Заказ не найден", { show_alert: true });
+            }
 
             if (orderCheck.status === 'canceled') {
                 await ctx.answerCbQuery("❌ Отбой! Ресторан отменил этот заказ.", { show_alert: true });
-                return ctx.editMessageText(ctx.callbackQuery.message.text + `\n\n❌ ОТМЕНЕН РЕСТОРАНОМ`, { reply_markup: { inline_keyboard: [] } }).catch(() => {});
+                const currentText = ctx.callbackQuery.message.text || 'Заказ';
+                return ctx.editMessageText(currentText + `\n\n❌ ОТМЕНЕН РЕСТОРАНОМ`).catch(() => {});
             }
             
             if (orderCheck.courier_id && orderCheck.courier_id !== courierId) {
                 await ctx.answerCbQuery("❌ Опоздали! Заказ взял другой курьер", { show_alert: true });
-                return ctx.editMessageText(ctx.callbackQuery.message.text + `\n\n❌ ЗАБРАЛ ДРУГОЙ КУРЬЕР`, { reply_markup: { inline_keyboard: [] } }).catch(() => {});
+                const currentText = ctx.callbackQuery.message.text || 'Заказ';
+                return ctx.editMessageText(currentText + `\n\n❌ ЗАБРАЛ ДРУГОЙ КУРЬЕР`).catch(() => {});
             }
 
             let newBalance = courierCheck.balance || 0;
 
             // 👉 ЛОГИКА НАЗНАЧЕНИЯ В БАЗЕ (Ручной вызов vs Обычный заказ)
             if (orderCheck.is_manual) {
-                // РУЧНОЙ ЗАКАЗ: Сразу завершаем его и списываем 20 сом
                 newBalance -= 20;
                 await supabase.from('orders').update({ courier_id: courierId, status: 'completed' }).eq('id', orderId);
                 await supabase.from('couriers').update({ balance: newBalance }).eq('id', courierId);
             } else {
-                // ОБЫЧНЫЙ ЗАКАЗ: Просто назначаем курьера, статус остается прежним
                 await supabase.from('orders').update({ courier_id: courierId }).eq('id', orderId);
             }
 
-            // Уведомления админу и ресторану
             const { data: courierData } = await supabase.from('couriers').select('name, phone').eq('id', courierId).maybeSingle();
             const cName = courierData?.name || ctx.from.first_name || 'Курьер';
             const cPhone = courierData?.phone || 'Номер не указан';
             
             const notifyMessage = `🛵 Курьер едет за заказом #${String(orderId).slice(0,5)}\n👤 Курьер: ${cName}\n📞 Телефон: ${cPhone}`;
-            try { await bot.telegram.sendMessage(ADMIN_GROUP_ID, notifyMessage); } catch(e) {}
+            try { await bot.telegram.sendMessage(ADMIN_GROUP_ID, notifyMessage); } catch(e) { console.error("Не смог отправить админу", e.message); }
             
             if (orderCheck.restaurant) {
                 const { data: restData } = await supabase.from('restaurants').select('id').eq('name', orderCheck.restaurant).maybeSingle();
                 if (restData) {
-                    try { await restBot.telegram.sendMessage(restData.id, notifyMessage); } catch(e) {}
+                    try { await restBot.telegram.sendMessage(restData.id, notifyMessage); } catch(e) { console.error("Не смог отправить в рест", e.message); }
                 }
             }
 
-            // Обновляем сообщение в общей группе
-            const groupMsg = ctx.callbackQuery.message.text || '';
-            // Правильное удаление инлайн-кнопок без багов
-            await ctx.editMessageText(groupMsg + `\n\n✅ ЗАКАЗ ВЗЯЛ: ${cName}`);
+            // ИСПРАВЛЕНИЕ БАГА ГРУППЫ: Изменяем текст максимально безопасно
+            const groupMsg = ctx.callbackQuery.message.text || `Заказ #${String(orderId).slice(0,5)}`;
+            await ctx.editMessageText(`${groupMsg}\n\n✅ ЗАКАЗ ВЗЯЛ: ${cName}`).catch((e) => console.error("Ошибка editMessageText:", e.message));
+            
             await ctx.answerCbQuery("✅ Вы назначены на заказ! Подробности в ЛС.");
 
             // 👉 ФОРМИРУЕМ СООБЩЕНИЕ В ЛИЧКУ КУРЬЕРУ
@@ -155,17 +160,14 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             const buttons = [];
 
             if (orderCheck.is_manual) {
-                // ТЕКСТ ТОЛЬКО ДЛЯ РУЧНОГО ЗАКАЗА (Без кнопок вообще)
                 privateText = `📦 <b>Детали РУЧНОГО заказа #${String(orderId).slice(0,5)}</b>\n` +
                               `📍 Забрать из: <b>${safeHtml(orderCheck.restaurant)}</b>\n` +
                               `📞 <b>Данные клиента:</b>\n${safeHtml(orderCheck.address)}\n\n` +
                               `💸 Комиссия за заказ: 20 сом\n` +
                               `💳 Остаток Баланса: ${newBalance} сом`;
             } else {
-                // ТЕКСТ ДЛЯ ОБЫЧНОГО ЗАКАЗА ИЗ ПРИЛОЖЕНИЯ (Crash-proof вычисление цены доставки)
                 buttons.push([Markup.button.callback('📦 Я взял заказ (Еду к клиенту)', `courier_picked_up_${orderId}`)]);
 
-                // ВЫСЧИТЫВАЕМ СТОИМОСТЬ ДОСТАВКИ ИЗ БД (без багов с регулярными выражениями)
                 let deliveryPriceText = 0;
                 let foodPrice = 0;
                 try { 
@@ -219,15 +221,16 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 parse_mode: 'HTML',
                 ...(buttons.length > 0 ? Markup.inlineKeyboard(buttons) : {})
             });
+            console.log("[КУРЬЕР] Успешно отправили данные в ЛС курьеру!");
 
         } catch (err) {
-            console.error("❌ Ошибка при взятии заказа курьером:", err);
-            try { await ctx.answerCbQuery("❌ Ошибка базы данных", {show_alert: true}); } catch(e){}
+            console.error("❌ Фатальная ошибка при взятии заказа курьером:", err);
+            try { await ctx.answerCbQuery("❌ Ошибка сервера", {show_alert: true}); } catch(e){}
         }
     });
 
     // ==========================================
-    // 2. КУРЬЕР ЗАБРАЛ ЗАКАЗ (В ПУТИ) - Только для обычных заказов
+    // 2. КУРЬЕР ЗАБРАЛ ЗАКАЗ (В ПУТИ)
     // ==========================================
     courierBot.action(/courier_picked_up_(.+)/, async (ctx) => {
         const orderId = ctx.match[1].trim();
@@ -262,7 +265,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
     });
 
     // ==========================================
-    // 3. КУРЬЕР ДОСТАВИЛ ЗАКАЗ (СПИСАНИЕ КОМИССИИ) - Для обычных заказов
+    // 3. КУРЬЕР ДОСТАВИЛ ЗАКАЗ
     // ==========================================
     courierBot.action(/courier_delivered_(.+)/, async (ctx) => {
         const orderId = ctx.match[1].trim();
@@ -289,7 +292,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 } catch(e) {}
                 
                 const deliveryPrice = Math.max(0, (order.total_price || 0) - foodPrice);
-                commission = Math.round(deliveryPrice * 0.10); // Удерживаем 10% с цены доставки
+                commission = Math.round(deliveryPrice * 0.10); 
             }
 
             const { data: cData } = await supabase.from('couriers').select('balance').eq('id', courierId).maybeSingle();
@@ -304,7 +307,7 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             }
 
             const oldText = ctx.callbackQuery.message.text || '';
-            await ctx.editMessageText(oldText + `\n\n🎉 ЗАКАЗ УСПЕШНО ДОСТАВЛЕН!`);
+            await ctx.editMessageText(oldText + `\n\n🎉 ЗАКАЗ УСПЕШНО ДОСТАВЛЕН!`).catch(() => {});
             await ctx.answerCbQuery("Отличная работа!");
         } catch (err) {
             console.error("Ошибка при статусе 'доставлен':", err);
