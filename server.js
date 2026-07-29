@@ -29,34 +29,6 @@ setupCourierBot(courierBot, bot, restBot, supabase, ADMIN_GROUP_ID);
 setupRestaurantBot(restBot, courierBot, bot, supabase, ADMIN_GROUP_ID);
 const adminActions = setupAdminBot(bot, restBot, courierBot, supabase, ADMIN_GROUP_ID);
 
-// ==========================================
-// 0. ОДНОРАЗОВАЯ ВЫЖИМАЛКА ТОКЕНА 
-// ==========================================
-app.get('/api/get-bakai-token', async (req, res) => {
-    try {
-        const response = await fetch('https://openbanking-api.bakai.kg/Auth/Login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                login: "m8kCCNSV",    // Твой новый логин
-                password: "57FcUKMn"  // Твой новый пароль
-            })
-        });
-        const data = await response.json();
-        
-        if (!response.ok) {
-            return res.status(response.status).json({ error: "Логин уже сгорел или неверный", details: data });
-        }
-
-        res.json({ 
-            status: "🔥 УСПЕШНО!", 
-            message: "СОХРАНИ ЭТОТ ТОКЕН В RENDER В ПЕРЕМЕННУЮ BAKAI_TOKEN", 
-            token: data.token 
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
 
 // ==========================================
 // 1. СОЗДАНИЕ ЗАКАЗА В БАЗЕ (status: 'waiting_payment')
@@ -68,16 +40,15 @@ app.post('/web-data', async (req, res) => {
         if (type !== 'food') return res.status(400).json({ error: 'Тип не еда' });
 
         // Защита от спама (не больше 2 активных заказов)
-if (user && user.id && user.id != 111) {
-    const { data: activeUserOrders } = await supabase
-        .from('orders').select('id').eq('client_id', user.id)
-        // 👇 УБРАЛИ waiting_payment отсюда!
-        .in('status', ['paid', 'cooking', 'delivery']); 
-        
-    if (activeUserOrders && activeUserOrders.length >= 2) {
-        return res.status(400).json({ error: 'У вас уже есть 2 готовящихся заказа! Дождитесь их доставки.' });
-    }
-}
+        if (user && user.id && user.id != 111) {
+            const { data: activeUserOrders } = await supabase
+                .from('orders').select('id').eq('client_id', user.id)
+                .in('status', ['paid', 'cooking', 'delivery']); 
+                
+            if (activeUserOrders && activeUserOrders.length >= 2) {
+                return res.status(400).json({ error: 'У вас уже есть 2 готовящихся заказа! Дождитесь их доставки.' });
+            }
+        }
 
         let extraDetails = [];
         if (restaurantAddress) extraDetails.push(`🏪 Адрес ресторана: ${restaurantAddress}`); 
@@ -123,7 +94,6 @@ app.post('/api/create-paylink', async (req, res) => {
             amount: Number(amount),         
             transactionID: transactionID,   
             comment: `Oplata zakaza #${orderId}`, 
-            // 🌟 МЕНЯЕМ ССЫЛКУ: Теперь клиент не улетит в бота, а увидит красивую страницу успеха!
             redirectURL: "https://tamak-backend.onrender.com/success", 
             ttlUnits: 1,                    
             ttl: 15                         
@@ -158,7 +128,7 @@ app.get('/success', (req, res) => {
 });
 
 // ==========================================
-// 4. ВЕБХУК ОТ БАНКА (ПОЧИНЕННЫЙ)
+// 4. ВЕБХУК ОТ БАНКА (АВТОМАТИЗАЦИЯ)
 // ==========================================
 app.post('/api/bakai-webhook', async (req, res) => {
     try {
@@ -169,11 +139,12 @@ app.post('/api/bakai-webhook', async (req, res) => {
 
         if (incomingID && (status.toUpperCase() === "SUCCESS" || status === "COMPLETED" || req.body.isPaid === true)) {
             
-            // 🐛 ИСПРАВЛЕНИЕ БАГА: Убираем "ORDER" без подчеркивания, чтобы сервер нашел ID в базе!
+            // 🐛 Убираем "ORDER", чтобы сервер нашел ID в базе!
             const orderId = incomingID.replace("ORDER", "");
 
             const { data: existingOrder } = await supabase.from('orders').select('status').eq('id', orderId).single();
 
+            // Если заказ ждал оплаты - переводим в paid и запускаем рассылку
             if (existingOrder && existingOrder.status === 'waiting_payment') {
                 const { data: updatedOrders, error } = await supabase
                     .from('orders')
@@ -196,43 +167,6 @@ app.post('/api/bakai-webhook', async (req, res) => {
 });
 
 // ==========================================
-// 3. ВЕБХУК ОТ БАНКА
-// ==========================================
-app.post('/api/bakai-webhook', async (req, res) => {
-    try {
-        console.log("🔔 ВЕБХУК ОТ БАКАЙ БАНКА:", req.body);
-        
-        const incomingID = req.body.transactionID || req.body.operationID || req.body.TransactionId || req.body.OperationId;
-        const status = req.body.status || req.body.Status || "SUCCESS";
-
-        if (incomingID && (status.toUpperCase() === "SUCCESS" || status === "COMPLETED" || req.body.isPaid === true)) {
-            const orderId = incomingID.replace("ORDER_", "");
-
-            const { data: existingOrder } = await supabase.from('orders').select('status').eq('id', orderId).single();
-
-            if (existingOrder && existingOrder.status === 'waiting_payment') {
-                const { data: updatedOrders, error } = await supabase
-                    .from('orders')
-                    .update({ status: 'paid' })
-                    .eq('id', orderId)
-                    .select();
-
-                if (!error && updatedOrders && updatedOrders.length > 0) {
-                    adminActions.sendOrderToAdmin(updatedOrders[0]);
-                    console.log(`✅ ЗАКАЗ №${orderId} ОПЛАЧЕН ПО ССЫЛКЕ! ОТПРАВЛЕН В РАБОТУ!`);
-                }
-            }
-        }
-        
-        res.status(200).json({ status: "ok" });
-    } catch (err) {
-        console.error("❌ Ошибка вебхука:", err);
-        res.status(200).send("OK");
-    }
-});
-
-const PORT = process.env.PORT || 3000;
-// ==========================================
 // 5. ПРОВЕРКА СТАТУСА ЗАКАЗА ДЛЯ ФРОНТЕНДА
 // ==========================================
 app.get('/api/check-status/:id', async (req, res) => {
@@ -244,6 +178,8 @@ app.get('/api/check-status/:id', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Сервер на порту ${PORT}`));
 
 const startBots = async () => {
