@@ -32,8 +32,11 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 return ctx.reply("⏳ Твой аккаунт на проверке.", Markup.removeKeyboard());
             }
 
-            ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\nИмя: ${courier.name || 'Курьер'}\nТелефон: ${courier.phone || 'Не указан'}\nБаланс: ${courier.balance || 0} сом\n\nДля пополнения баланса напишите админу: @foodkg_admin`, 
-                Markup.keyboard([['👤 Профиль']]).resize()
+            ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\nИмя: ${courier.name || 'Курьер'}\nТелефон: ${courier.phone || 'Не указан'}\nБаланс: ${courier.balance || 0} сом\n\nДля пополнения баланса нажмите кнопку ниже или напишите админу: @foodkg_admin`, 
+                Markup.keyboard([
+                    ['👤 Профиль'],
+                    ['💳 Пополнить баланс']
+                ]).resize()
             );
         } catch (e) { 
             console.error("Ошибка при старте курьера:", e); 
@@ -78,8 +81,31 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
 
             if (text === '👤 Профиль') {
                 if (courier.status === 'waiting_approval') return;
-                return ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\nИмя: ${courier.name || 'Курьер'}\nТелефон: ${courier.phone || 'Не указан'}\nБаланс: ${courier.balance || 0} сом\n\nДля пополнения: @foodkg_admin`);
+                return ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\nИмя: ${courier.name || 'Курьер'}\nТелефон: ${courier.phone || 'Не указан'}\nБаланс: ${courier.balance || 0} сом\n\nДля пополнения нажмите кнопку ниже или напишите админу: @foodkg_admin`,
+                    Markup.keyboard([
+                        ['👤 Профиль'],
+                        ['💳 Пополнить баланс']
+                    ]).resize()
+                );
             }
+
+            // 👉 НОВАЯ КНОПКА ПОПОЛНЕНИЯ БАЛАНСА
+            if (text === '💳 Пополнить баланс') {
+                if (courier.status === 'waiting_approval') return;
+                return ctx.reply(
+                    `💳 <b>Пополнение баланса</b>\n\n` +
+                    `Ваш ID курьера: <code>${id}</code>\n\n` +
+                    `Для автоматического пополнения баланса перейдите по ссылке ниже. ` +
+                    `<b>Обязательно укажите свой ID (${id}) в комментарии к платежу</b>, чтобы система начислила деньги на ваш аккаунт!`,
+                    {
+                        parse_mode: 'HTML',
+                        ...Markup.inlineKeyboard([
+                            [Markup.button.url('Перейти к оплате 💸', 'https://paylink.bakai.kg/96b604d5-064f-4863-9d41-6222dc670d40')]
+                        ])
+                    }
+                );
+            }
+
         } catch (e) {}
     });
 
