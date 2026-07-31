@@ -165,68 +165,43 @@ app.post('/api/bakai-webhook', async (req, res) => {
         res.status(200).send("OK");
     }
 });
-
 // ==========================================
-// ВЕБХУК БАКАЙ БАНКА: ПОПОЛНЕНИЕ БАЛАНСА КУРЬЕРОВ
+// ГЕНЕРАЦИЯ ЖЕСТКОЙ ССЫЛКИ ДЛЯ КУРЬЕРА (ЧЕРЕЗ API БАКАЙ БАНКА)
 // ==========================================
-app.post('/api/bakaicourier-webhook', async (req, res) => {
+app.post('/api/generate-bakai-link', async (req, res) => {
     try {
-        const payment = req.body;
-        console.log("💰 [БАКАЙ ВЕБХУК] Пришел платеж курьера:", payment);
-
-        // Банк присылает сумму и комментарий (названия полей могут чуть отличаться в зависимости от API)
-        const amount = parseFloat(payment.amount || payment.Amount || 0);
-        const comment = payment.comment || payment.description || payment.Comment || '';
-
-        // 👉 Crash-proof: Ищем ID курьера внутри комментария (вытаскиваем все цифры)
-        const idMatch = comment.match(/\d+/);
+        const { courierId, amount } = req.body;
         
-        if (!idMatch) {
-            console.error("❌ Ошибка: Не найден ID курьера в комментарии платежа:", comment);
-            // Отвечаем 200, чтобы банк не спамил нас повторными запросами из-за ошибки клиента
-            return res.status(200).send("No courier ID in comment");
+        // Стучимся в API банка для создания одноразовой защищенной ссылки
+        const response = await fetch('https://openbanking-api.bakai.kg/api/PayLink/CreatePayLink', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.BAKAI_COURIER_TOKEN}` // Твой токен из .env
+            },
+            body: JSON.stringify({
+                Amount: parseFloat(amount), 
+                // Жестко вшиваем ID курьера, чтобы он пришел нам обратно в вебхуке!
+                Comment: `ID_${courierId}`,
+                Description: `Пополнение баланса курьера ${courierId}`
+            })
+        });
+
+        const data = await response.json();
+        console.log("Ответ от Бакай Банка при создании ссылки:", data);
+        
+        // Достаем саму ссылку из ответа банка (посмотри в консоли, как банк её назовет: url, Url или payLink)
+        const payUrl = data.url || data.Url || data.payLink || data.link;
+
+        if (!payUrl) {
+            return res.status(400).json({ error: "Банк не вернул ссылку" });
         }
 
-        const courierId = idMatch[0];
-
-        // 1. Берем текущий баланс курьера из Supabase
-        const { data: courier } = await supabase
-            .from('couriers')
-            .select('balance')
-            .eq('id', courierId)
-            .single();
-
-        if (courier) {
-            // 2. Складываем старый баланс с суммой пополнения
-            const newBalance = (courier.balance || 0) + amount;
-            
-            // 3. Сохраняем новый баланс в базу
-            await supabase
-                .from('couriers')
-                .update({ balance: newBalance })
-                .eq('id', courierId);
-
-            console.log(`✅ Баланс курьера ${courierId} пополнен на ${amount}. Новый баланс: ${newBalance}`);
-
-            // 4. Мгновенно радуем курьера сообщением в бот!
-            try {
-                // Если courierBot у тебя импортирован в server.js, используем его
-                await courierBot.telegram.sendMessage(
-                    courierId, 
-                    `🎉 <b>Оплата успешно получена!</b>\nВаш баланс пополнен на <b>${amount} сом</b>.\n💳 Текущий баланс: ${newBalance} сом.`,
-                    { parse_mode: 'HTML' }
-                );
-            } catch (e) {
-                console.error("Не смогли отправить уведомление курьеру:", e.message);
-            }
-        }
-
-        // Обязательно отвечаем банку статус 200 (ОК)
-        res.status(200).send("OK");
+        res.json({ url: payUrl });
 
     } catch (err) {
-        console.error("❌ Фатальная ошибка в вебхуке Бакай:", err);
-        res.status(500).send("Server Error");
+        console.error("❌ Ошибка при генерации ссылки Бакай:", err);
+        res.status(500).json({ error: "Server error" });
     }
 });
 
