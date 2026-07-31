@@ -89,18 +89,18 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 );
             }
 
-            // 👉 НОВАЯ КНОПКА ПОПОЛНЕНИЯ БАЛАНСА
+            // 👉 НОВАЯ КНОПКА ПОПОЛНЕНИЯ БАЛАНСА (ЧЕРЕЗ MINI APP)
             if (text === '💳 Пополнить баланс') {
                 if (courier.status === 'waiting_approval') return;
                 return ctx.reply(
                     `💳 <b>Пополнение баланса</b>\n\n` +
-                    `Ваш ID курьера: <code>${id}</code>\n\n` +
-                    `Для автоматического пополнения баланса перейдите по ссылке ниже. ` +
-                    `<b>Обязательно укажите свой ID (${id}) в комментарии к платежу</b>, чтобы система начислила деньги на ваш аккаунт!`,
+                    `Ваш ID: <code>${id}</code>\n\n` +
+                    `Нажмите кнопку ниже, чтобы ввести сумму и пополнить баланс через Бакай Банк. Баланс обновится автоматически!`,
                     {
                         parse_mode: 'HTML',
                         ...Markup.inlineKeyboard([
-                            [Markup.button.url('Перейти к оплате 💸', 'https://paylink.bakai.kg/96b604d5-064f-4863-9d41-6222dc670d40')]
+                            // ВАЖНО: Замени ссылку на свою, где будет лежать файл courier_pay.html
+                            [Markup.button.webApp('Перейти к оплате 💸', 'https://superkgapp.vercel.app/courier_pay.html')]
                         ])
                     }
                 );

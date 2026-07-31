@@ -167,6 +167,70 @@ app.post('/api/bakai-webhook', async (req, res) => {
 });
 
 // ==========================================
+// ВЕБХУК БАКАЙ БАНКА: ПОПОЛНЕНИЕ БАЛАНСА КУРЬЕРОВ
+// ==========================================
+app.post('/api/bakaicourier-webhook', async (req, res) => {
+    try {
+        const payment = req.body;
+        console.log("💰 [БАКАЙ ВЕБХУК] Пришел платеж курьера:", payment);
+
+        // Банк присылает сумму и комментарий (названия полей могут чуть отличаться в зависимости от API)
+        const amount = parseFloat(payment.amount || payment.Amount || 0);
+        const comment = payment.comment || payment.description || payment.Comment || '';
+
+        // 👉 Crash-proof: Ищем ID курьера внутри комментария (вытаскиваем все цифры)
+        const idMatch = comment.match(/\d+/);
+        
+        if (!idMatch) {
+            console.error("❌ Ошибка: Не найден ID курьера в комментарии платежа:", comment);
+            // Отвечаем 200, чтобы банк не спамил нас повторными запросами из-за ошибки клиента
+            return res.status(200).send("No courier ID in comment");
+        }
+
+        const courierId = idMatch[0];
+
+        // 1. Берем текущий баланс курьера из Supabase
+        const { data: courier } = await supabase
+            .from('couriers')
+            .select('balance')
+            .eq('id', courierId)
+            .single();
+
+        if (courier) {
+            // 2. Складываем старый баланс с суммой пополнения
+            const newBalance = (courier.balance || 0) + amount;
+            
+            // 3. Сохраняем новый баланс в базу
+            await supabase
+                .from('couriers')
+                .update({ balance: newBalance })
+                .eq('id', courierId);
+
+            console.log(`✅ Баланс курьера ${courierId} пополнен на ${amount}. Новый баланс: ${newBalance}`);
+
+            // 4. Мгновенно радуем курьера сообщением в бот!
+            try {
+                // Если courierBot у тебя импортирован в server.js, используем его
+                await courierBot.telegram.sendMessage(
+                    courierId, 
+                    `🎉 <b>Оплата успешно получена!</b>\nВаш баланс пополнен на <b>${amount} сом</b>.\n💳 Текущий баланс: ${newBalance} сом.`,
+                    { parse_mode: 'HTML' }
+                );
+            } catch (e) {
+                console.error("Не смогли отправить уведомление курьеру:", e.message);
+            }
+        }
+
+        // Обязательно отвечаем банку статус 200 (ОК)
+        res.status(200).send("OK");
+
+    } catch (err) {
+        console.error("❌ Фатальная ошибка в вебхуке Бакай:", err);
+        res.status(500).send("Server Error");
+    }
+});
+
+// ==========================================
 // 5. ПРОВЕРКА СТАТУСА ЗАКАЗА ДЛЯ ФРОНТЕНДА
 // ==========================================
 app.get('/api/check-status/:id', async (req, res) => {

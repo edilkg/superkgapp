@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Пополнение баланса</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--tg-theme-bg-color, #1c1c1e); /* Адаптируется под темную/светлую тему ТГ */
+            color: var(--tg-theme-text-color, #ffffff);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 400px;
+            background: var(--tg-theme-secondary-bg-color, #2c2c2e);
+            border-radius: 16px;
+            padding: 24px;
+            box-sizing: border-box;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        h2 { margin-top: 0; text-align: center; }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #888; font-size: 14px; }
+        input {
+            width: 100%;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid #444;
+            background: var(--tg-theme-bg-color, #1c1c1e);
+            color: var(--tg-theme-text-color, #fff);
+            font-size: 24px;
+            font-weight: bold;
+            box-sizing: border-box;
+            text-align: center;
+            outline: none;
+            transition: 0.2s;
+        }
+        input:focus { border-color: #007aff; }
+        .pay-btn {
+            width: 100%;
+            padding: 16px;
+            border-radius: 12px;
+            background: var(--tg-theme-button-color, #007aff);
+            color: var(--tg-theme-button-text-color, #fff);
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+        }
+        .info { font-size: 13px; color: #888; text-align: center; margin-top: 12px; line-height: 1.4; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>💳 Пополнение баланса</h2>
+    
+    <div class="input-group">
+        <label>Укажите сумму (сом):</label>
+        <input type="number" id="amount-input" placeholder="500" inputmode="numeric">
+    </div>
+
+    <button class="pay-btn" onclick="goToPay()">Оплатить через Bakai</button>
+    <div class="info">
+        Ваш системный ID: <strong id="courier-id" style="color: var(--tg-theme-text-color, #fff);">Определение...</strong><br><br>
+        <span style="color: #ff453a;">Важно:</span> Если банк попросит комментарий к платежу, обязательно укажите этот ID!
+    </div>
+</div>
+
+<script>
+    // Инициализация Telegram Web App
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    // Автоматически достаем ID курьера
+    const courierId = tg.initDataUnsafe?.user?.id || 'Неизвестно';
+    document.getElementById('courier-id').innerText = courierId;
+
+    function goToPay() {
+        const amount = document.getElementById('amount-input').value;
+        
+        if (!amount || amount <= 0) {
+            tg.showAlert("Пожалуйста, введите корректную сумму!");
+            return;
+        }
+        
+        if (typeof tg.HapticFeedback !== 'undefined') {
+            tg.HapticFeedback.impactOccurred('medium');
+        }
+        
+        // Формируем ссылку Бакай. Пытаемся передать параметры автоматически
+        const payLink = `https://paylink.bakai.kg/96b604d5-064f-4863-9d41-6222dc670d40?amount=${amount}&comment=${courierId}`;
+        
+        // Открываем банковскую ссылку поверх нашего Mini App
+        tg.openLink(payLink);
+    }
+</script>
+</body>
+</html>
