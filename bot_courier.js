@@ -32,10 +32,12 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 return ctx.reply("⏳ Твой аккаунт на проверке.", Markup.removeKeyboard());
             }
 
+            // 👉 ВАЖНО: Кнопка Web App прямо в нижнем меню
             ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\nИмя: ${courier.name || 'Курьер'}\nТелефон: ${courier.phone || 'Не указан'}\nБаланс: ${courier.balance || 0} сом\n\nДля пополнения баланса нажмите кнопку ниже или напишите админу: @foodkg_admin`, 
                 Markup.keyboard([
                     ['👤 Профиль'],
-                    ['💳 Пополнить баланс']
+                    // Укажи здесь свою реальную ссылку на Vercel
+                    [Markup.button.webApp('💳 Пополнить баланс', 'https://superkgapp.vercel.app/courier_pay.html')]
                 ]).resize()
             );
         } catch (e) { 
@@ -81,30 +83,19 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
 
             if (text === '👤 Профиль') {
                 if (courier.status === 'waiting_approval') return;
+                
+                // 👉 ВАЖНО: Кнопка Web App прямо в нижнем меню
                 return ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\nИмя: ${courier.name || 'Курьер'}\nТелефон: ${courier.phone || 'Не указан'}\nБаланс: ${courier.balance || 0} сом\n\nДля пополнения нажмите кнопку ниже или напишите админу: @foodkg_admin`,
                     Markup.keyboard([
                         ['👤 Профиль'],
-                        ['💳 Пополнить баланс']
+                        // Укажи здесь свою реальную ссылку на Vercel
+                        [Markup.button.webApp('💳 Пополнить баланс', 'https://superkgapp.vercel.app/courier_pay.html')]
                     ]).resize()
                 );
             }
 
-            // 👉 НОВАЯ КНОПКА ПОПОЛНЕНИЯ БАЛАНСА (ЧЕРЕЗ MINI APP)
-            if (text === '💳 Пополнить баланс') {
-                if (courier.status === 'waiting_approval') return;
-                return ctx.reply(
-                    `💳 <b>Пополнение баланса</b>\n\n` +
-                    `Нажмите кнопку ниже, чтобы ввести сумму.\n` +
-                    `Система автоматически сгенерирует для вас безопасную ссылку на оплату. Баланс пополнится моментально!`,
-                    {
-                        parse_mode: 'HTML',
-                        ...Markup.inlineKeyboard([
-                            // ВАЖНО: Укажи ссылку на свой courier_pay.html на Vercel
-                            [Markup.button.webApp('Ввести сумму 💸', 'https://superkgapp.vercel.app/courier_pay.html')]
-                        ])
-                    }
-                );
-            }
+            // ❌ БЛОК `if (text === '💳 Пополнить баланс')` ПОЛНОСТЬЮ УДАЛЕН. 
+            // Он больше не нужен, так как Телеграм сам откроет сайт без отправки текста в чат!
 
         } catch (e) {}
     });
