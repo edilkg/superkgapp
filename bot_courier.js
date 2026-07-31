@@ -94,13 +94,13 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 if (courier.status === 'waiting_approval') return;
                 return ctx.reply(
                     `💳 <b>Пополнение баланса</b>\n\n` +
-                    `Ваш ID: <code>${id}</code>\n\n` +
-                    `Нажмите кнопку ниже, чтобы ввести сумму и пополнить баланс через Бакай Банк. Баланс обновится автоматически!`,
+                    `Нажмите кнопку ниже, чтобы ввести сумму.\n` +
+                    `Система автоматически сгенерирует для вас безопасную ссылку на оплату. Баланс пополнится моментально!`,
                     {
                         parse_mode: 'HTML',
                         ...Markup.inlineKeyboard([
-                            // ВАЖНО: Замени ссылку на свою, где будет лежать файл courier_pay.html
-                            [Markup.button.webApp('Перейти к оплате 💸', 'https://superkgapp.vercel.app/courier_pay.html')]
+                            // ВАЖНО: Укажи ссылку на свой courier_pay.html на Vercel
+                            [Markup.button.webApp('Ввести сумму 💸', 'https://superkgapp.vercel.app/courier_pay.html')]
                         ])
                     }
                 );
