@@ -79,8 +79,11 @@
             const data = await response.json();
 
             if (data.url) {
-                // Если ссылка сгенерировалась — открываем банк
+                // Открываем банковскую страницу поверх
                 tg.openLink(data.url);
+                
+                // 👉 Мгновенно закрываем наше окошко Mini App
+                tg.close();
             } else {
                 tg.showAlert("Ошибка со стороны банка: " + (data.error || "Неизвестная ошибка"));
             }

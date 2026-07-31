@@ -179,7 +179,8 @@ app.post('/api/generate-courier-paylink', async (req, res) => {
             amount: Number(amount),         
             transactionID: transactionID,   
             comment: `Пополнение баланса курьера ${courierId}`, 
-            redirectURL: "https://t.me/ТВОЙ_КУРЬЕРСКИЙ_БОТ", // Можно вписать ссылку на твоего бота
+            // ВАЖНО: Замени "ТВОЙ_КУРЬЕРСКИЙ_БОТ" на реальный username (например, foodkg_courier_bot)
+            redirectURL: "https://t.me/bizjumush_bot", 
             ttlUnits: 1,                    
             ttl: 15                         
         };
@@ -241,11 +242,9 @@ app.post('/api/bakaicourier-webhook', async (req, res) => {
 
                 // 3. Отправляем уведомление в бот
                 try {
-                    // Убедись, что courierBot у тебя доступен в server.js!
                     await courierBot.telegram.sendMessage(
                         courierId, 
-                        `🎉 <b>Оплата успешно получена!</b>\nВаш баланс пополнен на <b>${paidAmount} сом</b>.\n💳 Текущий баланс: ${newBalance} сом.`,
-                        { parse_mode: 'HTML' }
+                        `🎉 Баланс пополнен на ${paidAmount} сом.\n💳 Текущий баланс: ${newBalance} сом.\nЖирных заказов вам 🍔💸`
                     );
                 } catch (e) {
                     console.error("❌ Не смогли отправить сообщение курьеру:", e.message);
