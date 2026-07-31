@@ -166,45 +166,98 @@ app.post('/api/bakai-webhook', async (req, res) => {
     }
 });
 // ==========================================
-// ГЕНЕРАЦИЯ ЖЕСТКОЙ ССЫЛКИ ДЛЯ КУРЬЕРА (ЧЕРЕЗ API БАКАЙ БАНКА)
+// ГЕНЕРАЦИЯ ПЛАТЕЖНОЙ ССЫЛКИ ДЛЯ КУРЬЕРА (ФИКСИРОВАННАЯ СУММА)
 // ==========================================
-app.post('/api/generate-bakai-link', async (req, res) => {
+app.post('/api/generate-courier-paylink', async (req, res) => {
     try {
-        const { courierId, amount } = req.body;
+        const { amount, courierId } = req.body;
         
-        // Стучимся в API банка для создания одноразовой защищенной ссылки
+        // 👉 КЛЮЧЕВОЙ МОМЕНТ: Добавляем префикс COURIER к ID
+        const transactionID = "COURIER" + courierId; 
+
+        const bakaiPayload = {
+            amount: Number(amount),         
+            transactionID: transactionID,   
+            comment: `Пополнение баланса курьера ${courierId}`, 
+            redirectURL: "https://t.me/ТВОЙ_КУРЬЕРСКИЙ_БОТ", // Можно вписать ссылку на твоего бота
+            ttlUnits: 1,                    
+            ttl: 15                         
+        };
+
+        const token = process.env.BAKAI_COURIER_TOKEN; // Твой новый токен для курьеров
+        if (!token) return res.status(500).json({ error: "BAKAI_COURIER_TOKEN не найден" });
+
         const response = await fetch('https://openbanking-api.bakai.kg/api/PayLink/CreatePayLink', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.BAKAI_COURIER_TOKEN}` // Твой токен из .env
+                'Authorization': `Bearer ${token.trim()}` 
             },
-            body: JSON.stringify({
-                Amount: parseFloat(amount), 
-                // Жестко вшиваем ID курьера, чтобы он пришел нам обратно в вебхуке!
-                Comment: `ID_${courierId}`,
-                Description: `Пополнение баланса курьера ${courierId}`
-            })
+            body: JSON.stringify(bakaiPayload)
         });
 
-        const data = await response.json();
-        console.log("Ответ от Бакай Банка при создании ссылки:", data);
-        
-        // Достаем саму ссылку из ответа банка (посмотри в консоли, как банк её назовет: url, Url или payLink)
-        const payUrl = data.url || data.Url || data.payLink || data.link;
+        // Бакай возвращает просто текст (ссылку)
+        const textData = await response.text();
+        if (!response.ok) return res.status(response.status).json({ error: textData || "Ошибка банка" });
 
-        if (!payUrl) {
-            return res.status(400).json({ error: "Банк не вернул ссылку" });
-        }
-
-        res.json({ url: payUrl });
-
-    } catch (err) {
-        console.error("❌ Ошибка при генерации ссылки Бакай:", err);
-        res.status(500).json({ error: "Server error" });
+        // Отправляем ссылку фронтенду
+        res.json({ url: textData });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
+ // ==========================================
+// ВЕБХУК БАКАЙ БАНКА (ПОПОЛНЕНИЕ БАЛАНСА КУРЬЕРА)
+// ==========================================
+app.post('/api/bakaicourier-webhook', async (req, res) => {
+    try {
+        console.log("🔔 ВЕБХУК ОТ БАКАЙ (КУРЬЕР):", req.body);
+        
+        const incomingID = req.body.transactionID || req.body.operationID || req.body.TransactionId || req.body.OperationId;
+        const status = req.body.status || req.body.Status || "SUCCESS";
+        // Важно: берем сумму, на которую курьер пополнил
+        const paidAmount = Number(req.body.amount || req.body.Amount || req.body.totalAmount || 0);
 
+        // 👉 Проверяем, что оплата успешна и это именно КУРЬЕРСКАЯ транзакция
+        if (incomingID && incomingID.startsWith("COURIER") && 
+           (status.toUpperCase() === "SUCCESS" || status === "COMPLETED" || req.body.isPaid === true)) {
+            
+            // 🐛 Убираем "COURIER", чтобы сервер нашел ID курьера в базе!
+            const courierId = incomingID.replace("COURIER", "");
+
+            // 1. Ищем текущий баланс курьера в БД
+            const { data: courier } = await supabase.from('couriers').select('balance').eq('id', courierId).single();
+
+            if (courier && paidAmount > 0) {
+                // 2. Плюсуем баланс
+                const newBalance = (courier.balance || 0) + paidAmount;
+                
+                await supabase
+                    .from('couriers')
+                    .update({ balance: newBalance })
+                    .eq('id', courierId);
+
+                console.log(`✅ БАЛАНС КУРЬЕРА ${courierId} УСПЕШНО ПОПОЛНЕН НА ${paidAmount} сом!`);
+
+                // 3. Отправляем уведомление в бот
+                try {
+                    // Убедись, что courierBot у тебя доступен в server.js!
+                    await courierBot.telegram.sendMessage(
+                        courierId, 
+                        `🎉 <b>Оплата успешно получена!</b>\nВаш баланс пополнен на <b>${paidAmount} сом</b>.\n💳 Текущий баланс: ${newBalance} сом.`,
+                        { parse_mode: 'HTML' }
+                    );
+                } catch (e) {
+                    console.error("❌ Не смогли отправить сообщение курьеру:", e.message);
+                }
+            }
+        }
+        res.status(200).json({ status: "ok" });
+    } catch (err) {
+        console.error("❌ Ошибка курьерского вебхука:", err);
+        res.status(200).send("OK");
+    }
+});
 // ==========================================
 // 5. ПРОВЕРКА СТАТУСА ЗАКАЗА ДЛЯ ФРОНТЕНДА
 // ==========================================
