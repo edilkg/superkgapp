@@ -32,12 +32,11 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
                 return ctx.reply("⏳ Твой аккаунт на проверке.", Markup.removeKeyboard());
             }
 
-            // 👉 ВАЖНО: Кнопка Web App прямо в нижнем меню
+            // 👉 ВАЖНО: Вшиваем ID прямо в ссылку, чтобы сайт 100% его узнал
             ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\nИмя: ${courier.name || 'Курьер'}\nТелефон: ${courier.phone || 'Не указан'}\nБаланс: ${courier.balance || 0} сом\n\nДля пополнения баланса нажмите кнопку ниже или напишите админу: @foodkg_admin`, 
                 Markup.keyboard([
                     ['👤 Профиль'],
-                    // Укажи здесь свою реальную ссылку на Vercel
-                    [Markup.button.webApp('💳 Пополнить баланс', 'https://superkgapp.vercel.app/courier_pay.html')]
+                    [Markup.button.webApp('💳 Пополнить баланс', `https://superkgapp.vercel.app/courier_pay.html?id=${id}`)]
                 ]).resize()
             );
         } catch (e) { 
@@ -84,18 +83,14 @@ module.exports = function setupCourierBot(courierBot, bot, restBot, supabase, AD
             if (text === '👤 Профиль') {
                 if (courier.status === 'waiting_approval') return;
                 
-                // 👉 ВАЖНО: Кнопка Web App прямо в нижнем меню
+                // 👉 ВАЖНО: Вшиваем ID прямо в ссылку здесь тоже
                 return ctx.reply(`👤 ЛИЧНЫЙ КАБИНЕТ\nИмя: ${courier.name || 'Курьер'}\nТелефон: ${courier.phone || 'Не указан'}\nБаланс: ${courier.balance || 0} сом\n\nДля пополнения нажмите кнопку ниже или напишите админу: @foodkg_admin`,
                     Markup.keyboard([
                         ['👤 Профиль'],
-                        // Укажи здесь свою реальную ссылку на Vercel
-                        [Markup.button.webApp('💳 Пополнить баланс', 'https://superkgapp.vercel.app/courier_pay.html')]
+                        [Markup.button.webApp('💳 Пополнить баланс', `https://superkgapp.vercel.app/courier_pay.html?id=${id}`)]
                     ]).resize()
                 );
             }
-
-            // ❌ БЛОК `if (text === '💳 Пополнить баланс')` ПОЛНОСТЬЮ УДАЛЕН. 
-            // Он больше не нужен, так как Телеграм сам откроет сайт без отправки текста в чат!
 
         } catch (e) {}
     });

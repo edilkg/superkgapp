@@ -52,13 +52,23 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    const courierId = tg.initDataUnsafe?.user?.id || 'Неизвестно';
+    // 1. Надежный способ: достаем ID прямо из ссылки (bot передал его как ?id=...)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlId = urlParams.get('id');
+
+    // 2. Берем ID из ссылки, либо (если вдруг что) из Телеграма
+    const courierId = urlId || tg.initDataUnsafe?.user?.id || 'Неизвестно';
     document.getElementById('courier-id').innerText = courierId;
 
     async function generateAndPay() {
         const amount = document.getElementById('amount-input').value;
         if (!amount || amount < 10) {
             tg.showAlert("Пожалуйста, введите сумму больше 10 сом.");
+            return;
+        }
+
+        if (courierId === 'Неизвестно') {
+            tg.showAlert("Ошибка: Ваш ID не распознан. Нажмите /start в боте и попробуйте снова.");
             return;
         }
 
@@ -69,7 +79,7 @@
         if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
 
         try {
-            // 👉 Запрос к нашему новому генератору ссылок (замени на свой домен)
+            // 👉 Отправляем запрос на сервер с гарантированно правильным ID
             const response = await fetch('https://tamak-backend.onrender.com/api/generate-courier-paylink', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -79,10 +89,9 @@
             const data = await response.json();
 
             if (data.url) {
-                // Открываем банковскую страницу поверх
+                // Если ссылка сгенерировалась — открываем банк
                 tg.openLink(data.url);
-                
-                // 👉 Мгновенно закрываем наше окошко Mini App
+                // Мгновенно закрываем окошко ввода суммы
                 tg.close();
             } else {
                 tg.showAlert("Ошибка со стороны банка: " + (data.error || "Неизвестная ошибка"));
