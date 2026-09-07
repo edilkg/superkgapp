@@ -1,21 +1,43 @@
 const { Markup } = require('telegraf');
 
-module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase, ADMIN_GROUP_ID) {
+module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase, ADMIN_GROUP_ID, activeCouriers = new Map(), dispatcher = null) {
     
     // ==========================================
     // 1. ОДОБРЕНИЕ КУРЬЕРОВ И РЕСТОРАНОВ
     // ==========================================
     adminBot.action(/approve_courier_(.+)/, async (ctx) => {
         const id = ctx.match[1];
+        await ctx.answerCbQuery("✅ Курьер одобрен!").catch(() => {});
         await supabase.from('couriers').update({ status: 'active' }).eq('id', id);
         await ctx.editMessageText(`✅ Курьер ${id} одобрен!`, 
             Markup.inlineKeyboard([[Markup.button.callback('➕ Пополнить баланс (100)', `add_balance_${id}_100`)]])
         ).catch(() => {});
-        try { await courierBot.telegram.sendMessage(id, "🎉 Твоя заявка одобрена! Напиши /start, чтобы увидеть кабинет."); } catch(e){}
+
+        const welcomeText = 
+            `🎉 <b>Поздравляем! Ваша заявка одобрена!</b>\n\n` +
+            `Вы зарегистрированы как курьер в TamakKG 🛵\n\n` +
+            `📍 <b>Чтобы начать получать заказы:</b>\n` +
+            `1. Нажмите кнопку <b>«🟢 Выйти на линию»</b> ниже.\n` +
+            `2. Отправьте <b>трансляцию геопозиции</b> (скрепка 📎 ➡️ Геопозиция ➡️ Транслировать геопозицию на 8 часов).\n\n` +
+            `После этого система зафиксирует вас на карте и будет направлять вам ближайшие заказы от ресторанов!`;
+
+        try { 
+            await courierBot.telegram.sendMessage(id, welcomeText, {
+                parse_mode: 'HTML',
+                ...Markup.keyboard([
+                    ['🟢 Выйти на линию'],
+                    ['👤 Профиль'],
+                    [Markup.button.webApp('💳 Пополнить баланс', `https://superkgapp.vercel.app/courier_pay.html?id=${id}`)]
+                ]).resize()
+            }); 
+        } catch(e) {
+            console.error("Ошибка отправки приветствия курьеру:", e.message);
+        }
     });
 
     adminBot.action(/approve_rest_(.+)/, async (ctx) => {
         const restId = ctx.match[1];
+        await ctx.answerCbQuery("✅ Ресторан одобрен!").catch(() => {});
         await supabase.from('restaurants').update({ is_approved: true }).eq('id', restId);
         await ctx.editMessageText(`✅ Ресторан ${restId} одобрен!`).catch(() => {});
         try { await restBot.telegram.sendMessage(restId, "🎉 Поздравляем! Ваш ресторан одобрен. Теперь вы можете принимать заказы."); } catch(e){}
@@ -99,6 +121,109 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
     });
 
     // ==========================================
+    // 2.5. ПОВТОРНЫЙ ПОИСК И ОТМЕНА ПОДВИСШЕГО ЗАКАЗА
+    // ==========================================
+    adminBot.action(/retry_dispatch_(.+)/, async (ctx) => {
+        const orderId = ctx.match[1].trim();
+        await ctx.answerCbQuery("🔄 Запускаем повторный поиск курьера...").catch(() => {});
+
+        try {
+            if (!dispatcher) {
+                return ctx.reply("❌ Диспетчер недоступен.");
+            }
+
+            const result = await dispatcher.retryDispatch(orderId);
+            if (result.success) {
+                const oldText = ctx.callbackQuery.message.text || '';
+                await ctx.editMessageText(
+                    `${oldText}\n\n🔄 <b>Повторный поиск запущен администратором!</b>\nСистема снова опрашивает курьеров рядом...`, 
+                    { parse_mode: 'HTML' }
+                ).catch(() => {});
+
+                // Уведомляем ресторан
+                try {
+                    const { data: ord } = await supabase.from('orders').select('restaurant').eq('id', orderId).maybeSingle();
+                    if (ord?.restaurant) {
+                        const { data: r } = await supabase.from('restaurants').select('id').eq('name', ord.restaurant).maybeSingle();
+                        if (r?.id) {
+                            await restBot.telegram.sendMessage(r.id, `🔄 <i>Администратор перезапустил поиск курьера для заказа #${orderId.slice(0, 5)}</i>`, { parse_mode: 'HTML' });
+                        }
+                    }
+                } catch(e) {}
+            } else if (result.reason === 'already_taken') {
+                await ctx.editMessageText(`✅ Заказ #${orderId.slice(0, 5)} уже взят курьером!`).catch(() => {});
+            } else if (result.reason === 'invalid_status') {
+                await ctx.editMessageText(`⚠️ Заказ #${orderId.slice(0, 5)} уже ${result.status === 'canceled' ? 'отменен' : 'завершен'}.`).catch(() => {});
+            } else {
+                await ctx.reply("⚠️ Не удалось перезапустить поиск курьера.");
+            }
+        } catch (e) {
+            console.error("Ошибка при retry_dispatch в админке:", e.message);
+        }
+    });
+
+    adminBot.action(/admin_cancel_order_(.+)/, async (ctx) => {
+        const orderId = ctx.match[1].trim();
+        await ctx.answerCbQuery("Отменяем заказ...").catch(() => {});
+
+        try {
+            const { data: order } = await supabase
+                .from('orders')
+                .select('*')
+                .eq('id', orderId)
+                .maybeSingle();
+
+            if (!order) return;
+
+            if (order.status === 'canceled') {
+                return ctx.editMessageText(`⚠️ Заказ #${orderId.slice(0, 5)} уже был отменен ранее.`).catch(() => {});
+            }
+
+            if (['delivery', 'completed'].includes(order.status)) {
+                return ctx.editMessageText(`❌ Невозможно отменить: заказ уже ${order.status === 'delivery' ? 'в пути у курьера' : 'доставлен'}!`).catch(() => {});
+            }
+
+            // Переводим заказ в canceled
+            await supabase.from('orders').update({ status: 'canceled' }).eq('id', orderId);
+
+            // Останавливаем сессию диспетчера
+            if (dispatcher) {
+                dispatcher.finishSession(orderId);
+            }
+
+            const oldText = ctx.callbackQuery.message.text || '';
+            await ctx.editMessageText(
+                `${oldText}\n\n❌ <b>ЗАКАЗ ОТМЕНЕН АДМИНИСТРАТОРОМ.</b>`, 
+                { parse_mode: 'HTML' }
+            ).catch(() => {});
+
+            // Уведомляем клиента
+            const cid = order.client_id;
+            if (cid && String(cid) !== '111' && String(cid) !== 'null' && String(cid) !== 'undefined') {
+                const clientMsg = `❌ <b>Заказ #${String(orderId).slice(0, 5)} отменен администрацией сервиса.</b>\n\n` +
+                                  `К сожалению, поблизости не нашлось свободных курьеров для доставки.\n` +
+                                  `Приносим извинения за неудобства! Поддержка: @foodkg_admin`;
+                try {
+                    await adminBot.telegram.sendMessage(cid, clientMsg, { parse_mode: 'HTML' });
+                } catch(e) {}
+            }
+
+            // Уведомляем ресторан
+            if (order.restaurant) {
+                try {
+                    const { data: r } = await supabase.from('restaurants').select('id').eq('name', order.restaurant).maybeSingle();
+                    if (r?.id) {
+                        await restBot.telegram.sendMessage(r.id, `❌ <i>Администратор отменил заказ #${orderId.slice(0, 5)} (курьер не найден).</i>`, { parse_mode: 'HTML' });
+                    }
+                } catch(e) {}
+            }
+
+        } catch (e) {
+            console.error("Ошибка при admin_cancel_order в админке:", e.message);
+        }
+    });
+
+    // ==========================================
     // 3. ОТПРАВКА ИНФО-ЧЕКА В АДМИНКУ И РАССЫЛКА ПО РЕСТОРАНАМ (АВТОМАТИЧЕСКАЯ)
     // ==========================================
     return {
@@ -163,22 +288,31 @@ module.exports = function setupAdminBot(adminBot, restBot, courierBot, supabase,
                     console.error("❌ Ошибка отправки в ресторан:", e.message);
                 }
 
-                // 2. Отправляем курьерам в общую группу (ПРЯМО ТУДА ЖЕ, ГДЕ АДМИНЫ)
+                // 2. ОДНОВРЕМЕННО ОТПРАВЛЯЕМ КУРЬЕРУ (УМНЫЙ ДИСПЕТЧЕР)
+                // Не ждем пока повар приготовит! Курьер уже должен ехать к ресторану!
                 try {
-                    // 👉 МАГИЯ ЗДЕСЬ: Мы просто берем ID админской группы, как это и было раньше!
-                    const COURIER_GROUP_ID = ADMIN_GROUP_ID; 
+                    let restCoords = null;
+                    if (orderData.restaurant) {
+                        const { data: rData } = await supabase
+                            .from('restaurants')
+                            .select('lat, lon')
+                            .eq('name', orderData.restaurant)
+                            .maybeSingle();
+                        if (rData && rData.lat && rData.lon) {
+                            restCoords = { lat: rData.lat, lon: rData.lon };
+                        }
+                    }
 
-                    if (COURIER_GROUP_ID) {
-                        const courierText = `🚕 <b>НОВЫЙ ЗАКАЗ #${orderData.id}</b>\n\nОткуда: ${fullRestName}\nКуда: ${orderData.address}\n\nСумма заказа: ${orderData.total_price} сом`;
-                        
-                        await courierBot.telegram.sendMessage(COURIER_GROUP_ID, courierText, {
-                            parse_mode: 'HTML',
-                            reply_markup: {
-                                inline_keyboard: [[
-                                    { text: "🙋‍♂️ Я возьму заказ", callback_data: `take_order_${orderData.id}` }
-                                ]]
-                            }
-                        });
+                    if (dispatcher && restCoords) {
+                        // Запускаем умный поиск курьера (2 км -> 5 км -> 10 км -> fallback)
+                        console.log(`[ДИСПЕТЧЕР] Вызов startDispatch для заказа #${orderData.id}. Координаты ресторана: ${restCoords.lat}, ${restCoords.lon}`);
+                        await dispatcher.startDispatch(orderData, restCoords, fullRestName);
+                    } else {
+                        console.log(`[ДИСПЕТЧЕР] ОШИБКА: Нет координат ресторана (${orderData.restaurant})! Умный поиск не запущен, и сброс в общую группу отключен.`);
+                        // Отправляем уведомление только админу, чтобы он поправил координаты ресторана
+                        try {
+                            await bot.telegram.sendMessage(ADMIN_GROUP_ID, `⚠️ <b>ВНИМАНИЕ!</b>\nЗаказ #${orderData.id} не отправлен курьерам, так как у ресторана "${fullRestName}" нет координат! Пожалуйста, отправьте локацию ресторана через меню ресторана.`, { parse_mode: 'HTML' });
+                        } catch(e){}
                     }
                 } catch (e) {
                     console.error("❌ Ошибка отправки курьерам:", e.message);

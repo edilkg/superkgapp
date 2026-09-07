@@ -21,14 +21,48 @@ const restBot = new Telegraf(process.env.REST_BOT_TOKEN);
 
 const ADMIN_GROUP_ID = process.env.ADMIN_CHAT_ID; 
 
-// ==========================================
-// ИНИЦИАЛИЗАЦИЯ БОТОВ
-// ==========================================
-setupClientBot(bot, supabase, ADMIN_GROUP_ID);
-setupCourierBot(courierBot, bot, restBot, supabase, ADMIN_GROUP_ID);
-setupRestaurantBot(restBot, courierBot, bot, supabase, ADMIN_GROUP_ID);
-const adminActions = setupAdminBot(bot, restBot, courierBot, supabase, ADMIN_GROUP_ID);
+// In-memory кэш для оперативного хранения живых координат курьеров
+// Структура: courierId => { lat, lon, lastUpdate: timestamp, name, phone }
+const activeCouriers = new Map();
 
+const createDispatcher = require('./dispatch_engine');
+
+// ==========================================
+// ИНИЦИАЛИЗАЦИЯ БОТОВ И ДИСПЕТЧЕРА
+// ==========================================
+const dispatcher = createDispatcher({ courierBot, adminBot: bot, restBot, supabase, ADMIN_GROUP_ID, activeCouriers });
+
+setupClientBot(bot, supabase, ADMIN_GROUP_ID);
+setupCourierBot(courierBot, bot, restBot, supabase, ADMIN_GROUP_ID, activeCouriers, dispatcher);
+setupRestaurantBot(restBot, courierBot, bot, supabase, ADMIN_GROUP_ID, dispatcher);
+const adminActions = setupAdminBot(bot, restBot, courierBot, supabase, ADMIN_GROUP_ID, activeCouriers, dispatcher);
+// ==========================================
+// ФОНОВАЯ ОЧИСТКА "ПРИЗРАЧНЫХ" КУРЬЕРОВ
+// ==========================================
+// Каждые 5 минут проверяем базу: если курьер числится "is_online = true",
+// но его нет в оперативной памяти (activeCouriers) ИЛИ его гео-пинг старше 1 часа,
+// мы жестко переводим его в оффлайн в базе данных.
+setInterval(async () => {
+    try {
+        const { data: onlineCouriers } = await supabase.from('couriers').select('id, is_online').eq('is_online', true);
+        if (!onlineCouriers) return;
+
+        const NOW = Date.now();
+        const ONE_HOUR = 60 * 60 * 1000;
+
+        for (const c of onlineCouriers) {
+            const inCache = activeCouriers.get(c.id);
+            // Если курьера нет в кэше вообще ИЛИ его геопозиция не обновлялась больше часа
+            if (!inCache || (NOW - inCache.lastUpdate) > ONE_HOUR) {
+                console.log(`🧹 [ОЧИСТКА] Курьер ${c.id} висит в БД как онлайн, но геопозиции нет (или она старая). Переводим в оффлайн!`);
+                await supabase.from('couriers').update({ is_online: false }).eq('id', c.id);
+                if (inCache) activeCouriers.delete(c.id);
+            }
+        }
+    } catch (e) {
+        console.error("Ошибка при фоновой очистке курьеров:", e.message);
+    }
+}, 5 * 60 * 1000); // 5 минут
 
 // ==========================================
 // 1. СОЗДАНИЕ ЗАКАЗА В БАЗЕ (status: 'waiting_payment')
@@ -68,7 +102,9 @@ app.post('/web-data', async (req, res) => {
             total_price: totalPrice,
             comment: extraDetails.join(' | '), 
             items: items,
-            status: 'waiting_payment'
+            status: 'waiting_payment',
+            dest_lat: dest_lat ? Number(dest_lat) : null,
+            dest_lon: dest_lon ? Number(dest_lon) : null
         }]).select();
 
         if (dbError) throw dbError;
@@ -101,6 +137,35 @@ app.post('/api/create-paylink', async (req, res) => {
 
         const token = process.env.BAKAI_TOKEN;
         if (!token) return res.status(500).json({ error: "BAKAI_TOKEN не найден" });
+
+        // ==========================================
+        // ВРЕМЕННЫЙ ОБХОД БАКАЙ БАНКА ДЛЯ ТЕСТОВ
+        // Если Бакай не работает, мы сами переводим заказ в paid и отправляем его дальше
+        // ==========================================
+        const MOCK_BAKAI = true; // Поставь false, когда починят Бакай
+
+        if (MOCK_BAKAI) {
+            console.log(`[ТЕСТ] Обход Бакай Банка для заказа #${orderId}`);
+            
+            // 1. Меняем статус на paid
+            const { data: updatedOrders, error } = await supabase
+                .from('orders')
+                .update({ status: 'paid' })
+                .eq('id', orderId)
+                .select();
+
+            if (!error && updatedOrders && updatedOrders.length > 0) {
+                // 2. Отправляем админу/ресторану (имитируем вебхук)
+                adminActions.sendOrderToAdmin(updatedOrders[0]);
+            }
+
+            // 3. Возвращаем клиенту сразу нашу страницу успеха
+            return res.json({ 
+                status: "success", 
+                transactionID: transactionID, 
+                bakaiResponse: { url: "https://tamak-backend.onrender.com/success" } 
+            });
+        }
 
         const response = await fetch('https://openbanking-api.bakai.kg/api/PayLink/CreatePayLink', {
             method: 'POST',

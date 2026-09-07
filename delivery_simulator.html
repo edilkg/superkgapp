@@ -1,0 +1,2214 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🛵 Калькулятор & Симулятор Зон TamakKG — Городской Квадрат + Коридоры</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --primary: #FCE000;
+            --primary-hover: #E5CB00;
+            --dark: #1E1E24;
+            --card-bg: #FFFFFF;
+            --text-main: #2B2D42;
+            --text-muted: #6C757D;
+            --green: #2EC4B6;
+            --red: #E71D36;
+            --orange: #FF9F1C;
+            --blue: #3A86FF;
+            --purple: #7209B7;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        body { background: #F4F5F7; color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* Top Header */
+        header {
+            background: var(--dark);
+            color: #fff;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            z-index: 1000;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 16px;
+            font-weight: 800;
+        }
+        .brand-badge {
+            background: var(--primary);
+            color: #000;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 900;
+        }
+        .header-toggles {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .toggle-chip {
+            background: rgba(255,255,255,0.12);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 5px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .toggle-chip.active {
+            background: var(--primary);
+            color: #000;
+            border-color: var(--primary);
+        }
+
+        /* Map floating tool for Point A / B */
+        .map-selector-bar {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.95);
+            padding: 6px 12px;
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.18);
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            backdrop-filter: blur(8px);
+        }
+        .selector-btn {
+            border: 1.5px solid #CED4DA;
+            background: #fff;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .selector-btn.active.mode-rest {
+            background: #FF9F1C;
+            color: #fff;
+            border-color: #FF9F1C;
+            box-shadow: 0 2px 8px rgba(255, 159, 28, 0.4);
+        }
+        .selector-btn.active.mode-client {
+            background: #2EC4B6;
+            color: #fff;
+            border-color: #2EC4B6;
+            box-shadow: 0 2px 8px rgba(46, 196, 182, 0.4);
+        }
+
+        /* Layer Switcher (OSM vs Satellite) */
+        .map-layer-switch {
+            position: absolute;
+            top: 65px;
+            left: 12px;
+            z-index: 999;
+            background: rgba(255,255,255,0.95);
+            padding: 4px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+            display: flex;
+            gap: 4px;
+        }
+        .map-layer-btn {
+            padding: 5px 9px;
+            font-size: 11px;
+            font-weight: 700;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .map-layer-btn.active {
+            background: var(--dark);
+            color: #fff;
+        }
+
+        /* Main Workspace Container */
+        .workspace {
+            display: flex;
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        #map {
+            flex: 1;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Sidebar / Control Panel */
+        .sidebar {
+            width: 500px;
+            max-width: 100%;
+            background: #fff;
+            border-left: 1px solid #E0E2E6;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -4px 0 16px rgba(0,0,0,0.06);
+            z-index: 10;
+            overflow-y: auto;
+        }
+
+        /* Top Sticky Result & Tariffs Panel */
+        .top-results-panel {
+            background: #FFFDF0;
+            border-bottom: 2px solid var(--primary);
+            padding: 12px 18px;
+            position: sticky;
+            top: 0;
+            z-index: 30;
+        }
+        .total-price-large {
+            font-size: 28px;
+            font-weight: 900;
+            color: #111;
+            line-height: 1;
+        }
+
+        /* Live Tariffs Quick Edit Bar */
+        .tariffs-quick-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            margin-top: 10px;
+            background: #fff;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #E9ECEF;
+        }
+        .tariff-mini-box {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .tariff-mini-label {
+            font-size: 10px;
+            font-weight: 800;
+            color: #777;
+            text-transform: uppercase;
+        }
+        .tariff-mini-input-wrap {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+        .tariff-mini-input {
+            width: 48px;
+            font-size: 13px;
+            font-weight: 800;
+            border: 1px solid #CED4DA;
+            border-radius: 4px;
+            padding: 3px 4px;
+            text-align: center;
+        }
+        .tariff-mini-unit {
+            font-size: 11px;
+            font-weight: 700;
+            color: #555;
+        }
+
+        /* Calculation Mode Switcher */
+        .calc-mode-box {
+            margin-top: 8px;
+            background: #F8F9FA;
+            border: 1px solid #E0E2E6;
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .calc-mode-select {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 6px;
+            border-radius: 6px;
+            border: 1px solid #CED4DA;
+            background: #fff;
+            cursor: pointer;
+        }
+
+        /* Sidebar Tabs */
+        .sidebar-tabs {
+            display: flex;
+            background: #F1F3F5;
+            border-bottom: 1px solid #E9ECEF;
+            position: sticky;
+            top: 132px;
+            z-index: 20;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px 4px;
+            text-align: center;
+            font-size: 11.5px;
+            font-weight: 700;
+            color: #666;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+        .tab-btn.active {
+            color: #000;
+            background: #fff;
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .panel-section {
+            padding: 14px 18px;
+            border-bottom: 1px solid #EEF0F2;
+        }
+        .panel-section:last-child { border-bottom: none; }
+
+        .section-title {
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .corridor-group-box {
+            background: #FAFAFA;
+            border: 1px solid #E9ECEF;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+        .city-box-card {
+            background: #F0FDF4;
+            border: 1.5px solid #86EFAC;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        /* Slider Rows */
+        .slider-group {
+            margin-bottom: 12px;
+        }
+        .slider-group:last-child { margin-bottom: 0; }
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        .slider-title {
+            font-size: 12.5px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+        .slider-val-badge {
+            background: #E9ECEF;
+            color: #111;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 800;
+            font-family: monospace;
+        }
+        .slider-desc {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 3px;
+            line-height: 1.3;
+        }
+        .slider-input {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+            accent-color: #1E1E24;
+            cursor: pointer;
+        }
+        .slider-group.red-highlight .slider-input {
+            accent-color: var(--red);
+        }
+        .slider-group.red-highlight .slider-val-badge {
+            background: #FFE3E5;
+            color: var(--red);
+        }
+        .slider-group.purple-highlight .slider-input {
+            accent-color: #8B5CF6;
+        }
+        .slider-group.purple-highlight .slider-val-badge {
+            background: #EDE9FE;
+            color: #6D28D9;
+        }
+        .slider-group.city-highlight .slider-input {
+            accent-color: #059669;
+        }
+        .slider-group.city-highlight .slider-val-badge {
+            background: #D1FAE5;
+            color: #047857;
+        }
+        .slider-group.tariff-highlight .slider-input {
+            accent-color: #2EC4B6;
+        }
+        .slider-group.tariff-highlight .slider-val-badge {
+            background: #E0F7F6;
+            color: #00796B;
+        }
+
+        /* Quick Pills / Presets */
+        .pills-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+        .pill-btn {
+            background: #fff;
+            border: 1px solid #CED4DA;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .pill-btn:hover {
+            border-color: #111;
+            background: #F1F3F5;
+        }
+
+        /* Action Buttons */
+        .btn-action {
+            width: 100%;
+            background: var(--dark);
+            color: #fff;
+            border: none;
+            padding: 11px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.15s;
+        }
+        .btn-action:hover { background: #000; }
+        .btn-secondary {
+            background: #E9ECEF;
+            color: #111;
+        }
+        .btn-secondary:hover { background: #DEE2E6; }
+
+        /* Calculation Breakdown Table */
+        .breakdown-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            font-size: 12.5px;
+            border-bottom: 1px dashed #E9ECEF;
+        }
+        .breakdown-row:last-child { border-bottom: none; }
+        .breakdown-label { color: #555; }
+        .breakdown-value { font-weight: 700; color: #111; }
+
+        /* Tariff Tags */
+        .tariff-tag {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+        .tag-city { background: #E8F5E9; color: #2E7D32; }
+        .tag-outoftown { background: #FFEBEE; color: #C62828; }
+        .tag-purple { background: #F3E8FF; color: #7C3AED; }
+        .tag-outzone { background: #424242; color: #fff; }
+
+        /* Presets Grid */
+        .presets-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .preset-btn {
+            background: #fff;
+            border: 1px solid #CED4DA;
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 11.5px;
+            font-weight: 700;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .preset-btn:hover {
+            border-color: var(--primary);
+            background: #FFFDF0;
+        }
+        .preset-btn .sub {
+            display: block;
+            font-size: 10px;
+            font-weight: 500;
+            color: #777;
+            margin-top: 2px;
+        }
+
+        /* Toast notification */
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #111;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+            z-index: 9999;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        #toast.show { display: block; opacity: 1; }
+
+        @media (max-width: 900px) {
+            .workspace { flex-direction: column; }
+            #map { height: 50vh; }
+            .sidebar { width: 100%; height: 50vh; }
+            .map-selector-bar { top: 6px; font-size: 10px; padding: 4px 8px; }
+            .map-layer-switch { top: 48px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header with Quick Controls -->
+    <header>
+        <div class="brand">
+            <span>🛵 TamakKG</span>
+            <span class="brand-badge">ГОРОДСКОЙ КВАДРАТ + КОРИДОРЫ</span>
+        </div>
+
+        <div class="header-toggles">
+            <!-- Road multiplier 1.3 toggle -->
+            <div class="toggle-chip active" id="toggle-road-coef" onclick="toggleRoadCoef()">
+                <span>🛣️ Коэфф. дорог:</span>
+                <span id="road-coef-text" style="font-weight: 900;">ВКЛ (×1.3)</span>
+            </div>
+
+            <!-- Night tariff toggle -->
+            <div class="toggle-chip" id="toggle-night" onclick="toggleNightTariff()">
+                <span>🌙 Ночной (<span id="header-night-val">+50с</span>)</span>
+            </div>
+
+            <!-- Door delivery toggle -->
+            <div class="toggle-chip" id="toggle-door" onclick="toggleDoorDelivery()">
+                <span>🚪 До двери (<span id="header-door-val">+50с</span>)</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="workspace">
+        
+        <!-- Interactive selector overlay on top of map -->
+        <div class="map-selector-bar">
+            <span style="font-size: 11px; font-weight: 700; color: #555;">Клик на карте:</span>
+            <button class="selector-btn mode-rest" id="btn-mode-rest" onclick="setClickMode('rest')">
+                🏪 Точка А (Ресторан)
+            </button>
+            <button class="selector-btn mode-client active" id="btn-mode-client" onclick="setClickMode('client')">
+                🛵 Точка Б (Клиент)
+            </button>
+        </div>
+
+        <!-- Layer Switcher: OSM vs Esri Satellite -->
+        <div class="map-layer-switch">
+            <button class="map-layer-btn active" id="btn-layer-osm" onclick="setMapLayer('osm')">🗺️ Схема OSM</button>
+            <button class="map-layer-btn" id="btn-layer-sat" onclick="setMapLayer('sat')">🛰️ Спутник</button>
+        </div>
+
+        <div id="map"></div>
+
+        <aside class="sidebar">
+            
+            <!-- Top Sticky Result & Tariffs Panel -->
+            <div class="top-results-panel">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <span style="font-size: 10px; font-weight: 800; color: #777; text-transform: uppercase;">Итого доставка (А ➔ Б):</span>
+                        <div class="total-price-large" id="sticky-total">140 сом</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span id="sticky-rate-badge" class="tariff-tag tag-city">ГОРОД: 18с/км</span>
+                        <div style="font-size: 11px; color: #666; margin-top: 3px;" id="sticky-dist">0.0 км</div>
+                    </div>
+                </div>
+
+                <!-- Live Tariffs Quick Edit Bar -->
+                <div class="tariffs-quick-bar">
+                    <div class="tariff-mini-box">
+                        <span class="tariff-mini-label">🏙️ В городе:</span>
+                        <div class="tariff-mini-input-wrap">
+                            <input type="number" id="quick-rate-city" class="tariff-mini-input" value="17" min="10" max="60" oninput="onQuickTariffInput('city', this.value)">
+                            <span class="tariff-mini-unit">с/км</span>
+                        </div>
+                    </div>
+                    <div class="tariff-mini-box">
+                        <span class="tariff-mini-label">⛰️ За город:</span>
+                        <div class="tariff-mini-input-wrap">
+                            <input type="number" id="quick-rate-out" class="tariff-mini-input" value="29" min="15" max="90" oninput="onQuickTariffInput('out', this.value)">
+                            <span class="tariff-mini-unit">с/км</span>
+                        </div>
+                    </div>
+                    <div class="tariff-mini-box">
+                        <span class="tariff-mini-label" style="color:#7C3AED;">🟣 Супер:</span>
+                        <div class="tariff-mini-input-wrap">
+                            <input type="number" id="quick-rate-super" class="tariff-mini-input" value="43" min="20" max="100" style="border-color:#8B5CF6; color:#6D28D9;" oninput="onQuickTariffInput('super', this.value)">
+                            <span class="tariff-mini-unit">с/км</span>
+                        </div>
+                    </div>
+                    <div class="tariff-mini-box">
+                        <span class="tariff-mini-label">🛬 Посадка:</span>
+                        <div class="tariff-mini-input-wrap">
+                            <input type="number" id="quick-base-fee" class="tariff-mini-input" value="150" min="50" max="300" oninput="onQuickTariffInput('base', this.value)">
+                            <span class="tariff-mini-unit">сом</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Calculation Model Switcher -->
+                <div class="calc-mode-box">
+                    <span><b>Модель расчёта за городом:</b></span>
+                    <select id="select-calc-mode" class="calc-mode-select" onchange="onCalcModeChange(this.value)">
+                        <option value="split" selected id="opt-mode-split">Раздельный (город 17с + красная 29с + супер 43с)</option>
+                        <option value="flat" id="opt-mode-flat">Единый (все км по тарифу зоны)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Tabs Switcher -->
+            <div class="sidebar-tabs">
+                <div class="tab-btn active" id="btn-tab-adjust" onclick="switchTab('adjust')">
+                    🎛️ Город & Коридоры
+                </div>
+                <div class="tab-btn" id="btn-tab-tariffs" onclick="switchTab('tariffs')">
+                    💰 Тарифы (Цены)
+                </div>
+                <div class="tab-btn" id="btn-tab-calc" onclick="switchTab('calc')">
+                    📊 Смета и Точки
+                </div>
+            </div>
+
+            <!-- ============================================== -->
+            <!-- TAB 1: БАЗОВЫЙ ГОРОДСКОЙ КВАДРАТ + 4 КОРИДОРА -->
+            <!-- ============================================== -->
+            <div id="tab-adjust" class="tab-content active">
+                
+                <!-- 0. ОСНОВНОЙ ГОРОДСКОЙ КВАДРАТ (МЁРТВЫЕ ТОЧКИ ГОРОДА) -->
+                <div class="panel-section">
+                    <div class="city-box-card">
+                        <div class="section-title" style="color: #065F46; margin-bottom: 8px;">
+                            <span>🏛️ 0. Основной Городской Квадрат</span>
+                            <span class="tariff-tag tag-city">100% ГОРОД</span>
+                        </div>
+                        <div style="font-size: 11.5px; color: #047857; margin-bottom: 12px; line-height: 1.35;">
+                            Здесь задаются <b>мёртвые точки города</b>. Всё, что внутри этого прямоугольника — гарантированно город (18 сом/км) без отсечений! От этих 4-х граней начинаются коридоры:
+                        </div>
+
+                        <!-- Восток города (10 км) -->
+                        <div class="slider-group city-highlight">
+                            <div class="slider-header">
+                                <span class="slider-title">➡️ Восток города (Аламедин-1 / Тунгуч):</span>
+                                <span class="slider-val-badge" id="val-city-east">10.0 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-city-east" min="6.0" max="15.0" step="0.5" value="10.0" oninput="onConfigChange()">
+                            <div class="slider-desc">От этой отметки начинается вытягивание коридора Новопокровки.</div>
+                        </div>
+
+                        <!-- Север города (4 км) -->
+                        <div class="slider-group city-highlight">
+                            <div class="slider-header">
+                                <span class="slider-title">⬆️ Север города (по прямой на Дордой):</span>
+                                <span class="slider-val-badge" id="val-city-north">4.0 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-city-north" min="2.0" max="8.0" step="0.5" value="4.0" oninput="onConfigChange()">
+                            <div class="slider-desc">От этой отметки начинается вытягивание коридора Дордоя.</div>
+                        </div>
+
+                        <!-- Юг города (8 км) -->
+                        <div class="slider-group city-highlight">
+                            <div class="slider-header">
+                                <span class="slider-title">⬇️ Юг города (Асанбай / 12 мкр):</span>
+                                <span class="slider-val-badge" id="val-city-south">8.0 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-city-south" min="5.0" max="12.0" step="0.5" value="8.0" oninput="onConfigChange()">
+                            <div class="slider-desc">От этой отметки начинается вытягивание зоны предгорий.</div>
+                        </div>
+
+                        <!-- Запад города (4.6 км) -->
+                        <div class="slider-group city-highlight">
+                            <div class="slider-header">
+                                <span class="slider-title">⬅️ Запад города (Кызыл-Аскер / Шлагбаум):</span>
+                                <span class="slider-val-badge" id="val-city-west">4.6 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-city-west" min="3.0" max="9.0" step="0.2" value="4.6" oninput="onConfigChange()">
+                            <div class="slider-desc">От этой отметки начинается вытягивание коридора В-Антоновки.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 1. СЕВЕРНЫЙ КОРИДОР (ДОРДОЙ / ОБЪЕЗДНАЯ) -->
+                <div class="panel-section">
+                    <div class="section-title">
+                        <span>⬆️ 1. Вытягивание: Север (Дордой / объездная)</span>
+                        <span class="tariff-tag tag-city">РЫНОК</span>
+                    </div>
+
+                    <div class="corridor-group-box">
+                        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">Вытягивается от северной границы города (<span id="txt-start-north">4.0</span> км) на север:</div>
+
+                        <!-- Вправо / Восток от трассы (С ДО 25 КМ ДЛЯ ЖИЛМАССИВОВ!) -->
+                        <div class="slider-group tariff-highlight">
+                            <div class="slider-header">
+                                <span class="slider-title">➡️ Справа (на Восток) от оси Дордоя:</span>
+                                <span class="slider-val-badge" id="val-north-east">+12.0 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-north-east" min="1.0" max="25.0" step="0.2" value="12.0" oninput="onConfigChange()">
+                            <div class="slider-desc">Регулирует правую границу на северной объездной (Жер-Казар и др.). До <b>25 км</b>!</div>
+                        </div>
+
+                        <!-- Влево / Запад от трассы -->
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-title">⬅️ Слева (на Запад) от оси Дордоя:</span>
+                                <span class="slider-val-badge" id="val-north-west">-4.4 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-north-west" min="1.0" max="20.0" step="0.2" value="4.4" oninput="onConfigChange()">
+                            <div class="slider-desc">Регулирует левую границу на северной объездной (Маевка, Пригородное).</div>
+                        </div>
+
+                        <!-- Крайний Север (Макс вылет) -->
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-title">🏁 Крайняя северная точка (Макс вылет):</span>
+                                <span class="slider-val-badge" id="val-max-north">11.0 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-max-north" min="6.0" max="25.0" step="0.5" value="11.0" oninput="onConfigChange()">
+                        </div>
+
+                        <!-- Старт красной зоны -->
+                        <div class="slider-group red-highlight">
+                            <div class="slider-header">
+                                <span class="slider-title">📏 Старт красной зоны на Север:</span>
+                                <span class="slider-val-badge" id="val-red-north">6.0 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-red-north" min="3.0" max="15.0" step="0.5" value="6.0" oninput="onConfigChange()">
+                        </div>
+
+                        <!-- Старт фиолетовой зоны (Суперзагород) -->
+                        <div class="slider-group purple-highlight">
+                            <div class="slider-header">
+                                <span class="slider-title">🟣 Старт фиолетовой зоны (Суперзагород):</span>
+                                <span class="slider-val-badge" id="val-purple-north">8.0 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-purple-north" min="5.0" max="15.0" step="0.5" value="8.0" oninput="onConfigChange()">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. ВОСТОЧНЫЙ КОРИДОР (НОВОПОКРОВКА) -->
+                <div class="panel-section">
+                    <div class="section-title">
+                        <span>➡️ 2. Вытягивание: Восток (Новопокровка / Кант)</span>
+                        <span class="tariff-tag tag-outoftown">ТРАССА</span>
+                    </div>
+
+                    <div class="corridor-group-box">
+                        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">Вытягивается от восточной границы города (<span id="txt-start-east">10.0</span> км) на восток:</div>
+
+                        <!-- Вверх / Север от трассы -->
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-title">⬆️ Сверху (на Север) от трассы:</span>
+                                <span class="slider-val-badge" id="val-east-north">+2.1 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-east-north" min="0.5" max="15.0" step="0.1" value="2.1" oninput="onConfigChange()">
+                        </div>
+
+                        <!-- Вниз / Юг от трассы -->
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-title">⬇️ Снизу (на Юг) от трассы:</span>
+                                <span class="slider-val-badge" id="val-east-south">-8.5 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-east-south" min="0.5" max="15.0" step="0.1" value="8.5" oninput="onConfigChange()">
+                        </div>
+
+                        <!-- Макс Восток -->
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-title">🏁 Крайняя восточная точка (Макс вылет):</span>
+                                <span class="slider-val-badge" id="val-max-east">19.0 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-max-east" min="12.0" max="35.0" step="0.5" value="19.0" oninput="onConfigChange()">
+                        </div>
+
+                        <!-- Старт красной зоны -->
+                        <div class="slider-group red-highlight">
+                            <div class="slider-header">
+                                <span class="slider-title">📏 Старт красной зоны на Восток:</span>
+                                <span class="slider-val-badge" id="val-red-east">11.0 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-red-east" min="8.0" max="25.0" step="0.5" value="11.0" oninput="onConfigChange()">
+                        </div>
+
+                        <!-- Старт фиолетовой зоны (Суперзагород) -->
+                        <div class="slider-group purple-highlight">
+                            <div class="slider-header">
+                                <span class="slider-title">🟣 Старт фиолетовой зоны (Суперзагород):</span>
+                                <span class="slider-val-badge" id="val-purple-east">17.5 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-purple-east" min="10.0" max="25.0" step="0.5" value="17.5" oninput="onConfigChange()">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. ЗАПАДНЫЙ КОРИДОР (ВОЕННО-АНТОНОВКА) -->
+                <div class="panel-section">
+                    <div class="section-title">
+                        <span>⬅️ 3. Вытягивание: Запад (В-Антоновка / Сокулук)</span>
+                        <span class="tariff-tag tag-city">ТРАССА</span>
+                    </div>
+
+                    <div class="corridor-group-box">
+                        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">Вытягивается от западной границы города (<span id="txt-start-west">4.6</span> км) на запад:</div>
+
+                        <!-- Вверх / Север от трассы -->
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-title">⬆️ Сверху (на Север) от трассы:</span>
+                                <span class="slider-val-badge" id="val-west-north">+2.5 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-west-north" min="0.5" max="15.0" step="0.2" value="2.5" oninput="onConfigChange()">
+                        </div>
+
+                        <!-- Вниз / Юг от трассы -->
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-title">⬇️ Снизу (на Юг) от трассы:</span>
+                                <span class="slider-val-badge" id="val-west-south">-2.5 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-west-south" min="0.5" max="15.0" step="0.2" value="2.5" oninput="onConfigChange()">
+                        </div>
+
+                        <!-- Макс Запад -->
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-title">🏁 Крайняя западная точка (Макс вылет):</span>
+                                <span class="slider-val-badge" id="val-max-west">12.0 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-max-west" min="6.0" max="25.0" step="0.5" value="12.0" oninput="onConfigChange()">
+                        </div>
+
+                        <!-- Старт красной зоны -->
+                        <div class="slider-group red-highlight">
+                            <div class="slider-header">
+                                <span class="slider-title">📏 Старт красной зоны на Запад:</span>
+                                <span class="slider-val-badge" id="val-red-west">6.0 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-red-west" min="3.0" max="15.0" step="0.5" value="6.0" oninput="onConfigChange()">
+                        </div>
+
+                        <!-- Старт фиолетовой зоны (Суперзагород) -->
+                        <div class="slider-group purple-highlight">
+                            <div class="slider-header">
+                                <span class="slider-title">🟣 Старт фиолетовой зоны (Суперзагород):</span>
+                                <span class="slider-val-badge" id="val-purple-west">9.0 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-purple-west" min="6.0" max="15.0" step="0.5" value="9.0" oninput="onConfigChange()">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. ЮЖНЫЙ СЕКТОР (ЧОН-АРЫК / БАЙТИК / АРАШАН) -->
+                <div class="panel-section">
+                    <div class="section-title">
+                        <span>⬇️ 4. Вытягивание: Юг (Горы / Байтик / Арашан)</span>
+                        <span class="tariff-tag tag-outoftown">ПРЕДГОРЬЯ</span>
+                    </div>
+
+                    <div class="corridor-group-box">
+                        <div style="font-size: 11px; color: #666; margin-bottom: 8px;">Вытягивается от южной границы города (<span id="txt-start-south">8.0</span> км) в горы:</div>
+
+                        <!-- Слева (на Запад) в горах -->
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-title">⬅️ Слева (на Запад) в горах (Байтик):</span>
+                                <span class="slider-val-badge" id="val-south-west">-6.0 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-south-west" min="2.0" max="20.0" step="0.5" value="6.0" oninput="onConfigChange()">
+                        </div>
+
+                        <!-- Справа (на Восток) в горах -->
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-title">➡️ Справа (на Восток) в горах (Арашан):</span>
+                                <span class="slider-val-badge" id="val-south-east">+11.0 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-south-east" min="2.0" max="20.0" step="0.5" value="11.0" oninput="onConfigChange()">
+                        </div>
+
+                        <!-- Макс Юг -->
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-title">🏁 Крайняя южная точка (Макс вылет):</span>
+                                <span class="slider-val-badge" id="val-max-south">18.5 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-max-south" min="10.0" max="30.0" step="0.5" value="18.5" oninput="onConfigChange()">
+                        </div>
+
+                        <!-- Старт красной зоны -->
+                        <div class="slider-group red-highlight">
+                            <div class="slider-header">
+                                <span class="slider-title">📏 Старт красной зоны на Юг:</span>
+                                <span class="slider-val-badge" id="val-red-south">7.2 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-red-south" min="4.0" max="18.0" step="0.2" value="7.2" oninput="onConfigChange()">
+                        </div>
+
+                        <!-- Старт фиолетовой зоны (Суперзагород / Арашан) -->
+                        <div class="slider-group purple-highlight">
+                            <div class="slider-header">
+                                <span class="slider-title">🟣 Старт фиолетовой зоны (Арашан / горы):</span>
+                                <span class="slider-val-badge" id="val-purple-south">10.0 км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-purple-south" min="8.0" max="20.0" step="0.5" value="10.0" oninput="onConfigChange()">
+                            <div class="slider-desc">Выше этой отметки действует суперзагородный тариф <b>43 сом/км</b> (Арашан и дальние горы).</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Buttons Section -->
+                <div class="panel-section">
+                    <button class="btn-action" onclick="copyZoneCode()">
+                        📋 Скопировать готовый код настроек
+                    </button>
+                    <button class="btn-action btn-secondary" style="margin-top: 8px;" onclick="resetZonesToDefault()">
+                        ↺ Сбросить к базовым
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- ============================================== -->
+            <!-- TAB 2: НАСТРОЙКА ТАРИФОВ (ЦЕНЫ ЗА КМ И ПОСАДКА) -->
+            <!-- ============================================== -->
+            <div id="tab-tariffs" class="tab-content">
+                
+                <div class="panel-section">
+                    <div class="section-title">
+                        <span>💰 ТАРИФНАЯ СЕТКА TAMAKKG</span>
+                        <span class="tariff-tag tag-city">ЖИВОЙ РАСЧЁТ</span>
+                    </div>
+
+                    <!-- 1. ГОРОДСКОЙ ТАРИФ ЗА 1 КМ -->
+                    <div class="corridor-group-box">
+                        <div class="slider-group tariff-highlight">
+                            <div class="slider-header">
+                                <span class="slider-title">🏙️ Городской тариф (за 1 км):</span>
+                                <span class="slider-val-badge" id="val-rate-city">17 сом / км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-rate-city" min="10" max="50" step="1" value="17" oninput="onTariffChange()">
+                            <div class="slider-desc">Действует внутри черты Бишкека за каждый километр свыше 1 км.</div>
+                            <div class="pills-row">
+                                <button class="pill-btn" onclick="setSlider('slider-rate-city', 15)">15с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-rate-city', 17)">17с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-rate-city', 18)">18с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-rate-city', 20)">20с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-rate-city', 22)">22с</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. ЗАГОРОДНЫЙ ТАРИФ / КРАСНАЯ ЗОНА ЗА 1 КМ -->
+                    <div class="corridor-group-box">
+                        <div class="slider-group red-highlight">
+                            <div class="slider-header">
+                                <span class="slider-title">⛰️ Загородный тариф (Красные зоны):</span>
+                                <span class="slider-val-badge" id="val-rate-outoftown">29 сом / км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-rate-outoftown" min="15" max="80" step="1" value="29" oninput="onTariffChange()">
+                            <div class="slider-desc">Действует в 4-х красных зонах (Юг, Восток, Дордой, В-Антоновка).</div>
+                            <div class="pills-row">
+                                <button class="pill-btn" onclick="setSlider('slider-rate-outoftown', 25)">25с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-rate-outoftown', 28)">28с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-rate-outoftown', 29)">29с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-rate-outoftown', 33)">33с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-rate-outoftown', 35)">35с</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. СУПЕРЗАГОРОДНЫЙ ТАРИФ / ФИОЛЕТОВАЯ ЗОНА ЗА 1 КМ -->
+                    <div class="corridor-group-box">
+                        <div class="slider-group purple-highlight">
+                            <div class="slider-header">
+                                <span class="slider-title">🟣 Суперзагородный тариф (Фиолетовая зона):</span>
+                                <span class="slider-val-badge" id="val-rate-super">43 сом / км</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-rate-super" min="20" max="90" step="1" value="43" oninput="onTariffChange()">
+                            <div class="slider-desc">Действует в дальних сёлах (Арашан, дальний Байтик, Люксембург и др.).</div>
+                            <div class="pills-row">
+                                <button class="pill-btn" onclick="setSlider('slider-rate-super', 38)">38с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-rate-super', 40)">40с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-rate-super', 43)">43с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-rate-super', 45)">45с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-rate-super', 50)">50с</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. БАЗОВАЯ ПОСАДКА (ДО 1 КМ) -->
+                    <div class="corridor-group-box">
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-title">🛬 Базовая посадка (первый 1 км):</span>
+                                <span class="slider-val-badge" id="val-base-fee-setting">150 сом</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-base-fee" min="80" max="300" step="5" value="150" oninput="onTariffChange()">
+                            <div class="slider-desc">Минимальная сумма заказа, включает в себя первый 1 км пути.</div>
+                            <div class="pills-row">
+                                <button class="pill-btn" onclick="setSlider('slider-base-fee', 130)">130с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-base-fee', 140)">140с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-base-fee', 150)">150с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-base-fee', 160)">160с</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5. НОЧНОЙ ТАРИФ И ДОСТАВКА ДО ДВЕРИ -->
+                    <div class="corridor-group-box">
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-title">🌙 Ночная надбавка (22:00 - 06:00):</span>
+                                <span class="slider-val-badge" id="val-night-fee-setting">+50 сом</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-night-fee" min="0" max="150" step="5" value="50" oninput="onTariffChange()">
+                        </div>
+
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-title">🚪 Доставка до двери (опция):</span>
+                                <span class="slider-val-badge" id="val-door-fee-setting">+50 сом</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-door-fee" min="0" max="150" step="5" value="50" oninput="onTariffChange()">
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Export with tariffs -->
+                <div class="panel-section">
+                    <button class="btn-action" onclick="copyZoneCode()">
+                        📋 Скопировать код (Тарифы + Зоны)
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- ============================================== -->
+            <!-- TAB 3: ТОЧКИ А И Б / ДЕТАЛЬНАЯ СМЕТА РАСЧЁТА   -->
+            <!-- ============================================== -->
+            <div id="tab-calc" class="tab-content">
+                
+                <div class="panel-section">
+                    <div class="section-title">
+                        <span>Выбранные точки доставки</span>
+                        <span id="zone-status-badge" class="tariff-tag tag-city">В ГОРОДЕ</span>
+                    </div>
+                    
+                    <div class="breakdown-row">
+                        <span class="breakdown-label">🏪 <b>Точка А (Ресторан):</b></span>
+                        <span class="breakdown-value" id="val-rest-name" style="color: #FF9F1C;">Центр</span>
+                    </div>
+                    <div class="breakdown-row">
+                        <span class="breakdown-label">↳ Статус точки А:</span>
+                        <span class="breakdown-value" id="val-rest-status">В городе</span>
+                    </div>
+
+                    <div class="breakdown-row" style="margin-top: 6px;">
+                        <span class="breakdown-label">🛵 <b>Точка Б (Клиент):</b></span>
+                        <span class="breakdown-value" id="val-client-name" style="color: #2EC4B6;">Выбрана на карте</span>
+                    </div>
+                    <div class="breakdown-row">
+                        <span class="breakdown-label">↳ Статус точки Б:</span>
+                        <span class="breakdown-value" id="val-client-status">В городе</span>
+                    </div>
+
+                    <div style="display: flex; gap: 8px; margin-top: 10px;">
+                        <button class="btn-action btn-secondary" style="font-size: 11px; padding: 8px;" onclick="setRestToCenter()">
+                            🏛️ Ресторан в Центр
+                        </button>
+                        <button class="btn-action btn-secondary" style="font-size: 11px; padding: 8px;" onclick="swapPoints()">
+                            🔄 Поменять А и Б
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Метрики и подробная смета -->
+                <div class="panel-section">
+                    <div class="section-title">Дистанция и Тарификация</div>
+                    
+                    <div class="breakdown-row">
+                        <span class="breakdown-label">📏 Прямая дистанция (А ➔ Б):</span>
+                        <span class="breakdown-value" id="val-straight-dist">0.0 км</span>
+                    </div>
+                    <div class="breakdown-row">
+                        <span class="breakdown-label">🛣️ Расчётная дистанция:</span>
+                        <span class="breakdown-value" style="color: #E65100;" id="val-calc-dist">0.0 км</span>
+                    </div>
+                    <div class="breakdown-row">
+                        <span class="breakdown-label">🧭 Смещение точки Б от центра:</span>
+                        <span class="breakdown-value" id="val-point-offset">0.0 км</span>
+                    </div>
+
+                    <div style="margin: 10px 0 6px 0; font-size: 11px; font-weight: 800; color: #444; text-transform: uppercase;">
+                        Смета по километрам:
+                    </div>
+
+                    <div class="breakdown-row">
+                        <span class="breakdown-label">1. Посадка (первый 1 км):</span>
+                        <span class="breakdown-value" id="val-base-fee">150 сом</span>
+                    </div>
+                    <div class="breakdown-row">
+                        <span class="breakdown-label">2. Километры в городе (<span id="val-city-km">0</span> км × <span id="val-city-rate">17</span>с):</span>
+                        <span class="breakdown-value" id="val-city-fee">0 сом</span>
+                    </div>
+                    <div class="breakdown-row">
+                        <span class="breakdown-label">3. Километры за городом (<span id="val-out-km">0</span> км × <span id="val-out-rate">29</span>с):</span>
+                        <span class="breakdown-value" id="val-out-fee" style="color: var(--red);">0 сом</span>
+                    </div>
+                    <div class="breakdown-row">
+                        <span class="breakdown-label">🟣 4. Суперзагород (<span id="val-super-km">0</span> км × <span id="val-super-rate">43</span>с):</span>
+                        <span class="breakdown-value" id="val-super-fee" style="color: #7C3AED;">0 сом</span>
+                    </div>
+                    <div class="breakdown-row">
+                        <span class="breakdown-label">5. Ночной тариф (<span id="calc-night-rate">+50с</span>):</span>
+                        <span class="breakdown-value" id="val-night-fee">0 сом</span>
+                    </div>
+                    <div class="breakdown-row">
+                        <span class="breakdown-label">6. До двери (<span id="calc-door-rate">+50с</span>):</span>
+                        <span class="breakdown-value" id="val-door-fee">0 сом</span>
+                    </div>
+                </div>
+
+                <!-- Presets Grid -->
+                <div class="panel-section">
+                    <div class="section-title">Быстрые локации для теста точки Б</div>
+                    <div class="presets-grid">
+                        <button class="preset-btn" onclick="setClientPreset(42.876, 74.614, 'ЦУМ (Центр города)')">
+                            🎯 ЦУМ (Центр)
+                            <span class="sub">Городской квадрат</span>
+                        </button>
+                        <button class="preset-btn" onclick="setClientPreset(42.880, 74.670, 'Аламедин-1 (Восток)')">
+                            🏙️ Аламедин-1
+                            <span class="sub">Городской квадрат</span>
+                        </button>
+                        <button class="preset-btn" onclick="setClientPreset(42.870, 74.680, 'мкр Тунгуч')">
+                            🏙️ Тунгуч
+                            <span class="sub">Городской квадрат</span>
+                        </button>
+                        <button class="preset-btn" onclick="setClientPreset(42.818, 74.628, '12 мкр (Асанбай)')">
+                            🏙️ 12 мкр (Асанбай)
+                            <span class="sub">Городской квадрат</span>
+                        </button>
+                        <button class="preset-btn" onclick="setClientPreset(42.875, 74.520, 'Кызыл-Аскер')">
+                            🏙️ Кызыл-Аскер
+                            <span class="sub">Городской квадрат</span>
+                        </button>
+                        <button class="preset-btn" onclick="setClientPreset(42.940, 74.600, 'Рынок Дордой')">
+                            🏬 Рынок Дордой
+                            <span class="sub">Северный коридор</span>
+                        </button>
+                        <button class="preset-btn" onclick="setClientPreset(42.945, 74.685, 'Жер-Казар / Объездная восток')">
+                            🌾 Жер-Казар (Восток)
+                            <span class="sub">Северный коридор</span>
+                        </button>
+                        <button class="preset-btn" onclick="setClientPreset(42.875, 74.740, 'Новопокровка трасса')">
+                            🌾 Новопокровка трасса
+                            <span class="sub">Восточный коридор</span>
+                        </button>
+                        <button class="preset-btn" onclick="setClientPreset(42.875, 74.470, 'В-Антоновка трасса')">
+                            🌾 В-Антоновка трасса
+                            <span class="sub">Западный коридор</span>
+                        </button>
+                        <button class="preset-btn" onclick="setClientPreset(42.744, 74.654, 'Арашан (Юг 15.5 км)')">
+                            🏔️ Арашан
+                            <span class="sub">Южный сектор (Горы)</span>
+                        </button>
+                        <button class="preset-btn" onclick="setClientPreset(42.740, 74.550, 'Байтик (Юг 15.3 км)')">
+                            🏔️ Байтик
+                            <span class="sub">Южный сектор (Горы)</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+        </aside>
+    </div>
+
+    <div id="toast">✅ Готово!</div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // --- КОНФИГУРАЦИЯ: БАЗОВЫЙ ГОРОДСКОЙ КВАДРАТ + 4 КОРИДОРА ---
+        const config = {
+            // ТАРИФЫ (УПРАВЛЯЕМЫЕ ИЗ СИМУЛЯТОРА):
+            rateCity: 17,        // Городской тариф (сом за км)
+            rateOutOfTown: 29,   // Загородный тариф / Красные зоны (сом за км)
+            rateSuper: 43,       // Суперзагородный тариф / Фиолетовая зона (сом за км)
+            baseFee: 150,        // Посадка (первый 1 км)
+            nightFee: 50,        // Ночная надбавка (+50 сом)
+            doorFee: 50,         // Доставка до двери (+50 сом)
+
+            // Модель расчёта за городом: 'split' (дифференцированный) или 'flat' (единый повышенный)
+            calcMode: 'split',
+
+            // ==========================================
+            // 0. МЁРТВЫЕ ТОЧКИ ГОРОДСКОГО КВАДРАТА
+            // Всё внутри этого квадрата — 100% город (17 сом/км)!
+            // ==========================================
+            cityNorth: 4.0,   // Север города (до Дордоя)
+            cityEast: 10.0,   // Восток города (за Аламедин-1 / Тунгуч)
+            citySouth: 8.0,   // Юг города (до Асанбая / 12 мкр)
+            cityWest: 4.6,    // Запад города (до Кызыл-Аскера)
+
+            // ==========================================
+            // 1. СЕВЕРНЫЙ КОРИДОР (ДОРДОЙ / ОБЪЕЗДНАЯ)
+            // Вытягивается на север от cityNorth (4.0 км)
+            // ==========================================
+            maxNorth: 11.0,
+            corridorNorthWest: 4.4,  // Слева (на запад) от оси Дордоя
+            corridorNorthEast: 12.0, // Справа (на восток) от оси Дордоя (до 25 км)
+            redZoneNorth: 6.0,       // Старт красной зоны на Север
+            purpleZoneNorth: 8.0,    // Старт фиолетовой зоны на Север
+
+            // ==========================================
+            // 2. ВОСТОЧНЫЙ КОРИДОР (НОВОПОКРОВКА)
+            // Вытягивается на восток от cityEast (10.0 км)
+            // ==========================================
+            maxEast: 19.0,
+            corridorEastNorth: 2.1,  // Сверху (на север) от трассы
+            corridorEastSouth: 8.5,  // Снизу (на юг) от трассы
+            redZoneEast: 11.0,       // Старт красной зоны на Восток
+            purpleZoneEast: 17.5,    // Старт фиолетовой зоны на Восток
+
+            // ==========================================
+            // 3. ЗАПАДНЫЙ КОРИДОР (В-АНТОНОВКА / СОКУЛУК)
+            // Вытягивается на запад от cityWest (4.6 км)
+            // ==========================================
+            maxWest: 12.0,
+            corridorWestNorth: 2.5,  // Сверху (на север) от трассы
+            corridorWestSouth: 2.5,  // Снизу (на юг) от трассы
+            redZoneWest: 6.0,        // Старт красной зоны на Запад
+            purpleZoneWest: 9.0,     // Старт фиолетовой зоны на Запад
+
+            // ==========================================
+            // 4. ЮЖНЫЙ КОРИДОР (ПРЕДГОРЬЯ / БАЙТИК / АРАШАН)
+            // Вытягивается на юг от citySouth (8.0 км)
+            // ==========================================
+            maxSouth: 18.5,
+            corridorSouthWest: 6.0,  // Слева (на запад) в горах (Байтик)
+            corridorSouthEast: 11.0, // Справа (на восток) в горах (Арашан)
+            redZoneSouth: 7.2,       // Старт красной зоны на Юг
+            purpleZoneSouth: 10.0    // Старт фиолетовой зоны на Юг (Арашан)
+        };
+
+        const CENTER_LAT = 42.8746;
+        const CENTER_LON = 74.5698;
+        const CHUY_MANAS_LAT = 42.8746;
+        const CHUY_MANAS_LON = 74.5878;
+
+        const degLatPerKm = 1 / 111.139;
+        const degLonPerKm = 1 / (111.320 * Math.cos(CENTER_LAT * Math.PI / 180));
+
+        let useRoadCoef = true;
+        let isNightTariff = false;
+        let isDoorDelivery = false;
+        let clickMode = 'client'; // 'rest' (Точка А) или 'client' (Точка Б)
+
+        let restaurantPos = { lat: 42.8746, lon: 74.5878, name: "Чуй - Манаса (Центр)" };
+        let clientPos = { lat: 42.744, lon: 74.654, name: "Село Арашан (Южный сектор)" };
+
+        let map, restMarker, clientMarker, routeLine;
+        let cityBoxLayer, mainZoneLayer;
+        let redSouthLayer, redEastLayer, redNorthLayer, redWestLayer;
+        let purpleSouthLayer, purpleEastLayer, purpleNorthLayer, purpleWestLayer;
+        let osmLayer, satLayer;
+
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; 
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + 
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        // --- БЕЗУПРЕЧНАЯ ПРОВЕРКА: ГОРОДСКОЙ КВАДРАТ + 4 ВЫТЯГИВАЮЩИХСЯ КОРИДОРА ---
+        function evaluateLocation(lat, lon) {
+            if (!lat || !lon) return { inZone: false, isRed: false, isPurple: false, zoneTier: 'none', reason: 'Нет координат' };
+
+            const y = (lat - CENTER_LAT) / degLatPerKm;
+            const x = (lon - CENTER_LON) / degLonPerKm;
+
+            // 1. БАЗОВЫЙ ГОРОДСКОЙ КВАДРАТ (МЁРТВЫЕ ТОЧКИ ГОРОДА)
+            // Внутри него ТОЧКА ВСЕГДА В ЗОНЕ! Никаких ложных "Вне зоны"!
+            const inCityBox = (
+                x >= -config.cityWest && 
+                x <= config.cityEast && 
+                y >= -config.citySouth && 
+                y <= config.cityNorth
+            );
+
+            if (inCityBox) {
+                return {
+                    inZone: true,
+                    isRed: false,
+                    isPurple: false,
+                    zoneTier: 'city',
+                    distOffset: Math.max(Math.abs(x), Math.abs(y)),
+                    reason: `В черте города (${config.rateCity} сом/км)`
+                };
+            }
+
+            // 2. ВЫТЯГИВАЮЩИЙСЯ СЕВЕРНЫЙ КОРИДОР (Дордой от cityNorth):
+            if (y > config.cityNorth && y <= config.maxNorth) {
+                if (x >= -config.corridorNorthWest && x <= config.corridorNorthEast) {
+                    const isPurple = y > config.purpleZoneNorth;
+                    const isRed = !isPurple && (y > config.redZoneNorth);
+                    const zoneTier = isPurple ? 'purple' : (isRed ? 'red' : 'city');
+                    return {
+                        inZone: true,
+                        isRed: isRed,
+                        isPurple: isPurple,
+                        zoneTier: zoneTier,
+                        redDirection: 'Север',
+                        distOffset: y,
+                        redBoundaryKm: config.redZoneNorth,
+                        purpleBoundaryKm: config.purpleZoneNorth,
+                        reason: isPurple 
+                            ? `🟣 Суперзагород Север (Объездная > ${config.purpleZoneNorth}км, ${config.rateSuper}с/км)`
+                            : (isRed ? `Красная зона Север (Дордой > ${config.redZoneNorth}км, ${config.rateOutOfTown}с/км)` : `Север в черте города (${config.rateCity}с/км)`)
+                    };
+                }
+            }
+
+            // 3. ВЫТЯГИВАЮЩИЙСЯ ВОСТОЧНЫЙ КОРИДОР (Новопокровка от cityEast):
+            if (x > config.cityEast && x <= config.maxEast) {
+                if (y >= -config.corridorEastSouth && y <= config.corridorEastNorth) {
+                    const isPurple = x > config.purpleZoneEast;
+                    const isRed = !isPurple && (x > config.redZoneEast);
+                    const zoneTier = isPurple ? 'purple' : (isRed ? 'red' : 'city');
+                    return {
+                        inZone: true,
+                        isRed: isRed,
+                        isPurple: isPurple,
+                        zoneTier: zoneTier,
+                        redDirection: 'Восток',
+                        distOffset: x,
+                        redBoundaryKm: config.redZoneEast,
+                        purpleBoundaryKm: config.purpleZoneEast,
+                        reason: isPurple 
+                            ? `🟣 Суперзагород Восток (Кант/дальние > ${config.purpleZoneEast}км, ${config.rateSuper}с/км)`
+                            : (isRed ? `Красная зона Восток (Новопокровка > ${config.redZoneEast}км, ${config.rateOutOfTown}с/км)` : `Восток в черте города (${config.rateCity}с/км)`)
+                    };
+                }
+            }
+
+            // 4. ВЫТЯГИВАЮЩИЙСЯ ЗАПАДНЫЙ КОРИДОР (В-Антоновка от cityWest):
+            if (x < -config.cityWest && Math.abs(x) <= config.maxWest) {
+                if (y >= -config.corridorWestSouth && y <= config.corridorWestNorth) {
+                    const isPurple = Math.abs(x) > config.purpleZoneWest;
+                    const isRed = !isPurple && (Math.abs(x) > config.redZoneWest);
+                    const zoneTier = isPurple ? 'purple' : (isRed ? 'red' : 'city');
+                    return {
+                        inZone: true,
+                        isRed: isRed,
+                        isPurple: isPurple,
+                        zoneTier: zoneTier,
+                        redDirection: 'Запад',
+                        distOffset: Math.abs(x),
+                        redBoundaryKm: config.redZoneWest,
+                        purpleBoundaryKm: config.purpleZoneWest,
+                        reason: isPurple 
+                            ? `🟣 Суперзагород Запад (Сокулук > ${config.purpleZoneWest}км, ${config.rateSuper}с/км)`
+                            : (isRed ? `Красная зона Запад (В-Антоновка > ${config.redZoneWest}км, ${config.rateOutOfTown}с/км)` : `Запад в черте города (${config.rateCity}с/км)`)
+                    };
+                }
+            }
+
+            // 5. ВЫТЯГИВАЮЩИЙСЯ ЮЖНЫЙ КОРИДОР (Горы от citySouth):
+            if (y < -config.citySouth && Math.abs(y) <= config.maxSouth) {
+                if (x >= -config.corridorSouthWest && x <= config.corridorSouthEast) {
+                    const distS = Math.abs(y);
+                    const isPurple = distS > config.purpleZoneSouth;
+                    const isRed = !isPurple && (distS > config.redZoneSouth);
+                    const zoneTier = isPurple ? 'purple' : (isRed ? 'red' : 'city');
+                    return {
+                        inZone: true,
+                        isRed: isRed,
+                        isPurple: isPurple,
+                        zoneTier: zoneTier,
+                        redDirection: 'Юг',
+                        distOffset: distS,
+                        redBoundaryKm: config.redZoneSouth,
+                        purpleBoundaryKm: config.purpleZoneSouth,
+                        reason: isPurple 
+                            ? `🟣 Суперзагород Юг (Арашан / горы > ${config.purpleZoneSouth}км, ${config.rateSuper}с/км)`
+                            : (isRed ? `Красная зона Юг (Горы > ${config.redZoneSouth}км, ${config.rateOutOfTown}с/км)` : `Юг в черте города (${config.rateCity}с/км)`)
+                    };
+                }
+            }
+
+            // Все остальные точки за пределами квадрата и коридоров — ВНЕ ЗОНЫ
+            return {
+                inZone: false,
+                isRed: false,
+                isPurple: false,
+                zoneTier: 'none',
+                distOffset: Math.max(Math.abs(x), Math.abs(y)),
+                reason: 'Вне зоны доставки (отсечённые сёла / поля)'
+            };
+        }
+
+        // --- ИНИЦИАЛИЗАЦИЯ КАРТЫ С ЧИСТЫМИ OSM И СПУТНИКОВЫМИ ТАЙЛАМИ ---
+        function initMap() {
+            map = L.map('map').setView([42.810, 74.615], 11);
+
+            // Чистый OpenStreetMap (без водяных знаков)
+            osmLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Спутник Esri World Imagery для домов и дорог
+            satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri',
+                maxZoom: 19
+            });
+
+            initZoneLayers();
+            createMarkers();
+            recalculate();
+
+            // Клик по карте
+            map.on('click', function(e) {
+                if (clickMode === 'rest') {
+                    restaurantPos.lat = e.latlng.lat;
+                    restaurantPos.lon = e.latlng.lng;
+                    restaurantPos.name = `Ресторан [${e.latlng.lat.toFixed(3)}, ${e.latlng.lng.toFixed(3)}]`;
+                    restMarker.setLatLng(e.latlng);
+                } else {
+                    clientPos.lat = e.latlng.lat;
+                    clientPos.lon = e.latlng.lng;
+                    clientPos.name = `Клиент [${e.latlng.lat.toFixed(3)}, ${e.latlng.lng.toFixed(3)}]`;
+                    clientMarker.setLatLng(e.latlng);
+                }
+                recalculate();
+            });
+        }
+
+        function setMapLayer(layer) {
+            if (layer === 'sat') {
+                map.removeLayer(osmLayer);
+                map.addLayer(satLayer);
+                document.getElementById('btn-layer-sat').classList.add('active');
+                document.getElementById('btn-layer-osm').classList.remove('active');
+            } else {
+                map.removeLayer(satLayer);
+                map.addLayer(osmLayer);
+                document.getElementById('btn-layer-osm').classList.add('active');
+                document.getElementById('btn-layer-sat').classList.remove('active');
+            }
+        }
+
+        function initZoneLayers() {
+            // 0. Базовый городской квадрат (пунктирный зеленый)
+            cityBoxLayer = L.polygon([], {
+                color: '#059669',
+                weight: 2,
+                fillColor: '#10B981',
+                fillOpacity: 0.12,
+                dashArray: '5, 5'
+            }).addTo(map);
+
+            // 1. Общий контур с вытягивающимися коридорами
+            mainZoneLayer = L.polygon([], {
+                color: '#2EC4B6',
+                weight: 2.5,
+                fillColor: '#2EC4B6',
+                fillOpacity: 0.08
+            }).addTo(map);
+
+            const redStyle = {
+                color: '#E71D36',
+                weight: 2,
+                fillColor: '#E71D36',
+                fillOpacity: 0.22,
+                dashArray: '6, 6'
+            };
+
+            const purpleStyle = {
+                color: '#8B5CF6',
+                weight: 2,
+                fillColor: '#8B5CF6',
+                fillOpacity: 0.28,
+                dashArray: '5, 5'
+            };
+
+            redSouthLayer = L.polygon([], redStyle).addTo(map);
+            redEastLayer = L.polygon([], redStyle).addTo(map);
+            redNorthLayer = L.polygon([], redStyle).addTo(map);
+            redWestLayer = L.polygon([], redStyle).addTo(map);
+
+            purpleSouthLayer = L.polygon([], purpleStyle).addTo(map);
+            purpleEastLayer = L.polygon([], purpleStyle).addTo(map);
+            purpleNorthLayer = L.polygon([], purpleStyle).addTo(map);
+            purpleWestLayer = L.polygon([], purpleStyle).addTo(map);
+
+            L.circleMarker([CHUY_MANAS_LAT, CHUY_MANAS_LON], {
+                radius: 8,
+                fillColor: '#FFD700',
+                color: '#000',
+                weight: 2,
+                fillOpacity: 0.95
+            }).addTo(map).bindPopup("<b>🏛️ Центр (Чуй - Манаса)</b><br>Точка отсчета");
+
+            redrawAllPolygons();
+        }
+
+        // --- ИДЕАЛЬНАЯ ПЕРЕРИСОВКА: ГОРОДСКОЙ КВАДРАТ + 4 ВЫТЯГИВАЮЩИХСЯ КОРИДОРА ---
+        function redrawAllPolygons() {
+            const lat = (d) => CENTER_LAT + d * degLatPerKm;
+            const lon = (d) => CENTER_LON + d * degLonPerKm;
+
+            const c = config;
+
+            // 0. Отрисовка Базового Городского Квадрата
+            cityBoxLayer.setLatLngs([
+                [lat(c.cityNorth), lon(-c.cityWest)],
+                [lat(c.cityNorth), lon(c.cityEast)],
+                [lat(-c.citySouth), lon(c.cityEast)],
+                [lat(-c.citySouth), lon(-c.cityWest)]
+            ]);
+
+            // 1. Полный контур зоны обслуживания (Городской квадрат + вытягивающиеся коридоры)
+            const mainPoints = [];
+
+            // 1. Северный коридор (верх)
+            mainPoints.push([lat(c.maxNorth), lon(-c.corridorNorthWest)]);
+            mainPoints.push([lat(c.maxNorth), lon(c.corridorNorthEast)]);
+            mainPoints.push([lat(c.cityNorth), lon(c.corridorNorthEast)]);
+
+            if (c.corridorNorthEast < c.cityEast) {
+                mainPoints.push([lat(c.cityNorth), lon(c.cityEast)]);
+            }
+
+            // 2. Восточный коридор
+            const eastTopLon = Math.max(c.cityEast, c.corridorNorthEast);
+            mainPoints.push([lat(c.corridorEastNorth), lon(eastTopLon)]);
+            mainPoints.push([lat(c.corridorEastNorth), lon(c.maxEast)]);
+            mainPoints.push([lat(-c.corridorEastSouth), lon(c.maxEast)]);
+            
+            const eastBottomLon = Math.max(c.cityEast, c.corridorSouthEast);
+            mainPoints.push([lat(-c.corridorEastSouth), lon(eastBottomLon)]);
+
+            if (c.corridorSouthEast < c.cityEast) {
+                mainPoints.push([lat(-c.citySouth), lon(c.cityEast)]);
+            }
+
+            // 3. Южный коридор
+            mainPoints.push([lat(-c.citySouth), lon(c.corridorSouthEast)]);
+            mainPoints.push([lat(-c.maxSouth), lon(c.corridorSouthEast)]);
+            mainPoints.push([lat(-c.maxSouth), lon(-c.corridorSouthWest)]);
+            mainPoints.push([lat(-c.citySouth), lon(-c.corridorSouthWest)]);
+
+            if (c.corridorSouthWest < c.cityWest) {
+                mainPoints.push([lat(-c.citySouth), lon(-c.cityWest)]);
+            }
+
+            // 4. Западный коридор
+            const westBottomLon = -Math.max(c.cityWest, c.corridorSouthWest);
+            mainPoints.push([lat(-c.corridorWestSouth), lon(westBottomLon)]);
+            mainPoints.push([lat(-c.corridorWestSouth), lon(-c.maxWest)]);
+            mainPoints.push([lat(c.corridorWestNorth), lon(-c.maxWest)]);
+
+            const westTopLon = -Math.max(c.cityWest, c.corridorNorthWest);
+            mainPoints.push([lat(c.corridorWestNorth), lon(westTopLon)]);
+
+            if (c.corridorNorthWest < c.cityWest) {
+                mainPoints.push([lat(c.cityNorth), lon(-c.cityWest)]);
+            }
+
+            // Замыкание к Северному коридору
+            mainPoints.push([lat(c.cityNorth), lon(-c.corridorNorthWest)]);
+
+            mainZoneLayer.setLatLngs(mainPoints);
+
+            // 2. Красная и Фиолетовая зоны ЮГ (Горы)
+            const effPurpleSouth = Math.min(c.maxSouth, Math.max(c.redZoneSouth, c.purpleZoneSouth));
+            redSouthLayer.setLatLngs([
+                [lat(-c.redZoneSouth), lon(-c.corridorSouthWest)],
+                [lat(-c.redZoneSouth), lon(c.corridorSouthEast)],
+                [lat(-effPurpleSouth), lon(c.corridorSouthEast)],
+                [lat(-effPurpleSouth), lon(-c.corridorSouthWest)]
+            ]);
+            purpleSouthLayer.setLatLngs([
+                [lat(-effPurpleSouth), lon(-c.corridorSouthWest)],
+                [lat(-effPurpleSouth), lon(c.corridorSouthEast)],
+                [lat(-c.maxSouth), lon(c.corridorSouthEast)],
+                [lat(-c.maxSouth), lon(-c.corridorSouthWest)]
+            ]);
+
+            // 3. Красная и Фиолетовая зоны ВОСТОК (Новопокровка)
+            const effPurpleEast = Math.min(c.maxEast, Math.max(c.redZoneEast, c.purpleZoneEast));
+            redEastLayer.setLatLngs([
+                [lat(c.corridorEastNorth), lon(c.redZoneEast)],
+                [lat(c.corridorEastNorth), lon(effPurpleEast)],
+                [lat(-c.corridorEastSouth), lon(effPurpleEast)],
+                [lat(-c.corridorEastSouth), lon(c.redZoneEast)]
+            ]);
+            purpleEastLayer.setLatLngs([
+                [lat(c.corridorEastNorth), lon(effPurpleEast)],
+                [lat(c.corridorEastNorth), lon(c.maxEast)],
+                [lat(-c.corridorEastSouth), lon(c.maxEast)],
+                [lat(-c.corridorEastSouth), lon(effPurpleEast)]
+            ]);
+
+            // 4. Красная и Фиолетовая зоны СЕВЕР (Дордой)
+            const effPurpleNorth = Math.min(c.maxNorth, Math.max(c.redZoneNorth, c.purpleZoneNorth));
+            redNorthLayer.setLatLngs([
+                [lat(c.redZoneNorth), lon(-c.corridorNorthWest)],
+                [lat(effPurpleNorth), lon(-c.corridorNorthWest)],
+                [lat(effPurpleNorth), lon(c.corridorNorthEast)],
+                [lat(c.redZoneNorth), lon(c.corridorNorthEast)]
+            ]);
+            purpleNorthLayer.setLatLngs([
+                [lat(effPurpleNorth), lon(-c.corridorNorthWest)],
+                [lat(c.maxNorth), lon(-c.corridorNorthWest)],
+                [lat(c.maxNorth), lon(c.corridorNorthEast)],
+                [lat(effPurpleNorth), lon(c.corridorNorthEast)]
+            ]);
+
+            // 5. Красная и Фиолетовая зоны ЗАПАД (В-Антоновка)
+            const effPurpleWest = Math.min(c.maxWest, Math.max(c.redZoneWest, c.purpleZoneWest));
+            redWestLayer.setLatLngs([
+                [lat(c.corridorWestNorth), lon(-c.redZoneWest)],
+                [lat(c.corridorWestNorth), lon(-effPurpleWest)],
+                [lat(-c.corridorWestSouth), lon(-effPurpleWest)],
+                [lat(-c.corridorWestSouth), lon(-c.redZoneWest)]
+            ]);
+            purpleWestLayer.setLatLngs([
+                [lat(c.corridorWestNorth), lon(-effPurpleWest)],
+                [lat(c.corridorWestNorth), lon(-c.maxWest)],
+                [lat(-c.corridorWestSouth), lon(-c.maxWest)],
+                [lat(-c.corridorWestSouth), lon(-effPurpleWest)]
+            ]);
+        }
+
+        // --- МАРКЕРЫ ТОЧКИ А И ТОЧКИ Б ---
+        function createMarkers() {
+            const restIcon = L.divIcon({
+                className: 'custom-marker',
+                html: '<div style="background:#FF9F1C; color:#fff; width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; border:2.5px solid #fff; box-shadow:0 3px 10px rgba(0,0,0,0.35);">🏪</div>',
+                iconSize: [38, 38],
+                iconAnchor: [19, 19]
+            });
+
+            const clientIcon = L.divIcon({
+                className: 'custom-marker',
+                html: '<div style="background:#2EC4B6; color:#fff; width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; border:2.5px solid #fff; box-shadow:0 3px 10px rgba(0,0,0,0.35);">🛵</div>',
+                iconSize: [38, 38],
+                iconAnchor: [19, 19]
+            });
+
+            restMarker = L.marker([restaurantPos.lat, restaurantPos.lon], { icon: restIcon, draggable: true }).addTo(map);
+            clientMarker = L.marker([clientPos.lat, clientPos.lon], { icon: clientIcon, draggable: true }).addTo(map);
+
+            restMarker.bindPopup("<b>🏪 Точка А (Ресторан)</b><br>Перетаскивай мышкой!");
+            clientMarker.bindPopup("<b>🛵 Точка Б (Клиент)</b><br>Перетаскивай мышкой!");
+
+            routeLine = L.polyline([[restaurantPos.lat, restaurantPos.lon], [clientPos.lat, clientPos.lon]], {
+                color: '#1E1E24',
+                weight: 3.5,
+                opacity: 0.8,
+                dashArray: '6, 8'
+            }).addTo(map);
+
+            restMarker.on('drag', () => {
+                const p = restMarker.getLatLng();
+                restaurantPos.lat = p.lat;
+                restaurantPos.lon = p.lng;
+                recalculate();
+            });
+
+            clientMarker.on('drag', () => {
+                const p = clientMarker.getLatLng();
+                clientPos.lat = p.lat;
+                clientPos.lon = p.lng;
+                recalculate();
+            });
+        }
+
+        // --- ДИНАМИЧЕСКИЙ РАСЧЁТ С ДВУМЯ МОДЕЛЯМИ ---
+        function recalculate() {
+            const rLat = restaurantPos.lat, rLon = restaurantPos.lon;
+            const cLat = clientPos.lat, cLon = clientPos.lon;
+
+            routeLine.setLatLngs([[rLat, rLon], [cLat, cLon]]);
+
+            const straightDist = getDistance(rLat, rLon, cLat, cLon);
+            const effectiveDist = useRoadCoef ? (straightDist * 1.3) : straightDist;
+
+            const resCheck = evaluateLocation(rLat, rLon);
+            const clientCheck = evaluateLocation(cLat, cLon);
+
+            const inZone = resCheck.inZone && clientCheck.inZone;
+            const isPurple = clientCheck.isPurple || resCheck.isPurple;
+            const isOutOfTown = !isPurple && (clientCheck.isRed || resCheck.isRed);
+
+            let baseFee = config.baseFee;
+            let nightFee = isNightTariff ? config.nightFee : 0;
+            let doorFee = isDoorDelivery ? config.doorFee : 0;
+
+            let cityKm = 0;
+            let outKm = 0;
+            let superKm = 0;
+            let kmFee = 0;
+
+            const extraKmTotal = Math.max(0, effectiveDist - 1);
+
+            if (!isPurple && !isOutOfTown) {
+                // 1. Чистый город
+                cityKm = extraKmTotal;
+                outKm = 0;
+                superKm = 0;
+                kmFee = cityKm * config.rateCity;
+            } else if (config.calcMode === 'flat') {
+                // 2. Единая модель (все км по тарифу наивысшей зоны)
+                if (isPurple) {
+                    cityKm = 0;
+                    outKm = 0;
+                    superKm = extraKmTotal;
+                    kmFee = superKm * config.rateSuper;
+                } else {
+                    cityKm = 0;
+                    outKm = extraKmTotal;
+                    superKm = 0;
+                    kmFee = outKm * config.rateOutOfTown;
+                }
+            } else {
+                // 3. Раздельная модель (Сплит): город + загород + суперзагород
+                const ry = (rLat - CENTER_LAT) / degLatPerKm;
+                const rx = (rLon - CENTER_LON) / degLonPerKm;
+                const cy = (cLat - CENTER_LAT) / degLatPerKm;
+                const cx = (cLon - CENTER_LON) / degLonPerKm;
+
+                const check = clientCheck.isPurple || clientCheck.isRed ? clientCheck : resCheck;
+                const dir = (check && check.redDirection) ? check.redDirection : 'Юг';
+
+                let bRed = config.redZoneSouth;
+                let bPurple = config.purpleZoneSouth;
+                let dRes = Math.max(0, -ry), dClient = Math.max(0, -cy);
+
+                if (dir === 'Восток') {
+                    bRed = config.redZoneEast;
+                    bPurple = config.purpleZoneEast;
+                    dRes = Math.max(0, rx);
+                    dClient = Math.max(0, cx);
+                } else if (dir === 'Север') {
+                    bRed = config.redZoneNorth;
+                    bPurple = config.purpleZoneNorth;
+                    dRes = Math.max(0, ry);
+                    dClient = Math.max(0, cy);
+                } else if (dir === 'Запад') {
+                    bRed = config.redZoneWest;
+                    bPurple = config.purpleZoneWest;
+                    dRes = Math.max(0, -rx);
+                    dClient = Math.max(0, -cx);
+                }
+
+                const dMin = Math.min(dRes, dClient);
+                const dMax = Math.max(dRes, dClient);
+                const span = Math.max(0.001, dMax - dMin);
+
+                const rawCity = Math.max(0, Math.min(dMax, bRed) - dMin);
+                const rawRed = Math.max(0, Math.min(dMax, bPurple) - Math.max(dMin, bRed));
+                const rawPurple = Math.max(0, dMax - Math.max(dMin, bPurple));
+
+                const pCity = rawCity / span;
+                const pRed = rawRed / span;
+                const pPurple = rawPurple / span;
+
+                const effCityFull = effectiveDist * pCity;
+                const effRed = effectiveDist * pRed;
+                const effPurple = effectiveDist * pPurple;
+
+                cityKm = Math.max(0, effCityFull - 1);
+                let remBase = Math.max(0, 1 - effCityFull);
+                outKm = Math.max(0, effRed - remBase);
+                remBase = Math.max(0, remBase - effRed);
+                superKm = Math.max(0, effPurple - remBase);
+
+                kmFee = (cityKm * config.rateCity) + (outKm * config.rateOutOfTown) + (superKm * config.rateSuper);
+            }
+
+            let totalFee = baseFee + nightFee + kmFee + doorFee;
+            let finalRounded = Math.ceil(totalFee / 5) * 5;
+
+            // UI
+            const stickyTotal = document.getElementById('sticky-total');
+            const stickyBadge = document.getElementById('sticky-rate-badge');
+            const stickyDist = document.getElementById('sticky-dist');
+            const statusBadge = document.getElementById('zone-status-badge');
+
+            if (!inZone) {
+                stickyTotal.innerText = "Вне зоны";
+                stickyTotal.style.color = "var(--red)";
+                statusBadge.innerText = "ВНЕ ЗОНЫ ДОСТАВКИ";
+                statusBadge.className = "tariff-tag tag-outzone";
+                stickyBadge.innerText = "СЛИШКОМ ДАЛЕКО";
+                stickyBadge.className = "tariff-tag tag-outzone";
+            } else {
+                stickyTotal.innerText = finalRounded + " сом";
+                stickyTotal.style.color = "#111";
+                statusBadge.innerText = "В ЗОНЕ БИШКЕКА";
+                statusBadge.className = "tariff-tag tag-city";
+
+                if (isPurple) {
+                    const dir = clientCheck.isPurple ? clientCheck.redDirection : resCheck.redDirection;
+                    stickyBadge.innerText = `🟣 ${config.rateSuper}с/км (${dir})`;
+                    stickyBadge.className = "tariff-tag tag-purple";
+                } else if (isOutOfTown) {
+                    const dir = clientCheck.isRed ? clientCheck.redDirection : resCheck.redDirection;
+                    stickyBadge.innerText = `⛰️ ${config.rateOutOfTown}с/км (${dir})`;
+                    stickyBadge.className = "tariff-tag tag-outoftown";
+                } else {
+                    stickyBadge.innerText = `🏙️ ГОРОД: ${config.rateCity}с/км`;
+                    stickyBadge.className = "tariff-tag tag-city";
+                }
+            }
+
+            stickyDist.innerText = effectiveDist.toFixed(1) + " км" + (useRoadCoef ? " (×1.3)" : " (прямая)");
+
+            document.getElementById('val-rest-name').innerText = restaurantPos.name;
+            document.getElementById('val-rest-status').innerText = resCheck.reason;
+            document.getElementById('val-client-name').innerText = clientPos.name;
+            document.getElementById('val-client-status').innerText = clientCheck.reason;
+
+            document.getElementById('val-straight-dist').innerText = straightDist.toFixed(2) + " км";
+            document.getElementById('val-calc-dist').innerText = effectiveDist.toFixed(2) + " км" + (useRoadCoef ? " (с коэфф. 1.3)" : " (по прямой)");
+            document.getElementById('val-point-offset').innerText = (clientCheck.distOffset || 0).toFixed(2) + " км от центра";
+
+            document.getElementById('val-base-fee').innerText = baseFee + " сом";
+            document.getElementById('val-city-km').innerText = cityKm.toFixed(1);
+            document.getElementById('val-city-rate').innerText = config.rateCity;
+            document.getElementById('val-city-fee').innerText = Math.round(cityKm * config.rateCity) + " сом";
+
+            document.getElementById('val-out-km').innerText = outKm.toFixed(1);
+            document.getElementById('val-out-rate').innerText = config.rateOutOfTown;
+            document.getElementById('val-out-fee').innerText = outKm > 0 
+                ? (Math.round(outKm * config.rateOutOfTown) + " сом") 
+                : (isOutOfTown || isPurple ? "0 сом" : "0 сом (в черте города)");
+
+            document.getElementById('val-super-km').innerText = superKm.toFixed(1);
+            document.getElementById('val-super-rate').innerText = config.rateSuper;
+            document.getElementById('val-super-fee').innerText = superKm > 0 
+                ? (Math.round(superKm * config.rateSuper) + " сом") 
+                : "0 сом (точка вне суперзоны)";
+
+            config.lastSuperKm = superKm;
+            config.lastOutKm = outKm;
+
+            document.getElementById('val-night-fee').innerText = nightFee > 0 ? ("+" + nightFee + " сом") : "0 сом";
+            document.getElementById('val-door-fee').innerText = doorFee > 0 ? ("+" + doorFee + " сом") : "0 сом";
+
+            document.getElementById('calc-night-rate').innerText = `+${config.nightFee}с`;
+            document.getElementById('calc-door-rate').innerText = `+${config.doorFee}с`;
+            document.getElementById('header-night-val').innerText = `+${config.nightFee}с`;
+            document.getElementById('header-door-val').innerText = `+${config.doorFee}с`;
+
+            // Обновляем текст в подсказках секций
+            document.getElementById('txt-start-north').innerText = config.cityNorth.toFixed(1);
+            document.getElementById('txt-start-east').innerText = config.cityEast.toFixed(1);
+            document.getElementById('txt-start-west').innerText = config.cityWest.toFixed(1);
+            document.getElementById('txt-start-south').innerText = config.citySouth.toFixed(1);
+
+            updateCalcModeDropdownLabels();
+        }
+
+        function updateCalcModeDropdownLabels() {
+            const optSplit = document.getElementById('opt-mode-split');
+            const optFlat = document.getElementById('opt-mode-flat');
+            if (optSplit) {
+                optSplit.innerText = `Раздельный: 140с + город ${config.rateCity}с + красная ${config.rateOutOfTown}с + супер ${config.rateSuper}с`;
+            }
+            if (optFlat) {
+                optFlat.innerText = `Единый: 140с + все км по ставке дальней зоны (${config.rateSuper}с)`;
+            }
+        }
+
+        function onCalcModeChange(val) {
+            config.calcMode = val;
+            recalculate();
+            showToast(val === 'split' ? "Включен раздельный расчёт (город + загород + супер)!" : "Включен единый тариф по дальней зоне!");
+        }
+
+        // --- ИЗМЕНЕНИЕ СЛАЙДЕРОВ ГРАНИЦ И КОРИДОРОВ ---
+        function onConfigChange() {
+            // 0. Базовый городской квадрат
+            config.cityEast = parseFloat(document.getElementById('slider-city-east').value);
+            config.cityNorth = parseFloat(document.getElementById('slider-city-north').value);
+            config.citySouth = parseFloat(document.getElementById('slider-city-south').value);
+            config.cityWest = parseFloat(document.getElementById('slider-city-west').value);
+
+            // 1. Север (Дордой)
+            config.corridorNorthWest = parseFloat(document.getElementById('slider-north-west').value);
+            config.corridorNorthEast = parseFloat(document.getElementById('slider-north-east').value);
+            config.maxNorth = parseFloat(document.getElementById('slider-max-north').value);
+            config.redZoneNorth = parseFloat(document.getElementById('slider-red-north').value);
+            config.purpleZoneNorth = parseFloat(document.getElementById('slider-purple-north').value);
+
+            // 2. Восток (Новопокровка)
+            config.corridorEastNorth = parseFloat(document.getElementById('slider-east-north').value);
+            config.corridorEastSouth = parseFloat(document.getElementById('slider-east-south').value);
+            config.maxEast = parseFloat(document.getElementById('slider-max-east').value);
+            config.redZoneEast = parseFloat(document.getElementById('slider-red-east').value);
+            config.purpleZoneEast = parseFloat(document.getElementById('slider-purple-east').value);
+
+            // 3. Запад (В-Антоновка)
+            config.corridorWestNorth = parseFloat(document.getElementById('slider-west-north').value);
+            config.corridorWestSouth = parseFloat(document.getElementById('slider-west-south').value);
+            config.maxWest = parseFloat(document.getElementById('slider-max-west').value);
+            config.redZoneWest = parseFloat(document.getElementById('slider-red-west').value);
+            config.purpleZoneWest = parseFloat(document.getElementById('slider-purple-west').value);
+
+            // 4. Юг (Горы)
+            config.corridorSouthWest = parseFloat(document.getElementById('slider-south-west').value);
+            config.corridorSouthEast = parseFloat(document.getElementById('slider-south-east').value);
+            config.maxSouth = parseFloat(document.getElementById('slider-max-south').value);
+            config.redZoneSouth = parseFloat(document.getElementById('slider-red-south').value);
+            config.purpleZoneSouth = parseFloat(document.getElementById('slider-purple-south').value);
+
+            // Бейджи
+            document.getElementById('val-city-east').innerText = config.cityEast.toFixed(1) + ' км';
+            document.getElementById('val-city-north').innerText = config.cityNorth.toFixed(1) + ' км';
+            document.getElementById('val-city-south').innerText = config.citySouth.toFixed(1) + ' км';
+            document.getElementById('val-city-west').innerText = config.cityWest.toFixed(1) + ' км';
+
+            document.getElementById('val-north-west').innerText = '-' + config.corridorNorthWest.toFixed(1) + ' км';
+            document.getElementById('val-north-east').innerText = '+' + config.corridorNorthEast.toFixed(1) + ' км';
+            document.getElementById('val-max-north').innerText = config.maxNorth.toFixed(1) + ' км';
+            document.getElementById('val-red-north').innerText = config.redZoneNorth.toFixed(1) + ' км';
+            document.getElementById('val-purple-north').innerText = config.purpleZoneNorth.toFixed(1) + ' км';
+
+            document.getElementById('val-east-north').innerText = '+' + config.corridorEastNorth.toFixed(1) + ' км';
+            document.getElementById('val-east-south').innerText = '-' + config.corridorEastSouth.toFixed(1) + ' км';
+            document.getElementById('val-max-east').innerText = config.maxEast.toFixed(1) + ' км';
+            document.getElementById('val-red-east').innerText = config.redZoneEast.toFixed(1) + ' км';
+            document.getElementById('val-purple-east').innerText = config.purpleZoneEast.toFixed(1) + ' км';
+
+            document.getElementById('val-west-north').innerText = '+' + config.corridorWestNorth.toFixed(1) + ' км';
+            document.getElementById('val-west-south').innerText = '-' + config.corridorWestSouth.toFixed(1) + ' км';
+            document.getElementById('val-max-west').innerText = config.maxWest.toFixed(1) + ' км';
+            document.getElementById('val-red-west').innerText = config.redZoneWest.toFixed(1) + ' км';
+            document.getElementById('val-purple-west').innerText = config.purpleZoneWest.toFixed(1) + ' км';
+
+            document.getElementById('val-south-west').innerText = '-' + config.corridorSouthWest.toFixed(1) + ' км';
+            document.getElementById('val-south-east').innerText = '+' + config.corridorSouthEast.toFixed(1) + ' км';
+            document.getElementById('val-max-south').innerText = config.maxSouth.toFixed(1) + ' км';
+            document.getElementById('val-red-south').innerText = config.redZoneSouth.toFixed(1) + ' км';
+            document.getElementById('val-purple-south').innerText = config.purpleZoneSouth.toFixed(1) + ' км';
+
+            redrawAllPolygons();
+            recalculate();
+        }
+
+        // --- ИЗМЕНЕНИЕ СЛАЙДЕРОВ ТАРИФОВ ---
+        function onTariffChange() {
+            config.rateCity = parseInt(document.getElementById('slider-rate-city').value, 10);
+            config.rateOutOfTown = parseInt(document.getElementById('slider-rate-outoftown').value, 10);
+            config.rateSuper = parseInt(document.getElementById('slider-rate-super').value, 10);
+            config.baseFee = parseInt(document.getElementById('slider-base-fee').value, 10);
+            config.nightFee = parseInt(document.getElementById('slider-night-fee').value, 10);
+            config.doorFee = parseInt(document.getElementById('slider-door-fee').value, 10);
+
+            document.getElementById('quick-rate-city').value = config.rateCity;
+            document.getElementById('quick-rate-out').value = config.rateOutOfTown;
+            document.getElementById('quick-rate-super').value = config.rateSuper;
+            document.getElementById('quick-base-fee').value = config.baseFee;
+
+            document.getElementById('val-rate-city').innerText = config.rateCity + ' сом / км';
+            document.getElementById('val-rate-outoftown').innerText = config.rateOutOfTown + ' сом / км';
+            document.getElementById('val-rate-super').innerText = config.rateSuper + ' сом / км';
+            document.getElementById('val-base-fee-setting').innerText = config.baseFee + ' сом';
+            document.getElementById('val-night-fee-setting').innerText = '+' + config.nightFee + ' сом';
+            document.getElementById('val-door-fee-setting').innerText = '+' + config.doorFee + ' сом';
+
+            recalculate();
+        }
+
+        function onQuickTariffInput(type, val) {
+            const num = parseInt(val, 10);
+            if (isNaN(num)) return;
+
+            if (type === 'city') {
+                config.rateCity = num;
+                document.getElementById('slider-rate-city').value = num;
+                document.getElementById('val-rate-city').innerText = num + ' сом / км';
+            } else if (type === 'out') {
+                config.rateOutOfTown = num;
+                document.getElementById('slider-rate-outoftown').value = num;
+                document.getElementById('val-rate-outoftown').innerText = num + ' сом / км';
+            } else if (type === 'super') {
+                config.rateSuper = num;
+                document.getElementById('slider-rate-super').value = num;
+                document.getElementById('val-rate-super').innerText = num + ' сом / км';
+            } else if (type === 'base') {
+                config.baseFee = num;
+                document.getElementById('slider-base-fee').value = num;
+                document.getElementById('val-base-fee-setting').innerText = num + ' сом';
+            }
+            recalculate();
+        }
+
+        function setSlider(id, val) {
+            const input = document.getElementById(id);
+            if (!input) return;
+            input.value = val;
+            if (id.startsWith('slider-rate-') || id.startsWith('slider-base-') || id.startsWith('slider-night-') || id.startsWith('slider-door-')) {
+                onTariffChange();
+            } else {
+                onConfigChange();
+            }
+        }
+
+        function resetZonesToDefault() {
+            document.getElementById('slider-city-east').value = 10.0;
+            document.getElementById('slider-city-north').value = 4.0;
+            document.getElementById('slider-city-south').value = 8.0;
+            document.getElementById('slider-city-west').value = 4.6;
+
+            document.getElementById('slider-north-west').value = 4.4;
+            document.getElementById('slider-north-east').value = 12.0;
+            document.getElementById('slider-max-north').value = 11.0;
+            document.getElementById('slider-red-north').value = 6.0;
+            document.getElementById('slider-purple-north').value = 8.0;
+
+            document.getElementById('slider-east-north').value = 2.1;
+            document.getElementById('slider-east-south').value = 8.5;
+            document.getElementById('slider-max-east').value = 19.0;
+            document.getElementById('slider-red-east').value = 11.0;
+            document.getElementById('slider-purple-east').value = 17.5;
+
+            document.getElementById('slider-west-north').value = 2.5;
+            document.getElementById('slider-west-south').value = 2.5;
+            document.getElementById('slider-max-west').value = 12.0;
+            document.getElementById('slider-red-west').value = 6.0;
+            document.getElementById('slider-purple-west').value = 9.0;
+
+            document.getElementById('slider-south-west').value = 6.0;
+            document.getElementById('slider-south-east').value = 11.0;
+            document.getElementById('slider-max-south').value = 18.5;
+            document.getElementById('slider-red-south').value = 7.2;
+            document.getElementById('slider-purple-south').value = 10.0;
+
+            onConfigChange();
+            showToast("Сброшено к твоим базовым значениям!");
+        }
+
+        function setClickMode(mode) {
+            clickMode = mode;
+            document.getElementById('btn-mode-rest').classList.toggle('active', mode === 'rest');
+            document.getElementById('btn-mode-client').classList.toggle('active', mode === 'client');
+        }
+
+        function setClientPreset(lat, lon, name) {
+            clientPos.lat = lat;
+            clientPos.lon = lon;
+            clientPos.name = name;
+            clientMarker.setLatLng([lat, lon]);
+            map.panTo([lat, lon]);
+            recalculate();
+        }
+
+        function setRestToCenter() {
+            restaurantPos.lat = CHUY_MANAS_LAT;
+            restaurantPos.lon = CHUY_MANAS_LON;
+            restaurantPos.name = "Чуй - Манаса (Центр)";
+            restMarker.setLatLng([CHUY_MANAS_LAT, CHUY_MANAS_LON]);
+            recalculate();
+            showToast("Ресторан перемещён в Центр!");
+        }
+
+        function swapPoints() {
+            const tmp = { ...restaurantPos };
+            restaurantPos.lat = clientPos.lat;
+            restaurantPos.lon = clientPos.lon;
+            restaurantPos.name = clientPos.name;
+
+            clientPos.lat = tmp.lat;
+            clientPos.lon = tmp.lon;
+            clientPos.name = tmp.name;
+
+            restMarker.setLatLng([restaurantPos.lat, restaurantPos.lon]);
+            clientMarker.setLatLng([clientPos.lat, clientPos.lon]);
+            recalculate();
+            showToast("Точки А и Б поменялись местами!");
+        }
+
+        function switchTab(tab) {
+            document.getElementById('btn-tab-adjust').classList.toggle('active', tab === 'adjust');
+            document.getElementById('btn-tab-tariffs').classList.toggle('active', tab === 'tariffs');
+            document.getElementById('btn-tab-calc').classList.toggle('active', tab === 'calc');
+
+            document.getElementById('tab-adjust').classList.toggle('active', tab === 'adjust');
+            document.getElementById('tab-tariffs').classList.toggle('active', tab === 'tariffs');
+            document.getElementById('tab-calc').classList.toggle('active', tab === 'calc');
+        }
+
+        function toggleRoadCoef() {
+            useRoadCoef = !useRoadCoef;
+            const chip = document.getElementById('toggle-road-coef');
+            const text = document.getElementById('road-coef-text');
+            if (useRoadCoef) {
+                chip.classList.add('active');
+                text.innerText = 'ВКЛ (×1.3)';
+            } else {
+                chip.classList.remove('active');
+                text.innerText = 'ВЫКЛ (по прямой)';
+            }
+            recalculate();
+        }
+
+        function toggleNightTariff() {
+            isNightTariff = !isNightTariff;
+            document.getElementById('toggle-night').classList.toggle('active', isNightTariff);
+            recalculate();
+        }
+
+        function toggleDoorDelivery() {
+            isDoorDelivery = !isDoorDelivery;
+            document.getElementById('toggle-door').classList.toggle('active', isDoorDelivery);
+            recalculate();
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        function copyZoneCode() {
+            const snippet = `// ==========================================\n` +
+                `// ТАРИФЫ ДОСТАВКИ TAMAKKG:\n` +
+                `// ==========================================\n` +
+                `const BASE_DELIVERY_FEE = ${config.baseFee};         // Посадка (первый 1 км)\n` +
+                `const RATE_CITY_PER_KM = ${config.rateCity};           // В городе (за каждый км свыше 1 км)\n` +
+                `const RATE_OUT_OF_TOWN_PER_KM = ${config.rateOutOfTown};    // За городом / Красные зоны (за каждый км свыше 1 км)\n` +
+                `const RATE_SUPER_OUT_OF_TOWN_PER_KM = ${config.rateSuper}; // Суперзагород / Фиолетовая зона (сом за км)\n` +
+                `const NIGHT_TARIFF_FEE = ${config.nightFee};           // Ночной тариф (22:00 - 06:00)\n` +
+                `const DOOR_DELIVERY_FEE = ${config.doorFee};          // Доставка до двери\n` +
+                `const CALC_MODE = '${config.calcMode}';                 // 'split' (раздельный) или 'flat' (единый)\n\n` +
+                `// ==========================================\n` +
+                `// 0. МЁРТВЫЕ ТОЧКИ ГОРОДСКОГО КВАДРАТА (100% ГОРОД):\n` +
+                `// ==========================================\n` +
+                `const CITY_BOX_NORTH_KM = ${config.cityNorth.toFixed(1)}; // Север города\n` +
+                `const CITY_BOX_EAST_KM = ${config.cityEast.toFixed(1)};   // Восток города\n` +
+                `const CITY_BOX_SOUTH_KM = ${config.citySouth.toFixed(1)}; // Юг города\n` +
+                `const CITY_BOX_WEST_KM = ${config.cityWest.toFixed(1)};   // Запад города\n\n` +
+                `// ==========================================\n` +
+                `// ВЫТЯГИВАЮЩИЕСЯ КОРИДОРЫ (МАКС ВЫЛЕТ + КРАСНЫЕ И ФИОЛЕТОВЫЕ ЗОНЫ):\n` +
+                `// ==========================================\n` +
+                `// 1. Север (Дордой):\n` +
+                `const MAX_NORTH_KM = ${config.maxNorth.toFixed(1)};\n` +
+                `const CORRIDOR_NORTH_WEST_KM = ${config.corridorNorthWest.toFixed(1)};\n` +
+                `const CORRIDOR_NORTH_EAST_KM = ${config.corridorNorthEast.toFixed(1)};\n` +
+                `const RED_ZONE_NORTH_KM = ${config.redZoneNorth.toFixed(1)};\n` +
+                `const PURPLE_ZONE_NORTH_KM = ${config.purpleZoneNorth.toFixed(1)};\n\n` +
+                `// 2. Восток (Новопокровка):\n` +
+                `const MAX_EAST_KM = ${config.maxEast.toFixed(1)};\n` +
+                `const CORRIDOR_EAST_NORTH_KM = ${config.corridorEastNorth.toFixed(1)};\n` +
+                `const CORRIDOR_EAST_SOUTH_KM = ${config.corridorEastSouth.toFixed(1)};\n` +
+                `const RED_ZONE_EAST_KM = ${config.redZoneEast.toFixed(1)};\n` +
+                `const PURPLE_ZONE_EAST_KM = ${config.purpleZoneEast.toFixed(1)};\n\n` +
+                `// 3. Запад (В-Антоновка):\n` +
+                `const MAX_WEST_KM = ${config.maxWest.toFixed(1)};\n` +
+                `const CORRIDOR_WEST_NORTH_KM = ${config.corridorWestNorth.toFixed(1)};\n` +
+                `const CORRIDOR_WEST_SOUTH_KM = ${config.corridorWestSouth.toFixed(1)};\n` +
+                `const RED_ZONE_WEST_KM = ${config.redZoneWest.toFixed(1)};\n` +
+                `const PURPLE_ZONE_WEST_KM = ${config.purpleZoneWest.toFixed(1)};\n\n` +
+                `// 4. Юг (Горы / Арашан):\n` +
+                `const MAX_SOUTH_KM = ${config.maxSouth.toFixed(1)};\n` +
+                `const CORRIDOR_SOUTH_WEST_KM = ${config.corridorSouthWest.toFixed(1)};\n` +
+                `const CORRIDOR_SOUTH_EAST_KM = ${config.corridorSouthEast.toFixed(1)};\n` +
+                `const RED_ZONE_SOUTH_KM = ${config.redZoneSouth.toFixed(1)};\n` +
+                `const PURPLE_ZONE_SOUTH_KM = ${config.purpleZoneSouth.toFixed(1)};\n`;
+
+            navigator.clipboard.writeText(snippet).then(() => {
+                showToast("✅ Полный код тарифов и зон скопирован в буфер!");
+            }).catch(() => {
+                showToast("Параметры сохранены!");
+            });
+        }
+
+        window.onload = initMap;
+    </script>
+</body>
+</html>

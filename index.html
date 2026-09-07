@@ -787,9 +787,9 @@
     <div id="screen-main">
         <div class="header-nav">
             <img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=100" class="logo-img" loading="lazy" alt="logo">
-            <div class="header-address" onclick="onHeaderAddressClick()" style="cursor: pointer; overflow: hidden; padding-right: 10px;">
-                <span style="color: var(--text-gray); font-size: 11px; display: flex; align-items: center; gap: 4px;">ДОСТАВИТЬ ПО АДРЕСУ <span style="font-size: 14px; font-weight: bold;">›</span></span>
-                <span id="current-city-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; width: 100%; font-size: 15px; font-weight: 700;">Укажите адрес 📍</span>
+            <div class="header-address" onclick="onHeaderAddressClick()" style="cursor: pointer; overflow: hidden; padding-right: 10px; display: flex; flex-direction: column; justify-content: center;">
+                <span id="header-region-badge" style="color: var(--text-gray); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.2;">БИШКЕК</span>
+                <span id="current-city-display" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; width: 100%; font-size: 15px; font-weight: 800; color: #111; line-height: 1.3;">Укажите адрес 📍</span>
             </div>
         </div>
 
@@ -1062,14 +1062,7 @@
         </div>
     </div>
 
-    <div id="modal-address" class="modal-overlay hidden" onclick="closeAddressModalIfOverlay(event)">
-        <div class="modal-content">
-            <div class="modal-close" style="top:16px; right:16px; box-shadow:none; background:#f0f0f0;" onclick="closeAddressModal()">✕</div>
-            <h2 style="margin: 0; padding: 20px; font-size: 20px;">Выберите город</h2>
-            <div class="city-list" id="city-list-container">
-                </div>
-        </div>
-    </div>
+
 
     <div id="modal-clear-cart" class="modal-overlay hidden" style="justify-content: center; align-items: center; padding: 20px;">
         <div class="modal-content confirm-modal-content" style="border-radius: 24px; width: 100%; max-width: 340px; padding: 24px; text-align: center;">
@@ -1127,7 +1120,7 @@
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHlicGRqYmRtcXJ2c2R3dnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwODI5OTYsImV4cCI6MjA5MTY1ODk5Nn0.WFWBrwvxqEgfR9tzusvFcvfPN_mS4SmwvsWlyH13LEs'; 
         const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
         
-        let globalCity = "Чолпон-Ата";
+        let globalCity = localStorage.getItem('tamak_city') || "Бишкек";
         
         function getDistance(lat1, lon1, lat2, lon2) {
             const R = 6371; 
@@ -1138,52 +1131,125 @@
         }
 
         // ==========================================
-// ЛОГИКА РАСЧЕТА СТОИМОСТИ ДОСТАВКИ (УМНЫЙ ТАРИФ ИССЫК-КУЛЬ + ОКРУГЛЕНИЕ ДО 5)
+// ЛОГИКА РАСЧЕТА СТОИМОСТИ ДОСТАВКИ TAMAKKG
+// 1. Посадка (первый 1 км): 140 сом
+// 2. В городе: 18 сом за каждый километр свыше 1 км
+// 3. Красные зоны (33 сом/км):
+//    - Юг > 7.8 км (Чон-Арык, Байтик, Арашан)
+//    - Восток > 11.0 км (Новопокровка)
+//    - Север > 6.0 км (Дордой)
+//    - Запад > 6.0 км (Военно-Антоновка)
+// 4. Ночной тариф (22:00 - 06:00): +50 сом
+// 5. Округление в большую сторону до кратного 5 сом
 // ==========================================
 function calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon) {
-    // 1. ЗАЩИТА: Если координаты не пришли, отдаем 0 (обработается выше)
+    // 1. ЗАЩИТА: Если координаты не пришли или невалидны, отдаем 0
     if (!resLat || !resLon || !clientLat || !clientLon) return 0;
 
-    // 2. Получаем расстояние в километрах (используем твою функцию getDistance)
-    const distKm = getDistance(resLat, resLon, clientLat, clientLon);
+    const rLat = parseFloat(resLat);
+    const rLon = parseFloat(resLon);
+    const cLat = parseFloat(clientLat);
+    const cLon = parseFloat(clientLon);
 
-    // 3. ОПРЕДЕЛЯЕМ БАЗОВУЮ ПОСАДКУ (В зависимости от радиуса)
-    let baseFee = 0;
-    
-    if (distKm <= 0.5) {
-        // До 500 метров
-        baseFee = 130; 
-    } else if (distKm <= 1.3) {
-        // От 500 метров до 1.3 км
-        baseFee = 150; 
-    } else {
-        // Если больше 1.3 км, базовая посадка для старта расчета берется как 150
-        baseFee = 150; 
-    }
+    if (isNaN(rLat) || isNaN(rLon) || isNaN(cLat) || isNaN(cLon)) return 0;
 
-    // 4. ОПРЕДЕЛЯЕМ ТЕКУЩЕЕ ВРЕМЯ (Ночной тариф +50 сом)
-    const currentHour = new Date().getHours(); // Получаем часы по местному времени
-    
-    // Если время от 22:00 (вечер) до 06:00 (утро) — накидываем 50 сом
+    // 2. Получаем расстояние в километрах с учетом извилистости дорог Бишкека (×1.3)
+    const straightDist = getDistance(rLat, rLon, cLat, cLon);
+    const distKm = straightDist * 1.3;
+
+    // 3. БАЗОВАЯ ПОСАДКА (первый 1 км) = 150 сом
+    let baseFee = 150;
+
+    // 4. НОЧНОЙ ТАРИФ (+50 сом с 22:00 до 06:00)
+    const currentHour = new Date().getHours();
     if (currentHour >= 22 || currentHour < 6) {
         baseFee += 50; 
     }
 
-    // 5. МАТЕМАТИКА: Считаем итоговую сумму
-    let totalFee = baseFee;
+    // 5. ОПРЕДЕЛЕНИЕ СТАВКИ И РАЗДЕЛЬНЫЙ РАСЧЕТ ПО ЗОНАМ (150с посадка + 17с город + 29с красная + 43с фиолетовая):
+    const CENTER_LAT = 42.8746;
+    const CENTER_LON = 74.5698;
+    const degLatPerKm = 1 / 111.139;
+    const degLonPerKm = 1 / (111.320 * Math.cos(CENTER_LAT * Math.PI / 180));
 
-    // Если расстояние больше 1 км, добавляем 25 сом за каждый лишний километр
-    if (distKm > 1) {
-        // Вычитаем 1 км (так как первый километр уже включен в baseFee)
-        const extraKm = distKm - 1; 
-        totalFee = baseFee + (extraKm * 25);
+    // Пороги 4 красных зон (29 сом/км)
+    const RED_ZONE_SOUTH_KM = 7.2;   // Юг (Чон-Арык / начало Байтика)
+    const RED_ZONE_EAST_KM = 11.0;   // Восток (Новопокровка)
+    const RED_ZONE_NORTH_KM = 6.0;   // Север (Дордой)
+    const RED_ZONE_WEST_KM = 6.0;    // Запад (Военно-Антоновка)
+
+    // Пороги 4 фиолетовых зон (43 сом/км - Суперзагород)
+    const PURPLE_ZONE_SOUTH_KM = 10.0; // Юг (Арашан / горы)
+    const PURPLE_ZONE_EAST_KM = 17.5;  // Восток (Люксембург / Кант)
+    const PURPLE_ZONE_NORTH_KM = 8.0;  // Север (Объездная дальняя)
+    const PURPLE_ZONE_WEST_KM = 9.0;   // Запад (Сокулук)
+
+    const ry = (rLat - CENTER_LAT) / degLatPerKm;
+    const rx = (rLon - CENTER_LON) / degLonPerKm;
+    const cy = (cLat - CENTER_LAT) / degLatPerKm;
+    const cx = (cLon - CENTER_LON) / degLonPerKm;
+
+    const extraTotal = Math.max(0, distKm - 1);
+    let cityKm = 0, outKm = 0, superKm = 0;
+
+    // Определяем коридор направления доставки
+    let bRed = RED_ZONE_SOUTH_KM, bPurple = PURPLE_ZONE_SOUTH_KM;
+    let dRes = Math.max(0, -ry), dClient = Math.max(0, -cy);
+    let isOutOfTown = false;
+
+    if (cy < -RED_ZONE_SOUTH_KM || ry < -RED_ZONE_SOUTH_KM) {
+        bRed = RED_ZONE_SOUTH_KM; bPurple = PURPLE_ZONE_SOUTH_KM;
+        dRes = Math.max(0, -ry); dClient = Math.max(0, -cy);
+        isOutOfTown = true;
+    } else if (cx > RED_ZONE_EAST_KM || rx > RED_ZONE_EAST_KM) {
+        bRed = RED_ZONE_EAST_KM; bPurple = PURPLE_ZONE_EAST_KM;
+        dRes = Math.max(0, rx); dClient = Math.max(0, cx);
+        isOutOfTown = true;
+    } else if (cy > RED_ZONE_NORTH_KM || ry > RED_ZONE_NORTH_KM) {
+        bRed = RED_ZONE_NORTH_KM; bPurple = PURPLE_ZONE_NORTH_KM;
+        dRes = Math.max(0, ry); dClient = Math.max(0, cy);
+        isOutOfTown = true;
+    } else if (cx < -RED_ZONE_WEST_KM || rx < -RED_ZONE_WEST_KM) {
+        bRed = RED_ZONE_WEST_KM; bPurple = PURPLE_ZONE_WEST_KM;
+        dRes = Math.max(0, -rx); dClient = Math.max(0, -cx);
+        isOutOfTown = true;
     }
+
+    if (!isOutOfTown) {
+        // Чистый город: все км сверх 1-го по 17 сом/км
+        cityKm = extraTotal;
+    } else {
+        // Раздельный расчет по зонам пути: город (17) + красная (29) + фиолетовая (43)
+        const dMin = Math.min(dRes, dClient);
+        const dMax = Math.max(dRes, dClient);
+        const span = Math.max(0.001, dMax - dMin);
+
+        const rawCity = Math.max(0, Math.min(dMax, bRed) - dMin);
+        const rawRed = Math.max(0, Math.min(dMax, bPurple) - Math.max(dMin, bRed));
+        const rawPurple = Math.max(0, dMax - Math.max(dMin, bPurple));
+
+        const pCity = rawCity / span;
+        const pRed = rawRed / span;
+        const pPurple = rawPurple / span;
+
+        const effCityFull = distKm * pCity;
+        const effRed = distKm * pRed;
+        const effPurple = distKm * pPurple;
+
+        cityKm = Math.max(0, effCityFull - 1);
+        let remBase = Math.max(0, 1 - effCityFull);
+        outKm = Math.max(0, effRed - remBase);
+        remBase = Math.max(0, remBase - effRed);
+        superKm = Math.max(0, effPurple - remBase);
+    }
+
+    const kmFee = (cityKm * 17) + (outKm * 29) + (superKm * 43);
+    let totalFee = baseFee + kmFee;
 
     // ЖЕЛЕЗНОЕ ПРАВИЛО: Доставка никогда не может быть дешевле базовой посадки
     let finalFee = Math.max(baseFee, totalFee);
 
-    // 6. УМНОЕ ОКРУГЛЕНИЕ: Всегда в большую сторону до ближайшего числа, кратного 5.
-    // Пример: 231 / 5 = 46.2 -> ceil(46.2) = 47 -> 47 * 5 = 235 сом.
+    // 7. УМНОЕ ОКРУГЛЕНИЕ: Всегда в большую сторону до ближайшего числа, кратного 5
     finalFee = Math.ceil(finalFee / 5) * 5;
 
     return finalFee;
@@ -1224,9 +1290,6 @@ if (tg.disableVerticalSwipes) {
                     if (productModal && !productModal.classList.contains('hidden')) {
                         productModal.classList.add('hidden');
                     } 
-                    else if (addressModal && !addressModal.classList.contains('hidden')) {
-                        addressModal.classList.add('hidden');
-                    }
                     else if (myAddressesModal && !myAddressesModal.classList.contains('hidden')) {
                         myAddressesModal.classList.add('hidden'); // <-- Закрываем "Мои адреса"
                     }
@@ -1268,8 +1331,7 @@ if (tg.disableVerticalSwipes) {
             pizza: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=300'
         };
 
-        const database = {
-            // Твой реальный ресторан из базы 
+        const FALLBACK_RESTAURANTS = {
             '8709006886': { 
                 lat: 42.650075, lon: 77.086667, city: 'Чолпон-Ата', 
                 title: 'MAX BURGER',
@@ -1278,9 +1340,9 @@ if (tg.disableVerticalSwipes) {
                 address: 'ул. Советская, 67в', 
                 hours: '10:00 - 22:00', 
                 img: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/max%20big%20logo.jpg', 
-                tags: ['burgers', 'shawarma'], // <--- Теги для фильтра
-                items: [],
-                categories_order: ['Шаурма', 'Бургеры', 'Курочка', 'Снеки', 'Рамены'] // <--- Порядок категорий
+                tags: ['burgers', 'shawarma'],
+                categories_order: ['Шаурма', 'Бургеры', 'Курочка', 'Снеки', 'Рамены'],
+                sort_order: 3
             },
             '8905203649': { 
                 lat: 42.64584, lon: 77.076624, city: 'Чолпон-Ата',
@@ -1291,8 +1353,8 @@ if (tg.disableVerticalSwipes) {
                 hours: '10:00 - 22:00', 
                 img: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/shashlyk%20biglogo%20(1).jpeg', 
                 tags: ['shashlik', 'pizza', 'desserts'],
-                items: [],
-                categories_order: ['Шашлыки', 'Ассорти', 'Стейки', 'Напитки','Закуски', 'Горячие закуски', 'Пиццы',  'Десерты', 'Супы', 'Вторые блюда', 'Салаты', 'Пасты', 'Соусы']
+                categories_order: ['Шашлыки', 'Ассорти', 'Стейки', 'Напитки','Закуски', 'Горячие закуски', 'Пиццы',  'Десерты', 'Супы', 'Вторые блюда', 'Салаты', 'Пасты', 'Соусы'],
+                sort_order: 2
             },
             '1532754022': { 
                 lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', 
@@ -1303,8 +1365,8 @@ if (tg.disableVerticalSwipes) {
                 hours: '09:00 - 22:00', 
                 img: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/lagmanlogo.jpg', 
                 tags: [],
-                items: [],
-                categories_order: ['Лагманы', 'Супы', 'Вторые блюда', 'Напитки', 'Салаты', 'Завтраки', 'Гарниры', 'Мучные изделия',]
+                categories_order: ['Лагманы', 'Супы', 'Вторые блюда', 'Напитки', 'Салаты', 'Завтраки', 'Гарниры', 'Мучные изделия'],
+                sort_order: 4
             },
             '8958317669': { 
                 lat: 42.650075, lon: 77.086667, city: 'Чолпон-Ата',
@@ -1315,20 +1377,20 @@ if (tg.disableVerticalSwipes) {
                 hours: '09:00 - 22:00', 
                 img: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/KUNJUT%20BIGLOGO.jpg', 
                 tags: ['burgers', 'sushi', 'shawarma', 'pizza'],
-                items: [],
-                categories_order: ['Шаурма', 'Бургеры','Курочка', 'Пицца', 'Сеты', 'Напитки', 'Суши']
+                categories_order: ['Шаурма', 'Бургеры','Курочка', 'Пицца', 'Сеты', 'Напитки', 'Суши'],
+                sort_order: 1
             },
             '5521273499': { 
-                lat: 42.650075, lon: 77.086667, city: 'Чолпон-Ата',
+                lat: 42.852578, lon: 74.687742, city: 'Бишкек',
                 title: 'ТЕСТ ЗАКАЗ', 
                 phone: '+996505696970',
                 logo: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/KUNJUT%20MINI%20LOG.png', 
-                address: 'ул. Советская, 67в', 
+                address: 'ул. Киевская, 100', 
                 hours: '09:00 - 22:00', 
                 img: 'https://dummyimage.com/600x400/ff8c00/fff&text=TEST+RESTAURANT', 
                 tags: ['burgers', 'sushi', 'shawarma', 'pizza'],
-                items: [],
-                categories_order: []
+                categories_order: [],
+                sort_order: 6
             },
             '6756874089': { 
                 lat: 42.650075, lon: 77.086667, city: 'Чолпон-Ата',
@@ -1339,8 +1401,8 @@ if (tg.disableVerticalSwipes) {
                 hours: '09:00 - 22:00', 
                 img: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/injirlogo.jpeg', 
                 tags: ['burgers', 'sushi', 'shawarma', 'pizza'],
-                items: [],
-                categories_order: ['Шашлыки', 'Восточная кухня', 'Салаты', 'Напитки', 'Пиццы','Первые блюда', 'Европейсие блюда','Стейки',  'Нарезки', 'Гарниры','Соусы', 'Банкотные блюда' ]
+                categories_order: ['Шашлыки', 'Восточная кухня', 'Салаты', 'Напитки', 'Пиццы','Первые блюда', 'Европейсие блюда','Стейки',  'Нарезки', 'Гарниры','Соусы', 'Банкотные блюда'],
+                sort_order: 5
             },
             '843389293': { 
                 lat: 42.6490, lon: 77.0870, city: 'Чолпон-Ата', 
@@ -1351,10 +1413,99 @@ if (tg.disableVerticalSwipes) {
                 hours: '09:00 - 22:00', 
                 img: 'https://dtxybpdjbdmqrvsdwvvk.supabase.co/storage/v1/object/public/icons/baimantu%20biglogo.jpeg', 
                 tags: [],
-                items: [],
-                categories_order: ['Манты', 'Дополнительно', 'Напитки']
+                categories_order: ['Манты', 'Дополнительно', 'Напитки'],
+                sort_order: 7
             }
         };
+
+        let database = {};
+        let isRestaurantsLoading = false;
+
+        async function loadRestaurantsFromDB() {
+            isRestaurantsLoading = true;
+            renderRestaurants();
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('restaurants')
+                    .select('*')
+                    .eq('is_approved', true)
+                    .order('sort_order', { ascending: true });
+
+                if (error) {
+                    console.warn("Предупреждение при загрузке ресторанов из БД (используем fallback):", error.message);
+                }
+
+                if (data && data.length > 0) {
+                    const newDb = {};
+                    for (const row of data) {
+                        if (row.is_active === false) continue;
+
+                        const idStr = String(row.id);
+                        const fallback = FALLBACK_RESTAURANTS[idStr] || {};
+                        const existingItems = database[idStr]?.items || [];
+
+                        let parsedTags = [];
+                        if (row.tags) {
+                            try {
+                                parsedTags = Array.isArray(row.tags) ? row.tags : (typeof row.tags === 'string' ? JSON.parse(row.tags) : []);
+                            } catch (e) { parsedTags = fallback.tags || []; }
+                        } else {
+                            parsedTags = fallback.tags || [];
+                        }
+
+                        let parsedCatOrder = [];
+                        if (row.categories_order) {
+                            try {
+                                parsedCatOrder = Array.isArray(row.categories_order) ? row.categories_order : (typeof row.categories_order === 'string' ? JSON.parse(row.categories_order) : []);
+                            } catch (e) { parsedCatOrder = fallback.categories_order || []; }
+                        } else {
+                            parsedCatOrder = fallback.categories_order || [];
+                        }
+
+                        // ВАЖНО: сопоставляем title: row.name для совместимости с index.html
+                        newDb[idStr] = {
+                            id: idStr,
+                            lat: (row.lat !== null && row.lat !== undefined) ? Number(row.lat) : (fallback.lat || null),
+                            lon: (row.lon !== null && row.lon !== undefined) ? Number(row.lon) : (fallback.lon || null),
+                            city: row.city || fallback.city || 'Бишкек',
+                            name: row.name || fallback.title || '',
+                            title: row.name || fallback.title || '',
+                            phone: row.phone || fallback.phone || '',
+                            logo: row.logo || fallback.logo || '',
+                            address: row.address || fallback.address || '',
+                            hours: row.hours || fallback.hours || '10:00 - 22:00',
+                            img: row.img || fallback.img || ('https://dummyimage.com/600x400/ff8c00/fff&text=' + encodeURIComponent(row.name || 'Ресторан')),
+                            tags: parsedTags,
+                            categories_order: parsedCatOrder,
+                            sort_order: (row.sort_order !== null && row.sort_order !== undefined) ? Number(row.sort_order) : (fallback.sort_order ?? 100),
+                            items: existingItems
+                        };
+                    }
+                    database = newDb;
+                } else if (Object.keys(database).length === 0) {
+                    database = JSON.parse(JSON.stringify(FALLBACK_RESTAURANTS));
+                    Object.keys(database).forEach(id => {
+                        database[id].id = id;
+                        database[id].name = database[id].title;
+                        database[id].items = [];
+                    });
+                }
+            } catch (err) {
+                console.error("Ошибка сети при загрузке ресторанов:", err);
+                if (Object.keys(database).length === 0) {
+                    database = JSON.parse(JSON.stringify(FALLBACK_RESTAURANTS));
+                    Object.keys(database).forEach(id => {
+                        database[id].id = id;
+                        database[id].name = database[id].title;
+                        database[id].items = [];
+                    });
+                }
+            } finally {
+                isRestaurantsLoading = false;
+                renderRestaurants();
+            }
+        }
         history.replaceState({screen: 'main'}, '');
 
         function checkOpenStatus(hoursString) {
@@ -1394,8 +1545,8 @@ if (tg.disableVerticalSwipes) {
 
     window.scrollTo(0, 0);
 
-    document.getElementById('modal-product').classList.add('hidden');
-    document.getElementById('modal-address').classList.add('hidden');
+    const prodModal = document.getElementById('modal-product');
+    if (prodModal) prodModal.classList.add('hidden');
 
     if (tg && tg.BackButton) {
         if (screenId === 'main') {
@@ -1427,8 +1578,6 @@ if (tg.disableVerticalSwipes) {
                     setTimeout(() => { if(checkoutMap) checkoutMap.invalidateSize(); }, 50);
                 } else if (st.modal === 'profile') {
                     document.getElementById('modal-profile').classList.remove('hidden');
-                } else if (st.modal === 'address') {
-                    document.getElementById('modal-address').classList.remove('hidden');
                 }
             }
         });
@@ -1457,24 +1606,128 @@ if (tg.disableVerticalSwipes) {
             renderRestaurants();
         }
 
-// --- ОБНОВЛЕННАЯ ЛОГИКА ВЫБОРА ГОРОДА И ПОИСКА ---
+// --- ГЕО-ЗОНЫ ОБСЛУЖИВАНИЯ И АВТОМАТИЧЕСКАЯ ФИЛЬТРАЦИЯ ---
 
-// --- ОБНОВЛЕННАЯ ЛОГИКА ВЫБОРА ГОРОДА И ПОИСКА (АДАПТИРОВАНО ПОД БАЗУ FOODKG) ---
+const BISHKEK_CENTER = { lat: 42.8746, lon: 74.5698 };
+const ISSYK_KUL_CENTER = { lat: 42.6482, lon: 77.0855 };
+const MAX_DELIVERY_DISTANCE_KM = 20;
 
-function selectCityFast(city) { // В твоем HTML функция в модалке называется selectCityFast
+function isInsideBishkekZone(lat, lon) {
+    if (!lat || !lon) return false;
+
+    const CENTER_LAT = 42.8746;
+    const CENTER_LON = 74.5698;
+
+    // 1. Расчет смещения по широте (y) и долготе (x) от центра
+    const degLatPerKm = 1 / 111.139;
+    const degLonPerKm = 1 / (111.320 * Math.cos(CENTER_LAT * Math.PI / 180));
+    const y = (lat - CENTER_LAT) / degLatPerKm;
+    const x = (lon - CENTER_LON) / degLonPerKm;
+
+    // 0. Базовый Городской Квадрат (Мёртвые точки города - 100% город):
+    // Восток: 10.0 км (Аламедин-1 / Тунгуч), Север: 4.0 км, Юг: 8.0 км (12 мкр), Запад: 4.6 км (Кызыл-Аскер)
+    const inCityBox = (
+        x >= -4.6 && 
+        x <= 10.0 && 
+        y >= -8.0 && 
+        y <= 4.0
+    );
+    if (inCityBox) return true;
+
+    // 1. Вытягивающийся Северный коридор (Дордой и объездная, y от 4.0 км до 10.0 км):
+    if (y > 4.0 && y <= 10.0) {
+        if (x >= -4.4 && x <= 12.0) return true; // Слева 4.4 км, Справа 12.0 км (Жер-Казар)
+    }
+
+    // 2. Вытягивающийся Восточный коридор (Новопокровка / Кант, x от 10.0 км до 19.0 км):
+    if (x > 10.0 && x <= 19.0) {
+        if (y >= -2.0 && y <= 2.0) return true; // Сверху +2.0 км, Снизу -2.0 км от трассы
+    }
+
+    // 3. Вытягивающийся Западный коридор (Военно-Антоновка / Сокулук, x от -4.6 км до -12.0 км):
+    if (x < -4.6 && Math.abs(x) <= 12.0) {
+        if (y >= -2.5 && y <= 2.5) return true; // Сверху +2.5 км, Снизу -2.5 км от трассы
+    }
+
+    // 4. Вытягивающийся Южный коридор (Чон-Арык / Байтик / Арашан, y от -8.0 км до -18.5 км):
+    if (y < -8.0 && Math.abs(y) <= 18.5) {
+        if (x >= -6.0 && x <= 11.0) return true; // Слева 6.0 км (Байтик), Справа 11.0 км (Арашан)
+    }
+
+    // Все остальные точки за пределами квадрата и коридоров — вне зоны доставки
+    return false;
+}
+
+function isInsideIssykKulZone(lat, lon) {
+    if (!lat || !lon) return false;
+    // 20 км радиус по побережью вокруг Чолпон-Аты
+    const dist = getDistance(ISSYK_KUL_CENTER.lat, ISSYK_KUL_CENTER.lon, lat, lon);
+    return dist <= 20;
+}
+
+function detectCoverageZone(lat, lon) {
+    // Защита от ошибки первого входа (lat = null): если координаты еще не успели определиться
+    // или юзер отклонил GPS, мягко отдаем сохраненный/дефолтный город (Бишкек), чтобы витрина сразу загрузилась
+    if (lat === null || lat === undefined || lon === null || lon === undefined || isNaN(lat) || isNaN(lon)) {
+        const savedCity = (globalCity && (globalCity === 'Чолпон-Ата' || globalCity === 'Бишкек')) ? globalCity : 'Бишкек';
+        return {
+            inZone: true,
+            isDefault: true,
+            city: savedCity,
+            badge: savedCity === 'Чолпон-Ата' ? 'ИССЫК-КУЛЬ' : 'БИШКЕК'
+        };
+    }
+
+    const nLat = parseFloat(lat);
+    const nLon = parseFloat(lon);
+
+    if (isInsideBishkekZone(nLat, nLon)) {
+        return {
+            inZone: true,
+            isDefault: false,
+            city: 'Бишкек',
+            badge: 'БИШКЕК'
+        };
+    }
+
+    if (isInsideIssykKulZone(nLat, nLon)) {
+        return {
+            inZone: true,
+            isDefault: false,
+            city: 'Чолпон-Ата',
+            badge: 'ИССЫК-КУЛЬ'
+        };
+    }
+
+    // Координаты определены, но точка вне всех зон обслуживания
+    return {
+        inZone: false,
+        isDefault: false,
+        city: null,
+        badge: 'ВНЕ ЗОНЫ'
+    };
+}
+
+function updateHeaderRegionUI(zone) {
+    const badge = document.getElementById('header-region-badge');
+    if (!badge) return;
+    if (!zone || !zone.inZone) {
+        badge.innerText = 'ВНЕ ЗОНЫ';
+        badge.style.color = '#d32f2f';
+    } else {
+        badge.innerText = zone.badge || 'БИШКЕК';
+        badge.style.color = 'var(--text-gray)';
+    }
+}
+
+function selectCityFast(city) {
     globalCity = city;
-    document.getElementById('current-city-display').innerText = city;
-    closeAddressModal();
-    
-    // Очищаем строку поиска при смене города
-    const searchInput = document.getElementById('search-input');
-    if (searchInput) searchInput.value = '';
-    
-    // Перерисовываем список
+    try {
+        localStorage.setItem('tamak_city', city);
+    } catch(e) {}
     renderRestaurants();
 }
 
-// У тебя в HTML уже прописан oninput="handleSearch()", так что пишем саму функцию:
 function handleSearch() {
     const query = document.getElementById('search-input').value;
     renderRestaurants(query);
@@ -1485,327 +1738,244 @@ function renderRestaurants(searchQuery = '') {
     if (!list) return; 
     
     list.innerHTML = '';
-    let hasResults = false;
 
-    // ---------------------------------------------------------
-    // ВАЖНО: Задаем порядок ресторанов по ID! Тот ID, который стоит первым, появится на сайте первым.
-    // Если добавишь новый ресторан, не забудь дописать его ID сюда.
-    // ---------------------------------------------------------
-    const resOrder = ['8958317669', '8905203649', '8709006886','1532754022' ,'6756874089', '5521273499'];
+    const zone = detectCoverageZone(clientLat, clientLon);
+    updateHeaderRegionUI(zone);
 
-    // Перебираем рестораны строго по нашему заданному массиву
-    for (let id of resOrder) {
-        const res = database[id];
+    // Если клиент за пределами всех зон обслуживания
+    if (!zone.inZone) {
+        list.innerHTML = `
+            <div style="padding: 50px 20px; text-align: center;">
+                <div style="font-size: 54px; margin-bottom: 14px;">🗺️</div>
+                <div style="font-size: 18px; font-weight: 800; color: #111; margin-bottom: 8px;">Здесь пока не работаем</div>
+                <div style="font-size: 14px; color: var(--text-gray); max-width: 320px; margin: 0 auto 20px auto; line-height: 1.4;">
+                    К сожалению, по этому адресу доставка TamakKG пока недоступна. Выберите адрес в Бишкеке или на Иссык-Куле.
+                </div>
+                <button onclick="openMapModal()" style="background: var(--main-yellow); color: #111; border: none; border-radius: 14px; padding: 14px 24px; font-size: 15px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 12px rgba(252,224,0,0.35);">
+                    🗺 Указать адрес на карте
+                </button>
+            </div>
+        `;
+        return;
+    }
+
+    const currentCity = zone.city || globalCity || 'Бишкек';
+    globalCity = currentCity;
+
+    if (isRestaurantsLoading && Object.keys(database).length === 0) {
+        list.innerHTML = `
+            <div style="padding: 50px 20px; text-align: center; color: var(--text-gray);">
+                <div style="font-size: 36px; margin-bottom: 12px; animation: spin 1s linear infinite;">⏳</div>
+                <div style="font-weight: 700; font-size: 15px; color: var(--text-main);">Загрузка ресторанов...</div>
+            </div>
+        `;
+        return;
+    }
+
+    // 1. Фильтрация: строго текущий город (защита между городами), поиск и теги
+    const filteredRestaurants = Object.values(database).filter(res => {
+        if (!res) return false;
         
-        // Защита: если ID есть в массиве, но ресторана нет в database, просто пропускаем
-        if (!res) continue; 
+        // Защита между городами: ресторан и клиент строго в одном городе
+        const matchesCity = (res.city || '').trim().toLowerCase() === (currentCity || '').trim().toLowerCase();
         
-        // 1. Проверяем, совпадает ли город
-        const matchesCity = res.city === globalCity;
+        // Поиск по названию
+        const matchesSearch = (res.title || '').toLowerCase().includes(searchQuery.toLowerCase());
         
-        // 2. Проверяем, совпадает ли текст поиска (по названию)
-        const matchesSearch = res.title.toLowerCase().includes(searchQuery.toLowerCase());
-        
-        // 3. Проверяем, совпадают ли выбранные фильтры (бургеры, суши и т.д.)
+        // Фильтры категорий
         let matchesTags = true;
         if (activeFilters.length > 0) {
             matchesTags = activeFilters.some(tag => res.tags && res.tags.includes(tag));
         }
 
-        // Если ресторан подходит по всем трем условиям — рисуем его
-        if (matchesCity && matchesSearch && matchesTags) {
-            hasResults = true;
-            
-            // --- НОВАЯ ЛОГИКА РАСЧЕТА ДОСТАВКИ ДЛЯ КАРТОЧКИ ---
-            let deliveryText = `<div class="res-desc">${res.address}</div>`; // По умолчанию показываем адрес
-            
-            // Если мы уже узнали координаты юзера, считаем цену
-            if (clientLat && clientLon) {
-                const straightDist = getDistance(res.lat, res.lon, clientLat, clientLon);
-                const MAX_DISTANCE_KM = 20; 
-                
-                if (straightDist > MAX_DISTANCE_KM) {
-                    deliveryText = `<div class="res-desc" style="color: #d32f2f; font-weight: 600;">🚫 Слишком далеко (${straightDist.toFixed(1)} км)</div>`;
-                } else {
-                    const fee = calculateDynamicDeliveryFee(res.lat, res.lon, clientLat, clientLon);
-                    
-                    // --- ОБНОВЛЕНО: Более быстрая доставка (2.5 мин на км) ---
-                    // 20 минут (готовка + подача) + 2.5 минуты на каждый километр пути
-                    const rawMinTime = 20 + (straightDist * 2.5);
-                    const minTime = Math.round(rawMinTime / 5) * 5; // Округление до 5
-                    const maxTime = minTime + 15; // Добавляем вилку в 15 минут
-                    
-                    deliveryText = `<div class="res-desc" style="color: #E65100; font-weight: 700; font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px;">
-                        <span>📍 ${straightDist.toFixed(1)} км</span> | 
-                        <span>🛵 ${fee} сом</span> | 
-                        <span>🕓 ${minTime}-${maxTime} мин</span>
-                    </div>`;
-                }
-            }
-            // -----------------------------------------------------
+        return matchesCity && matchesSearch && matchesTags;
+    });
 
-            const div = document.createElement('div');
-            div.className = 'res-card';
-            div.onclick = () => openMenu(id); 
-            
-            div.innerHTML = `
-                <img src="${res.img}" class="res-img" alt="${res.title}">
-                <div class="res-info">
-                    <div class="res-name">
-                        <span>${res.title}</span>
-                        <div class="res-meta">
-                            ${checkOpenStatus(res.hours)}
-                        </div>
-                    </div>
-                    ${deliveryText}
-                </div>
-            `;
-            list.appendChild(div);
-        }
+    // 2. Сортировка по дистанции (distance ASC): ближайшие кафе вверху, дальние — внизу
+    // Если геолокация клиента еще не определена — сортируем по sort_order
+    const hasClientGeo = !!(clientLat && clientLon);
+    if (hasClientGeo) {
+        filteredRestaurants.sort((a, b) => {
+            const distA = (a.lat && a.lon) ? getDistance(a.lat, a.lon, clientLat, clientLon) : 9999;
+            const distB = (b.lat && b.lon) ? getDistance(b.lat, b.lon, clientLat, clientLon) : 9999;
+            if (Math.abs(distA - distB) > 0.05) {
+                return distA - distB;
+            }
+            return (a.sort_order ?? 100) - (b.sort_order ?? 100);
+        });
+    } else {
+        filteredRestaurants.sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100));
     }
 
-    // Если ничего не найдено (ни по городу, ни по фильтру, ни по поиску)
-    if (!hasResults) {
+    // 3. Если заведений не найдено
+    if (filteredRestaurants.length === 0) {
         list.innerHTML = `
             <div style="padding: 40px 20px; text-align: center; color: var(--text-gray);">
                 <div style="font-size: 40px; margin-bottom: 10px;">🍽️</div>
-                Ничего не найдено
+                <div style="font-weight: 700; font-size: 16px; margin-bottom: 6px; color: var(--text-main);">В этом районе пока нет заведений</div>
+                <div style="font-size: 13px;">Попробуйте сбросить фильтры или выбрать другой адрес на карте</div>
             </div>
         `;
+        return;
+    }
+
+    // 4. Отрисовка заведений: честный и прозрачный расчет тарифа без блокировок
+    for (let res of filteredRestaurants) {
+        const id = res.id;
+        
+        let deliveryText = `<div class="res-desc">${res.address || ''}</div>`;
+        
+        if (clientLat && clientLon && res.lat && res.lon) {
+            const straightDist = getDistance(res.lat, res.lon, clientLat, clientLon);
+            const fee = calculateDynamicDeliveryFee(res.lat, res.lon, clientLat, clientLon);
+            const rawMinTime = 20 + (straightDist * 2.5);
+            const minTime = Math.round(rawMinTime / 5) * 5;
+            const maxTime = minTime + 15;
+            
+            deliveryText = `<div class="res-desc" style="color: #E65100; font-weight: 700; font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px;">
+                <span>📍 ${straightDist.toFixed(1)} км</span> | 
+                <span>🛵 ${fee} сом</span> | 
+                <span>🕓 ${minTime}-${maxTime} мин</span>
+            </div>`;
+        }
+
+        const div = document.createElement('div');
+        div.className = 'res-card';
+        div.onclick = () => openMenu(id); 
+        
+        div.innerHTML = `
+            <img src="${res.img}" class="res-img" alt="${res.title}" onerror="this.src='https://dummyimage.com/600x400/ff8c00/fff&text=Food'">
+            <div class="res-info">
+                <div class="res-name">
+                    <span>${res.title}</span>
+                    <div class="res-meta">
+                        ${checkOpenStatus(res.hours)}
+                    </div>
+                </div>
+                ${deliveryText}
+            </div>
+        `;
+        list.appendChild(div);
     }
 }
 
-        renderRestaurants();
+// Запускаем асинхронную загрузку ресторанов из Supabase
+loadRestaurantsFromDB();
 
-        async function openMenu(resId) {
-            currentRestaurantId = resId;
-            const res = database[resId];
-            
-            document.getElementById('menu-title').innerText = res.title;
-            document.getElementById('menu-logo').src = res.logo;
-
-            // 1. Показываем экран меню и лоадер, пока данные летят с сервера
-            const container = document.getElementById('all-products-container');
-            container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: 800; color: #999;">⏳ Загрузка меню...</div>';
-            
-            // Очищаем старые категории и сбрасываем поиск
-            let catBar = document.getElementById('category-bar');
-            if (catBar) catBar.innerHTML = '';
-            if (typeof clearMenuSearch === 'function') clearMenuSearch();
-
-            history.pushState({screen: 'menu', page: 'menu', resId: resId}, '');
-            showScreen('menu');
-
-            try {
-                // 2. СКАЧИВАЕМ ДАННЫЕ ИЗ SUPABASE
-                const { data, error } = await supabaseClient
-                    .from('menu')
-                    .select('*')
-                    .eq('restaurant_id', resId)
-                    .eq('is_available', true); // Берем только то, что есть в наличии
-
-                if (error) throw error;
-
-                // 3. Адаптируем данные из базы под твой код корзины
-                res.items = data.map(item => ({
-                    id: item.id.toString(), // ID конвертируем в строку
-                    name: item.name,
-                    price: item.price,
-                    weight: item.weight || '',
-                    category: item.category ? item.category.trim() : 'Другое', // СРАЗУ УБИРАЕМ ПРОБЕЛЫ
-                    desc: item.description || '',
-                    img: item.img_url
-                }));
-
-                // Если меню пока пустое
-                if (res.items.length === 0) {
-                    container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: 800; color: #999;">Меню скоро появится 🍽️</div>';
-                    return;
-                }
-
-                // 4. Отрисовываем НАВИГАЦИЮ (Поиск + Горизонтальные категории)
-                let navContainer = document.getElementById('menu-nav-container');
-                if (!navContainer) {
-                    // Создаем главный липкий контейнер
-                    navContainer = document.createElement('div');
-                    navContainer.id = 'menu-nav-container';
-                    navContainer.style.cssText = 'display: flex; align-items: center; background: white; position: sticky; top: 0; z-index: 50; border-bottom: 1px solid #eee; padding-left: 10px; width: 100%; box-sizing: border-box;';
-                    
-                    navContainer.innerHTML = `
-                        <button id="menu-search-toggle-btn" onclick="toggleMenuSearch()" style="background: none; border: none; padding: 10px 10px 10px 0; cursor: pointer; display: flex; align-items: center; flex-shrink: 0;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #222;">
-                                <circle cx="11" cy="11" r="8"></circle>
-                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                            </svg>
-                        </button>
-                        
-                        <div id="menu-search-container" style="display: none; flex-grow: 1; align-items: center; gap: 8px; padding-right: 10px;">
-                            <input type="text" id="menu-search-input" oninput="handleMenuSearch()" placeholder="Поиск блюда..." style="flex-grow: 1; border: 1px solid #e0e0e0; border-radius: 20px; padding: 6px 14px; font-size: 14px; outline: none; background: #f9f9f9; width: 100%;">
-                            <button onclick="clearMenuSearch()" style="background: none; border: none; padding: 4px; cursor: pointer; color: #999; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                            </button>
-                        </div>
-
-                        <div id="category-bar-wrapper" style="flex-grow: 1; min-width: 0; overflow: hidden;"></div>
-                    `;
-                    container.parentNode.insertBefore(navContainer, container);
-                }
-
-                // Вставляем твой category-bar внутрь нашей обертки
-                if (!catBar) {
-                    catBar = document.createElement('div');
-                    catBar.id = 'category-bar';
-                    // Отключаем его личные рамки и липкость, так как они теперь у родителя (navContainer)
-                    catBar.style.position = 'static'; 
-                    catBar.style.borderBottom = 'none';
-                    document.getElementById('category-bar-wrapper').appendChild(catBar);
-                }
-
-                let categories = [...new Set(res.items.map(item => item.category))];
-                
-                // ЖЕЛЕЗОБЕТОННАЯ СОРТИРОВКА ДЛЯ ВЕРХНИХ КНОПОК
-                const sortOrder = (res.categories_order || []).map(c => c.trim().toLowerCase());
-                categories.sort((a, b) => {
-                    let indexA = sortOrder.indexOf(a.toLowerCase());
-                    let indexB = sortOrder.indexOf(b.toLowerCase());
-                    if (indexA === -1) indexA = 999;
-                    if (indexB === -1) indexB = 999;
-                    return indexA - indexB;
-                });
-
-                catBar.innerHTML = categories.map((cat, i) => 
-                    `<button class="${i === 0 ? 'active' : ''}" onclick="scrollToCategory('${cat}', this)">${cat}</button>`
-                ).join('');
-                // 5. Отрисовываем сами карточки блюд
-                renderRestaurantMenu();
-
-            } catch (err) {
-                console.error("Ошибка загрузки меню:", err);
-                container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: bold; color: #d32f2f;">❌ Ошибка соединения. Попробуйте позже.</div>';
-            }
-        }
-
-        // 2. НОВАЯ ФУНКЦИЯ ПЛАВНОГО СКРОЛЛА (ВМЕСТО ФИЛЬТРАЦИИ)
-        function scrollToCategory(category, btn) {
-            // Подсвечиваем нажатую кнопку
-            document.querySelectorAll('#category-bar button').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
-            // Плавно скроллим к заголовку нужной категории
-            const section = document.getElementById('cat-' + category);
-            if (section) {
-                section.scrollIntoView({ behavior: 'smooth' });
-            }
-        }
-
-// И обязательно добавь эту функцию фильтрации рядом
 async function openMenu(resId) {
-            currentRestaurantId = resId;
-            const res = database[resId];
-            
-            document.getElementById('menu-title').innerText = res.title;
-            document.getElementById('menu-logo').src = res.logo;
+    currentRestaurantId = resId;
+    const res = database[resId];
+    if (!res) return;
+    
+    document.getElementById('menu-title').innerText = res.title;
+    document.getElementById('menu-logo').src = res.logo;
 
-            // 1. Показываем экран меню и лоадер, пока данные летят с сервера
-            const container = document.getElementById('all-products-container');
-            container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: 800; color: #999;">⏳ Загрузка меню...</div>';
-            
-            // Очищаем старые категории и сбрасываем поиск
-            let catBar = document.getElementById('category-bar');
-            if (catBar) catBar.innerHTML = '';
-            if (typeof clearMenuSearch === 'function') clearMenuSearch();
+    // 1. Показываем экран меню и лоадер, пока данные летят с сервера
+    const container = document.getElementById('all-products-container');
+    container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: 800; color: #999;">⏳ Загрузка меню...</div>';
+    
+    // Очищаем старые категории и сбрасываем поиск
+    let catBar = document.getElementById('category-bar');
+    if (catBar) catBar.innerHTML = '';
+    if (typeof clearMenuSearch === 'function') clearMenuSearch();
 
-            history.pushState({screen: 'menu', page: 'menu', resId: resId}, '');
-            showScreen('menu');
+    history.pushState({screen: 'menu', page: 'menu', resId: resId}, '');
+    showScreen('menu');
 
-            try {
-                // 2. СКАЧИВАЕМ ДАННЫЕ ИЗ SUPABASE
-                const { data, error } = await supabaseClient
-                    .from('menu')
-                    .select('*')
-                    .eq('restaurant_id', resId)
-                    .eq('is_available', true); // Берем только то, что есть в наличии
+    try {
+        // 2. СКАЧИВАЕМ ДАННЫЕ ИЗ SUPABASE
+        const { data, error } = await supabaseClient
+            .from('menu')
+            .select('*')
+            .eq('restaurant_id', resId)
+            .eq('is_available', true);
 
-                if (error) throw error;
+        if (error) throw error;
 
-                // 3. Адаптируем данные из базы под твой код корзины
-                res.items = data.map(item => ({
-                    id: item.id.toString(), // ID конвертируем в строку
-                    name: item.name,
-                    price: item.price,
-                    weight: item.weight || '',
-                    category: item.category ? item.category.trim() : 'Другое', // СРАЗУ УБИРАЕМ ПРОБЕЛЫ
-                    desc: item.description || '',
-                    img: item.img_url
-                }));
+        // 3. Адаптируем данные из базы под корзину
+        res.items = data.map(item => ({
+            id: item.id.toString(),
+            name: item.name,
+            price: item.price,
+            weight: item.weight || '',
+            category: item.category ? item.category.trim() : 'Другое',
+            desc: item.description || '',
+            img: item.img_url
+        }));
 
-                // Если меню пока пустое
-                if (res.items.length === 0) {
-                    container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: 800; color: #999;">Меню скоро появится 🍽️</div>';
-                    return;
-                }
-
-                // 4. Отрисовываем НАВИГАЦИЮ (Поиск + Горизонтальные категории)
-                let navContainer = document.getElementById('menu-nav-container');
-                if (!navContainer) {
-                    // Создаем главный липкий контейнер
-                    navContainer = document.createElement('div');
-                    navContainer.id = 'menu-nav-container';
-                    navContainer.style.cssText = 'display: flex; align-items: center; background: white; position: sticky; top: 0; z-index: 50; border-bottom: 1px solid #eee; padding-left: 10px; width: 100%; box-sizing: border-box;';
-                    
-                    navContainer.innerHTML = `
-                        <button id="menu-search-toggle-btn" onclick="toggleMenuSearch()" style="background: none; border: none; padding: 10px 10px 10px 0; cursor: pointer; display: flex; align-items: center; flex-shrink: 0;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #222;">
-                                <circle cx="11" cy="11" r="8"></circle>
-                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                            </svg>
-                        </button>
-                        
-                        <div id="menu-search-container" style="display: none; flex-grow: 1; align-items: center; gap: 8px; padding-right: 10px;">
-                            <input type="text" id="menu-search-input" oninput="handleMenuSearch()" placeholder="Поиск блюда..." style="flex-grow: 1; border: 1px solid #e0e0e0; border-radius: 20px; padding: 6px 14px; font-size: 14px; outline: none; background: #f9f9f9; width: 100%;">
-                            <button onclick="clearMenuSearch()" style="background: none; border: none; padding: 4px; cursor: pointer; color: #999; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                            </button>
-                        </div>
-
-                        <div id="category-bar-wrapper" style="flex-grow: 1; min-width: 0; overflow: hidden;"></div>
-                    `;
-                    container.parentNode.insertBefore(navContainer, container);
-                }
-
-                // Вставляем твой category-bar внутрь нашей обертки
-                if (!catBar) {
-                    catBar = document.createElement('div');
-                    catBar.id = 'category-bar';
-                    // Отключаем его личные рамки и липкость, так как они теперь у родителя (navContainer)
-                    catBar.style.position = 'static'; 
-                    catBar.style.borderBottom = 'none';
-                    document.getElementById('category-bar-wrapper').appendChild(catBar);
-                }
-
-                let categories = [...new Set(res.items.map(item => item.category))];
-                
-                // ЖЕЛЕЗОБЕТОННАЯ СОРТИРОВКА ДЛЯ ВЕРХНИХ КНОПОК
-                const sortOrder = (res.categories_order || []).map(c => c.trim().toLowerCase());
-                categories.sort((a, b) => {
-                    let indexA = sortOrder.indexOf(a.toLowerCase());
-                    let indexB = sortOrder.indexOf(b.toLowerCase());
-                    if (indexA === -1) indexA = 999;
-                    if (indexB === -1) indexB = 999;
-                    return indexA - indexB;
-                });
-
-                catBar.innerHTML = categories.map((cat, i) => 
-                    `<button class="${i === 0 ? 'active' : ''}" onclick="scrollToCategory('${cat}', this)">${cat}</button>`
-                ).join('');
-                // 5. Отрисовываем сами карточки блюд
-                renderRestaurantMenu();
-
-            } catch (err) {
-                console.error("Ошибка загрузки меню:", err);
-                container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: bold; color: #d32f2f;">❌ Ошибка соединения. Попробуйте позже.</div>';
-            }
+        if (res.items.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: 800; color: #999;">Меню скоро появится 🍽️</div>';
+            return;
         }
+
+        // 4. Отрисовываем НАВИГАЦИЮ (Поиск + Горизонтальные категории)
+        let navContainer = document.getElementById('menu-nav-container');
+        if (!navContainer) {
+            navContainer = document.createElement('div');
+            navContainer.id = 'menu-nav-container';
+            navContainer.style.cssText = 'display: flex; align-items: center; background: white; position: sticky; top: 0; z-index: 50; border-bottom: 1px solid #eee; padding-left: 10px; width: 100%; box-sizing: border-box;';
+            
+            navContainer.innerHTML = `
+                <button id="menu-search-toggle-btn" onclick="toggleMenuSearch()" style="background: none; border: none; padding: 10px 10px 10px 0; cursor: pointer; display: flex; align-items: center; flex-shrink: 0;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #222;">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </button>
+                
+                <div id="menu-search-container" style="display: none; flex-grow: 1; align-items: center; gap: 8px; padding-right: 10px;">
+                    <input type="text" id="menu-search-input" oninput="handleMenuSearch()" placeholder="Поиск блюда..." style="flex-grow: 1; border: 1px solid #e0e0e0; border-radius: 20px; padding: 6px 14px; font-size: 14px; outline: none; background: #f9f9f9; width: 100%;">
+                    <button onclick="clearMenuSearch()" style="background: none; border: none; padding: 4px; cursor: pointer; color: #999; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                </div>
+
+                <div id="category-bar-wrapper" style="flex-grow: 1; min-width: 0; overflow: hidden;"></div>
+            `;
+            container.parentNode.insertBefore(navContainer, container);
+        }
+
+        if (!catBar) {
+            catBar = document.createElement('div');
+            catBar.id = 'category-bar';
+            catBar.style.position = 'static'; 
+            catBar.style.borderBottom = 'none';
+            document.getElementById('category-bar-wrapper').appendChild(catBar);
+        }
+
+        let categories = [...new Set(res.items.map(item => item.category))];
+        
+        const sortOrder = (res.categories_order || []).map(c => c.trim().toLowerCase());
+        categories.sort((a, b) => {
+            let indexA = sortOrder.indexOf(a.toLowerCase());
+            let indexB = sortOrder.indexOf(b.toLowerCase());
+            if (indexA === -1) indexA = 999;
+            if (indexB === -1) indexB = 999;
+            return indexA - indexB;
+        });
+
+        catBar.innerHTML = categories.map((cat, i) => 
+            `<button class="${i === 0 ? 'active' : ''}" onclick="scrollToCategory('${cat}', this)">${cat}</button>`
+        ).join('');
+
+        // 5. Отрисовываем сами карточки блюд
+        renderRestaurantMenu();
+
+    } catch (err) {
+        console.error("Ошибка загрузки меню:", err);
+        container.innerHTML = '<div style="text-align:center; padding: 50px; font-weight: bold; color: #d32f2f;">❌ Ошибка соединения. Попробуйте позже.</div>';
+    }
+}
+
+function scrollToCategory(category, btn) {
+    document.querySelectorAll('#category-bar button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const section = document.getElementById('cat-' + category);
+    if (section) {
+        section.scrollIntoView({ behavior: 'smooth' });
+    }
+}
 
  function renderRestaurantMenu(itemsToRender) {
     const res = database[currentRestaurantId];
@@ -2077,22 +2247,7 @@ async function openMenu(resId) {
             }
         }
 
-        const availableCities = ['Бишкек', 'Чолпон-Ата', 'Балыкчы', 'Бостери'];
 
-        function openAddressModal() {
-            // Генерируем красивый список городов. Выбранный город подсвечиваем галочкой
-            const container = document.getElementById('city-list-container');
-            container.innerHTML = availableCities.map(city => 
-                `<div class="city-item ${city === globalCity ? 'active' : ''}" onclick="selectCityFast('${city}')">${city}</div>`
-            ).join('');
-            
-            document.getElementById('modal-address').classList.remove('hidden');
-        }
-
-        function closeAddressModal() {
-            // Железобетонное закрытие окна (крестик теперь точно работает)
-            document.getElementById('modal-address').classList.add('hidden');
-        }
 
 
 
@@ -2111,8 +2266,8 @@ async function openMenu(resId) {
     history.pushState({modal: 'map'}, '');
     
     const activeRes = database[cartActiveTabResId];
-    const resLat = activeRes ? activeRes.lat : (clientLat || 42.6482);
-    const resLon = activeRes ? activeRes.lon : (clientLon || 77.0855);
+    const resLat = activeRes ? activeRes.lat : (clientLat || (globalCity === 'Чолпон-Ата' ? 42.6482 : 42.8746));
+    const resLon = activeRes ? activeRes.lon : (clientLon || (globalCity === 'Чолпон-Ата' ? 77.0855 : 74.5698));
     
     // ЖЕЛЕЗОБЕТОННОЕ УПРАВЛЕНИЕ КНОПКОЙ И БЛОКОМ СРАЗУ ПРИ ОТКРЫТИИ
     const isCartVisible = !document.getElementById('screen-cart-list').classList.contains('hidden');
@@ -2263,16 +2418,6 @@ async function openMenu(resId) {
             
             const isCartVisible = !document.getElementById('screen-cart-list').classList.contains('hidden');
 
-            const cityCenters = {
-                'Чолпон-Ата': { lat: 42.6482, lon: 77.0855 },
-                'Бостери': { lat: 42.6353, lon: 77.1933 },
-                'Бишкек': { lat: 42.8746, lon: 74.5698 },
-                'Балыкчы': { lat: 42.4602, lon: 76.1871 }
-            };
-            
-            const activeCity = (typeof currentCity !== 'undefined' && currentCity) ? currentCity : 'Чолпон-Ата';
-            const center = cityCenters[activeCity] || cityCenters['Чолпон-Ата'];
-
             // 👉 Подхватываем временные координаты, если карту передвигают в данный момент
             const mapModal = document.getElementById('modal-map');
             let calcLat = clientLat;
@@ -2288,10 +2433,8 @@ async function openMenu(resId) {
                 if (deliveryBlock) deliveryBlock.style.display = 'none';
 
                 if (calcLat && calcLon) {
-                    const distFromCenter = getDistance(center.lat, center.lon, calcLat, calcLon);
-                    const GLOBAL_MAX_DIST = 20; 
-
-                    if (distFromCenter > GLOBAL_MAX_DIST) {
+                    const checkZone = detectCoverageZone(calcLat, calcLon);
+                    if (!checkZone.inZone) {
                         if (submitButton) {
                             submitButton.classList.add('disabled');
                             submitButton.style.pointerEvents = 'none';
@@ -2321,10 +2464,13 @@ async function openMenu(resId) {
                 return;
             }
 
-            const straightDist = getDistance(resLat, resLon, calcLat, calcLon);
-            const MAX_DISTANCE_KM = 20; 
+            const checkZone = detectCoverageZone(calcLat, calcLon);
+            const activeRes = database[cartActiveTabResId];
+            const isSameCity = activeRes && checkZone.inZone && 
+                ((activeRes.city || '').trim().toLowerCase() === (checkZone.city || '').trim().toLowerCase());
 
-            if (straightDist > MAX_DISTANCE_KM) {
+            // 1. Точка вне зон обслуживания вообще
+            if (!checkZone.inZone) {
                 currentDeliveryFee = 0; 
                 if (priceElement) {
                     priceElement.innerText = 'Вне зоны';
@@ -2336,6 +2482,20 @@ async function openMenu(resId) {
                     submitButton.style.pointerEvents = 'none';
                     submitButton.innerText = 'Слишком далеко 😔';
                 }
+            // 2. Защита между городами: ресторан и клиент в разных городах
+            } else if (!isSameCity) {
+                currentDeliveryFee = 0; 
+                if (priceElement) {
+                    priceElement.innerText = 'Другой город';
+                    priceElement.style.color = '#d32f2f'; 
+                    priceElement.style.fontSize = '16px'; 
+                }
+                if (submitButton) {
+                    submitButton.classList.add('disabled');
+                    submitButton.style.pointerEvents = 'none';
+                    submitButton.innerText = 'Заказ в другой город недоступен 😔';
+                }
+            // 3. В пределах одного города: никаких ограничений по километрам, кнопка всегда активна
             } else {
                 currentDeliveryFee = typeof calculateDynamicDeliveryFee === 'function' ? calculateDynamicDeliveryFee(resLat, resLon, calcLat, calcLon) : 0;
                 if (priceElement) {
@@ -2402,6 +2562,13 @@ async function openMenu(resId) {
                 saveAddressToCloudAndLocal(clientLat, clientLon, inputStreet, inputKv);
             }
 
+            const zone = detectCoverageZone(clientLat, clientLon);
+            if (zone.inZone && zone.city) {
+                globalCity = zone.city;
+                try { localStorage.setItem('tamak_city', globalCity); } catch(e) {}
+            }
+            updateHeaderRegionUI(zone);
+
             const isCartVisible = !document.getElementById('screen-cart-list').classList.contains('hidden');
 
             if (isCartVisible) {
@@ -2447,6 +2614,13 @@ function confirmAddressFromModal() {
         orderAddressData.comment = '';
         clientLat = data.lat;
         clientLon = data.lon;
+
+        const zone = detectCoverageZone(clientLat, clientLon);
+        if (zone.inZone && zone.city) {
+            globalCity = zone.city;
+            try { localStorage.setItem('tamak_city', globalCity); } catch(e) {}
+        }
+        updateHeaderRegionUI(zone);
 
         // 👉 РЕШЕНИЕ ПРОБЛЕМЫ: Жестко фиксируем этот адрес как активный для перезагрузок
         localStorage.setItem('tamak_last_lat', clientLat);
@@ -2580,6 +2754,12 @@ function confirmAddressFromModal() {
                         if (cityDisplay) {
                             cityDisplay.innerText = fullAddress;
                         }
+                        const zone = detectCoverageZone(lat, lon);
+                        if (zone.inZone && zone.city) {
+                            globalCity = zone.city;
+                            try { localStorage.setItem('tamak_city', globalCity); } catch(e) {}
+                        }
+                        updateHeaderRegionUI(zone);
                         updateCheckoutSummaryUI();
                         renderRestaurants();
                     }
@@ -2599,8 +2779,8 @@ function confirmAddressFromModal() {
         
 
         function initCheckoutMap(resLat, resLon) {
-            const startLat = clientLat || resLat || 42.6482;
-            const startLon = clientLon || resLon || 77.0855;
+            const startLat = clientLat || resLat || (globalCity === 'Чолпон-Ата' ? 42.6482 : 42.8746);
+            const startLon = clientLon || resLon || (globalCity === 'Чолпон-Ата' ? 77.0855 : 74.5698);
             const mapModal = document.getElementById('modal-map');
 
             if (!checkoutMap) {
@@ -3391,8 +3571,18 @@ function updateVariantCartModal(realVariantId, delta) {
                 const cityDisplay = document.getElementById('current-city-display');
                 if (cityDisplay) cityDisplay.innerText = finalDisplayString;
                 
+                const zone = detectCoverageZone(clientLat, clientLon);
+                if (zone.inZone && zone.city) {
+                    globalCity = zone.city;
+                    try { localStorage.setItem('tamak_city', globalCity); } catch(e) {}
+                }
+                updateHeaderRegionUI(zone);
                 renderRestaurants();
                 if (typeof updateCheckoutSummaryUI === 'function') updateCheckoutSummaryUI();
+            } else {
+                const zone = detectCoverageZone(clientLat, clientLon);
+                updateHeaderRegionUI(zone);
+                renderRestaurants();
             }
 
             // Проверка настроек GPS на старте
