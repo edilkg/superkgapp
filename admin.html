@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>TamakKG | Панель Администратора & Диспетчер</title>
 
+    <!-- Supabase JS CDN (v2) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <!-- Leaflet Map CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
@@ -30,9 +33,8 @@
             --status-completed: #26A69A;
             --status-canceled: #EF5350;
 
-            --sidebar-width: 360px;
+            --sidebar-width: 380px;
             --header-height: 60px;
-            --kpi-height: 80px;
         }
 
         * {
@@ -279,10 +281,23 @@
             background: rgba(38, 166, 154, 0.12);
             border: 1px solid rgba(38, 166, 154, 0.3);
             color: #4DB6AC;
-            padding: 5px 10px;
+            padding: 5px 12px;
             border-radius: 20px;
             font-size: 12px;
             font-weight: 700;
+            transition: all 0.3s;
+        }
+
+        .sys-status-chip.connecting {
+            background: rgba(255, 179, 0, 0.12);
+            border-color: rgba(255, 179, 0, 0.3);
+            color: #FFB300;
+        }
+
+        .sys-status-chip.error {
+            background: rgba(239, 83, 80, 0.12);
+            border-color: rgba(239, 83, 80, 0.3);
+            color: #EF5350;
         }
 
         .pulse-dot {
@@ -294,6 +309,17 @@
             animation: blinkDot 1.8s infinite;
         }
 
+        .sys-status-chip.connecting .pulse-dot {
+            background: #FFB300;
+            box-shadow: 0 0 8px #FFB300;
+        }
+
+        .sys-status-chip.error .pulse-dot {
+            background: #EF5350;
+            box-shadow: 0 0 8px #EF5350;
+            animation: none;
+        }
+
         @keyframes blinkDot {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.4; transform: scale(0.85); }
@@ -302,7 +328,7 @@
         .header-center {
             display: flex;
             align-items: center;
-            gap: 20px;
+            gap: 16px;
         }
 
         .live-clock-widget {
@@ -400,7 +426,7 @@
             border: 1px solid var(--border-color);
             border-radius: 14px;
             padding: 10px 16px;
-            min-width: 150px;
+            min-width: 155px;
             flex: 1;
             display: flex;
             flex-direction: column;
@@ -519,7 +545,7 @@
             color: var(--text-secondary);
             font-size: 12px;
             font-weight: 700;
-            padding: 2px 7px;
+            padding: 2px 8px;
             border-radius: 12px;
         }
 
@@ -621,6 +647,110 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+        }
+
+        /* Карточка заказа в ленте */
+        .order-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 12px 14px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+        }
+
+        .order-card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-highlight);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+        }
+
+        .order-card.selected {
+            border-color: var(--primary);
+            box-shadow: 0 0 12px rgba(252, 224, 0, 0.25);
+        }
+
+        .order-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .order-id-tag {
+            font-size: 14px;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: 0.2px;
+        }
+
+        .order-time-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .order-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+        }
+
+        /* Цвета бейджей статусов */
+        .status-badge-waiting_payment { background: rgba(255, 179, 0, 0.15); color: #FFB300; border: 1px solid rgba(255, 179, 0, 0.3); }
+        .status-badge-paid { background: rgba(41, 182, 246, 0.15); color: #29B6F6; border: 1px solid rgba(41, 182, 246, 0.3); }
+        .status-badge-cooking { background: rgba(255, 112, 67, 0.15); color: #FF7043; border: 1px solid rgba(255, 112, 67, 0.3); }
+        .status-badge-delivery { background: rgba(171, 71, 188, 0.15); color: #CE93D8; border: 1px solid rgba(171, 71, 188, 0.3); }
+        .status-badge-completed { background: rgba(38, 166, 154, 0.15); color: #4DB6AC; border: 1px solid rgba(38, 166, 154, 0.3); }
+        .status-badge-canceled { background: rgba(239, 83, 80, 0.15); color: #EF5350; border: 1px solid rgba(239, 83, 80, 0.3); }
+
+        .order-card-rest {
+            font-size: 13px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .order-card-addr {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .order-card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 8px;
+            border-top: 1px dashed rgba(255, 255, 255, 0.08);
+        }
+
+        .order-card-price {
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .order-card-client {
+            font-size: 11px;
+            color: var(--text-muted);
+            max-width: 160px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         /* Пустое состояние ленты (Empty State) */
@@ -737,7 +867,335 @@
             display: flex;
         }
 
-        /* Адаптив для планшетов и мобильных */
+        /* ==========================================================
+           6. ДЕТАЛЬНЫЙ ЧЕК ЗАКАЗА (ORDER DETAILS DRAWER)
+           ========================================================== */
+        .drawer-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 10000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .drawer-backdrop.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .order-drawer {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            right: 0;
+            width: 440px;
+            max-width: 100vw;
+            background: var(--bg-surface);
+            border-left: 1px solid var(--border-color);
+            z-index: 10001;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: -10px 0 40px rgba(0, 0, 0, 0.6);
+        }
+
+        .order-drawer.active {
+            transform: translateX(0);
+        }
+
+        .drawer-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-surface);
+            flex-shrink: 0;
+        }
+
+        .drawer-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .drawer-order-id {
+            font-size: 18px;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .drawer-close-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .drawer-close-btn:hover {
+            color: #fff;
+            background: var(--border-highlight);
+        }
+
+        .drawer-body {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .drawer-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 14px 16px;
+        }
+
+        .drawer-section-title {
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .drawer-info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .drawer-info-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .drawer-info-label {
+            color: var(--text-secondary);
+            flex-shrink: 0;
+            width: 100px;
+        }
+
+        .drawer-info-value {
+            color: #fff;
+            font-weight: 600;
+            text-align: right;
+            word-break: break-word;
+        }
+
+        .drawer-phone-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 700;
+        }
+
+        .drawer-phone-link:hover {
+            text-decoration: underline;
+        }
+
+        .drawer-action-links {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .drawer-action-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 700;
+            text-align: center;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
+        }
+
+        .drawer-action-btn.call-btn {
+            background: rgba(38, 166, 154, 0.15);
+            color: #4DB6AC;
+            border: 1px solid rgba(38, 166, 154, 0.3);
+        }
+
+        .drawer-action-btn.call-btn:hover {
+            background: rgba(38, 166, 154, 0.25);
+        }
+
+        .drawer-action-btn.gis-btn {
+            background: rgba(41, 182, 246, 0.15);
+            color: #81D4FA;
+            border: 1px solid rgba(41, 182, 246, 0.3);
+        }
+
+        .drawer-action-btn.gis-btn:hover {
+            background: rgba(41, 182, 246, 0.25);
+        }
+
+        .drawer-action-btn.tg-btn {
+            background: rgba(0, 136, 204, 0.15);
+            color: #29B6F6;
+            border: 1px solid rgba(0, 136, 204, 0.3);
+        }
+
+        /* Чек корзины */
+        .receipt-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .receipt-table th {
+            text-align: left;
+            padding: 6px 0;
+            color: var(--text-muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .receipt-table td {
+            padding: 8px 0;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
+        }
+
+        .receipt-item-name {
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .receipt-item-qty {
+            color: var(--text-secondary);
+            font-weight: 700;
+            text-align: center;
+            width: 40px;
+        }
+
+        .receipt-item-sum {
+            font-weight: 700;
+            color: #fff;
+            text-align: right;
+            width: 80px;
+        }
+
+        .receipt-total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 12px;
+            margin-top: 6px;
+            font-size: 15px;
+            font-weight: 800;
+        }
+
+        .receipt-total-val {
+            color: var(--primary);
+            font-size: 18px;
+        }
+
+        /* Кнопки экстренного управления */
+        .drawer-footer-actions {
+            display: flex;
+            gap: 10px;
+            padding-top: 6px;
+        }
+
+        .emergency-btn {
+            flex: 1;
+            padding: 12px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .emergency-btn.cancel {
+            background: rgba(239, 83, 80, 0.15);
+            border: 1px solid rgba(239, 83, 80, 0.35);
+            color: #EF5350;
+        }
+
+        .emergency-btn.cancel:hover {
+            background: rgba(239, 83, 80, 0.28);
+        }
+
+        .emergency-btn.complete {
+            background: rgba(38, 166, 154, 0.15);
+            border: 1px solid rgba(38, 166, 154, 0.35);
+            color: #4DB6AC;
+        }
+
+        .emergency-btn.complete:hover {
+            background: rgba(38, 166, 154, 0.28);
+        }
+
+        .emergency-btn:active {
+            transform: scale(0.97);
+        }
+
+        /* Тосты / Уведомления */
+        #toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 100000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+
+        .toast-msg {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-highlight);
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: slideInRight 0.3s ease-out;
+            pointer-events: auto;
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(50px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Адаптив для мобильных экранов */
         @media (max-width: 900px) {
             .sidebar {
                 position: absolute;
@@ -802,9 +1260,9 @@
                 🛵 TamakKG
                 <span class="header-badge">Admin</span>
             </div>
-            <div class="sys-status-chip">
+            <div class="sys-status-chip connecting" id="sys-status-chip">
                 <div class="pulse-dot"></div>
-                <span>Система онлайн</span>
+                <span id="sys-status-text">Подключение...</span>
             </div>
         </div>
 
@@ -935,15 +1393,15 @@
             <!-- Быстрый поиск -->
             <div class="search-bar-wrap">
                 <span class="search-icon-svg">🔍</span>
-                <input type="text" class="search-input" id="search-input" placeholder="Поиск по чеку, клиенту, телефону...">
+                <input type="text" class="search-input" id="search-input" placeholder="Поиск по чеку, клиенту, телефону..." oninput="SidebarUI.handleSearch(this.value)">
             </div>
 
-            <!-- Список заказов (Placeholder для Шага 1) -->
+            <!-- Список заказов -->
             <div class="orders-feed-list" id="orders-feed">
                 <div class="feed-empty-state">
-                    <div class="empty-icon">📦</div>
-                    <div class="empty-title">Ожидание заказов</div>
-                    <div class="empty-desc">Заказы будут поступать в ленту в режиме реального времени</div>
+                    <div class="empty-icon">⏳</div>
+                    <div class="empty-title">Загрузка заказов...</div>
+                    <div class="empty-desc">Синхронизация данных с Supabase Realtime</div>
                 </div>
             </div>
         </aside>
@@ -970,28 +1428,640 @@
         </section>
     </main>
 
+    <!-- ==========================================================
+         5. ДЕТАЛЬНЫЙ ЧЕК ЗАКАЗА (ORDER DETAILS DRAWER)
+         ========================================================== -->
+    <div class="drawer-backdrop" id="drawer-backdrop" onclick="OrderDrawer.close()"></div>
+    <div class="order-drawer" id="order-drawer">
+        <div class="drawer-header">
+            <div class="drawer-header-left">
+                <span class="drawer-order-id" id="drawer-order-id">#000</span>
+                <span class="order-status-badge" id="drawer-status-badge">Статус</span>
+            </div>
+            <button class="drawer-close-btn" onclick="OrderDrawer.close()">✖</button>
+        </div>
+
+        <div class="drawer-body" id="drawer-body">
+            <!-- Содержимое динамически генерируется в OrderDrawer.render() -->
+        </div>
+    </div>
+
+    <!-- Контейнер всплывающих тостов -->
+    <div id="toast-container"></div>
+
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- Изолированная логика интерфейса (Шаг 1) -->
+    <!-- Логика админ-панели (Шаг 2: Supabase, Заказы, KPI, Realtime) -->
     <script>
         // ==========================================================
-        // 1. СИСТЕМА АВТОРИЗАЦИИ PIN-КОДОМ
+        // 0. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (HELPERS)
+        // ==========================================================
+        function safeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function showToast(text, icon = 'ℹ️') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast-msg';
+            toast.innerHTML = `<span>${icon}</span><span>${safeHtml(text)}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.transition = 'opacity 0.3s, transform 0.3s';
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        const STATUS_MAP = {
+            waiting_payment: { text: 'Ожидает оплаты', icon: '⏳', color: '#FFB300', class: 'status-badge-waiting_payment' },
+            paid: { text: 'Оплачен / Новый', icon: '💳', color: '#29B6F6', class: 'status-badge-paid' },
+            cooking: { text: 'Готовится на кухне', icon: '👨‍🍳', color: '#FF7043', class: 'status-badge-cooking' },
+            delivery: { text: 'В пути у курьера', icon: '🛵', color: '#AB47BC', class: 'status-badge-delivery' },
+            completed: { text: 'Доставлен', icon: '✅', color: '#26A69A', class: 'status-badge-completed' },
+            canceled: { text: 'Отменен', icon: '❌', color: '#EF5350', class: 'status-badge-canceled' }
+        };
+
+        function formatOrderTime(dateString) {
+            if (!dateString) return '';
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+            } catch (e) {
+                return '';
+            }
+        }
+
+        function formatOrderDateTime(dateString) {
+            if (!dateString) return 'Не указано';
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleString('ru-RU', { 
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                });
+            } catch (e) {
+                return String(dateString);
+            }
+        }
+
+        // ==========================================================
+        // 1. ИНИЦИАЛИЗАЦИЯ SUPABASE CLIENT
+        // ==========================================================
+        const SUPABASE_URL = 'https://dtxybpdjbdmqrvsdwvvk.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHlicGRqYmRtcXJ2c2R3dnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwODI5OTYsImV4cCI6MjA5MTY1ODk5Nn0.WFWBrwvxqEgfR9tzusvFcvfPN_mS4SmwvsWlyH13LEs';
+        
+        let supabaseClient = null;
+        try {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        } catch (err) {
+            console.error('Ошибка инициализации Supabase:', err);
+        }
+
+        // ==========================================================
+        // 2. ХРАНИЛИЩЕ ДАННЫХ ЗАКАЗОВ (ORDERS STORE)
+        // ==========================================================
+        const OrdersStore = {
+            orders: [],
+            couriers: [],
+            activeOrderId: null,
+            realtimeChannel: null,
+
+            async loadInitialData() {
+                if (!supabaseClient) return;
+
+                // 1. Вычисляем начало сегодняшнего дня (00:00:00)
+                const startOfDay = new Date();
+                startOfDay.setHours(0, 0, 0, 0);
+                const startOfDayIso = startOfDay.toISOString();
+
+                try {
+                    // 2. Загружаем активные заказы ИЛИ завершенные за сегодня
+                    const { data, error } = await supabaseClient
+                        .from('orders')
+                        .select('*')
+                        .or(`created_at.gte.${startOfDayIso},status.in.(waiting_payment,paid,cooking,delivery)`)
+                        .order('id', { ascending: false })
+                        .limit(300);
+
+                    if (error) {
+                        console.warn('Ошибка выборки по created_at, пробуем fallback по id:', error.message);
+                        const fallback = await supabaseClient
+                            .from('orders')
+                            .select('*')
+                            .order('id', { ascending: false })
+                            .limit(100);
+                        this.orders = fallback.data || [];
+                    } else {
+                        this.orders = data || [];
+                    }
+
+                    // 3. Загружаем данные курьеров для KPI
+                    const { data: couriersData } = await supabaseClient
+                        .from('couriers')
+                        .select('id, name, phone, is_online, status');
+                    this.couriers = couriersData || [];
+
+                    // 4. Обновляем KPI и ленту
+                    this.updateKPI();
+                    SidebarUI.render();
+
+                    // 5. Подключаем Realtime
+                    this.initRealtime();
+
+                } catch (err) {
+                    console.error('Критическая ошибка загрузки заказов:', err);
+                    showToast('Ошибка загрузки данных', '⚠️');
+                }
+            },
+
+            updateKPI() {
+                let revenue = 0;
+                let completedCount = 0;
+                let waitingCount = 0;
+                let cookingCount = 0;
+                let deliveryCount = 0;
+                let canceledCount = 0;
+
+                const startOfDay = new Date();
+                startOfDay.setHours(0, 0, 0, 0);
+
+                this.orders.forEach(order => {
+                    const status = order.status;
+                    const price = Number(order.total_price) || 0;
+
+                    // Выручка считается по оплаченным и завершенным заказам
+                    if (['completed', 'paid', 'cooking', 'delivery'].includes(status)) {
+                        revenue += price;
+                    }
+
+                    if (status === 'completed') completedCount++;
+                    else if (status === 'waiting_payment') waitingCount++;
+                    else if (['paid', 'cooking'].includes(status)) cookingCount++;
+                    else if (status === 'delivery') deliveryCount++;
+                    else if (status === 'canceled') canceledCount++;
+                });
+
+                // Подсчет курьеров
+                const totalCouriers = this.couriers.length;
+                const onlineCouriers = this.couriers.filter(c => c.is_online === true).length;
+
+                // Обновление DOM элементов KPI
+                document.getElementById('kpi-revenue').innerText = `${revenue.toLocaleString('ru-RU')} сом`;
+                document.getElementById('kpi-orders-count').innerText = `${completedCount} доставленных чеков`;
+                document.getElementById('kpi-waiting').innerText = waitingCount;
+                document.getElementById('kpi-cooking').innerText = cookingCount;
+                document.getElementById('kpi-delivery').innerText = deliveryCount;
+                document.getElementById('kpi-completed').innerText = completedCount;
+                document.getElementById('kpi-canceled').innerText = canceledCount;
+
+                document.getElementById('kpi-couriers-online').innerText = `${onlineCouriers} на линии`;
+                document.getElementById('kpi-couriers-total').innerText = `из ${totalCouriers} зарегистрированных`;
+
+                document.getElementById('sidebar-counter').innerText = this.orders.length;
+            },
+
+            initRealtime() {
+                if (!supabaseClient || this.realtimeChannel) return;
+
+                const statusChip = document.getElementById('sys-status-chip');
+                const statusText = document.getElementById('sys-status-text');
+
+                this.realtimeChannel = supabaseClient.channel('admin_orders_channel')
+                    .on('postgres_changes', {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'orders'
+                    }, (payload) => {
+                        this.handleRealtimeInsert(payload.new);
+                    })
+                    .on('postgres_changes', {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'orders'
+                    }, (payload) => {
+                        this.handleRealtimeUpdate(payload.new);
+                    })
+                    .subscribe((status) => {
+                        if (status === 'SUBSCRIBED') {
+                            statusChip.className = 'sys-status-chip';
+                            statusText.innerText = 'Система онлайн';
+                            showToast('Realtime подключен', '🟢');
+                        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                            statusChip.className = 'sys-status-chip error';
+                            statusText.innerText = 'Связь потеряна';
+                        }
+                    });
+            },
+
+            handleRealtimeInsert(newOrder) {
+                // Добавляем в начало массива
+                const exists = this.orders.some(o => o.id === newOrder.id);
+                if (!exists) {
+                    this.orders.unshift(newOrder);
+                    this.updateKPI();
+                    SidebarUI.render();
+                    showToast(`🔥 Новый заказ #${newOrder.id} (${newOrder.total_price || 0} сом)`, '🔔');
+                }
+            },
+
+            handleRealtimeUpdate(updatedOrder) {
+                const index = this.orders.findIndex(o => o.id === updatedOrder.id);
+                if (index !== -1) {
+                    this.orders[index] = updatedOrder;
+                } else {
+                    this.orders.unshift(updatedOrder);
+                }
+
+                this.updateKPI();
+                SidebarUI.render();
+
+                // Если открыт чек этого заказа — обновляем чек в реальном времени
+                if (this.activeOrderId === updatedOrder.id) {
+                    OrderDrawer.render(updatedOrder);
+                }
+
+                const sInfo = STATUS_MAP[updatedOrder.status] || { text: updatedOrder.status };
+                showToast(`Заказ #${updatedOrder.id}: статус "${sInfo.text}"`, '🔄');
+            },
+
+            async cancelOrder(orderId) {
+                if (!confirm(`Вы уверены, что хотите отменить заказ #${orderId}?`)) return;
+
+                try {
+                    const { error } = await supabaseClient
+                        .from('orders')
+                        .update({ status: 'canceled' })
+                        .eq('id', orderId);
+
+                    if (error) throw error;
+                    showToast(`Заказ #${orderId} отменен`, '❌');
+                } catch (err) {
+                    console.error('Ошибка отмены заказа:', err);
+                    alert('Не удалось отменить заказ: ' + err.message);
+                }
+            },
+
+            async completeOrder(orderId) {
+                if (!confirm(`Отметить заказ #${orderId} как успешно доставленный?`)) return;
+
+                try {
+                    const { error } = await supabaseClient
+                        .from('orders')
+                        .update({ status: 'completed' })
+                        .eq('id', orderId);
+
+                    if (error) throw error;
+                    showToast(`Заказ #${orderId} завершен!`, '✅');
+                } catch (err) {
+                    console.error('Ошибка завершения заказа:', err);
+                    alert('Не удалось завершить заказ: ' + err.message);
+                }
+            }
+        };
+
+        // ==========================================================
+        // 3. УПРАВЛЕНИЕ САЙДБАРОМ И ФИЛЬТРАЦИЯ ЗАКАЗОВ
+        // ==========================================================
+        const SidebarUI = {
+            isCollapsed: false,
+            currentTab: 'active', // 'active' | 'waiting' | 'completed' | 'canceled' | 'all'
+            searchQuery: '',
+
+            toggle() {
+                const sidebar = document.getElementById('sidebar');
+                sidebar.classList.toggle('collapsed');
+                this.isCollapsed = sidebar.classList.contains('collapsed');
+
+                setTimeout(() => {
+                    if (AdminMap.map) AdminMap.map.invalidateSize();
+                }, 310);
+            },
+
+            setTab(button, tabKey) {
+                document.querySelectorAll('.feed-tab').forEach(b => b.classList.remove('active'));
+                button.classList.add('active');
+                this.currentTab = tabKey;
+                this.render();
+            },
+
+            handleSearch(query) {
+                this.searchQuery = (query || '').toLowerCase().trim();
+                this.render();
+            },
+
+            getFilteredOrders() {
+                return OrdersStore.orders.filter(order => {
+                    const status = order.status || '';
+
+                    // Фильтр по вкладке
+                    let matchesTab = true;
+                    if (this.currentTab === 'active') {
+                        matchesTab = ['paid', 'cooking', 'delivery'].includes(status);
+                    } else if (this.currentTab === 'waiting') {
+                        matchesTab = status === 'waiting_payment';
+                    } else if (this.currentTab === 'completed') {
+                        matchesTab = status === 'completed';
+                    } else if (this.currentTab === 'canceled') {
+                        matchesTab = status === 'canceled';
+                    }
+
+                    if (!matchesTab) return false;
+
+                    // Фильтр по поиску
+                    if (this.searchQuery) {
+                        const idStr = String(order.id);
+                        const clientName = (order.client_name || '').toLowerCase();
+                        const phoneStr = (order.phone || '').replace(/[\s\+\-\(\)]/g, '');
+                        const restName = (order.restaurant || '').toLowerCase();
+                        const address = (order.address || '').toLowerCase();
+
+                        const q = this.searchQuery.replace(/#/g, '');
+                        const qClean = q.replace(/[\s\+\-\(\)]/g, '');
+
+                        const matchesQuery = idStr.includes(q) ||
+                            clientName.includes(q) ||
+                            (qClean.length >= 3 && phoneStr.includes(qClean)) ||
+                            restName.includes(q) ||
+                            address.includes(q);
+
+                        if (!matchesQuery) return false;
+                    }
+
+                    return true;
+                });
+            },
+
+            render() {
+                const container = document.getElementById('orders-feed');
+                const filtered = this.getFilteredOrders();
+
+                if (filtered.length === 0) {
+                    container.innerHTML = `
+                        <div class="feed-empty-state">
+                            <div class="empty-icon">🔍</div>
+                            <div class="empty-title">Заказы не найдены</div>
+                            <div class="empty-desc">В этой категории или по вашему запросу нет заказов</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = '';
+                filtered.forEach(order => {
+                    const s = STATUS_MAP[order.status] || { text: order.status, icon: '📦', class: '' };
+                    const time = formatOrderTime(order.created_at);
+                    const isSelected = OrdersStore.activeOrderId === order.id ? 'selected' : '';
+                    const client = safeHtml(order.client_name || 'Гость');
+                    const phone = safeHtml(order.phone || '');
+                    const rest = safeHtml(order.restaurant || 'Ресторан');
+                    const addr = safeHtml(order.address || 'Адрес не указан');
+                    const price = (Number(order.total_price) || 0).toLocaleString('ru-RU');
+
+                    html += `
+                        <div class="order-card ${isSelected}" onclick="OrderDrawer.open(${order.id})">
+                            <div class="order-card-header">
+                                <span class="order-id-tag">#${order.id}</span>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span class="order-time-text">${time}</span>
+                                    <span class="order-status-badge ${s.class}">
+                                        ${s.icon} ${s.text}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="order-card-rest">
+                                🏪 ${rest}
+                            </div>
+                            <div class="order-card-addr">
+                                📍 ${addr}
+                            </div>
+                            <div class="order-card-footer">
+                                <span class="order-card-price">${price} сом</span>
+                                <span class="order-card-client">👤 ${client} ${phone ? '| ' + phone : ''}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html;
+            }
+        };
+
+        // ==========================================================
+        // 4. ДЕТАЛЬНЫЙ ЧЕК ЗАКАЗА (ORDER DETAILS DRAWER)
+        // ==========================================================
+        const OrderDrawer = {
+            open(orderId) {
+                const order = OrdersStore.orders.find(o => o.id === orderId);
+                if (!order) return;
+
+                OrdersStore.activeOrderId = orderId;
+                SidebarUI.render(); // Обновляем подсветку активной карточки
+
+                this.render(order);
+
+                document.getElementById('drawer-backdrop').classList.add('active');
+                document.getElementById('order-drawer').classList.add('active');
+            },
+
+            close() {
+                OrdersStore.activeOrderId = null;
+                SidebarUI.render();
+
+                document.getElementById('drawer-backdrop').classList.remove('active');
+                document.getElementById('order-drawer').classList.remove('active');
+            },
+
+            render(order) {
+                document.getElementById('drawer-order-id').innerText = `Заказ #${order.id}`;
+
+                const s = STATUS_MAP[order.status] || { text: order.status, icon: '📦', class: '' };
+                const badgeEl = document.getElementById('drawer-status-badge');
+                badgeEl.className = `order-status-badge ${s.class}`;
+                badgeEl.innerHTML = `${s.icon} ${s.text}`;
+
+                const body = document.getElementById('drawer-body');
+
+                // Парсинг блюд
+                let itemsListHtml = '';
+                let itemsArr = [];
+                try {
+                    if (Array.isArray(order.items)) {
+                        itemsArr = order.items;
+                    } else if (typeof order.items === 'string') {
+                        itemsArr = JSON.parse(order.items);
+                    }
+                } catch (e) {
+                    itemsArr = [];
+                }
+
+                if (itemsArr && itemsArr.length > 0) {
+                    itemsArr.forEach(i => {
+                        const name = safeHtml(i.item ? i.item.name : (i.name || 'Позиция'));
+                        const count = i.count || 1;
+                        const unitPrice = i.price || (i.item ? i.item.price : 0);
+                        const subtotal = (Number(unitPrice) * Number(count)).toLocaleString('ru-RU');
+
+                        itemsListHtml += `
+                            <tr>
+                                <td class="receipt-item-name">${name}</td>
+                                <td class="receipt-item-qty">x${count}</td>
+                                <td class="receipt-item-sum">${subtotal} с</td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    itemsListHtml = `
+                        <tr>
+                            <td colspan="3" style="color:var(--text-muted); text-align:center; padding:12px 0;">
+                                Состав корзины не указан
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                const totalSum = (Number(order.total_price) || 0).toLocaleString('ru-RU');
+                const cleanPhone = (order.phone || '').replace(/[^\d\+]/g, '');
+                const clientName = safeHtml(order.client_name || 'Гость');
+                const restaurant = safeHtml(order.restaurant || 'Не указан');
+                const address = safeHtml(order.address || 'Не указан');
+                const comment = safeHtml(order.comment || 'Нет');
+                const dateFormatted = formatOrderDateTime(order.created_at);
+
+                // Ссылка на 2ГИС
+                let gisLinkHtml = '';
+                if (order.dest_lat && order.dest_lon) {
+                    const gisUrl = `https://2gis.kg/geo/${order.dest_lon},${order.dest_lat}`;
+                    gisLinkHtml = `<a href="${gisUrl}" target="_blank" class="drawer-action-btn gis-btn">🗺️ 2GIS Маршрут</a>`;
+                }
+
+                // Кнопка связи в Telegram
+                let tgLinkHtml = '';
+                if (order.client_id && String(order.client_id) !== '111') {
+                    tgLinkHtml = `<a href="tg://user?id=${order.client_id}" class="drawer-action-btn tg-btn">💬 Telegram</a>`;
+                }
+
+                // Кнопка звонка
+                let callBtnHtml = '';
+                if (cleanPhone) {
+                    callBtnHtml = `<a href="tel:${cleanPhone}" class="drawer-action-btn call-btn">📞 Позвонить</a>`;
+                }
+
+                body.innerHTML = `
+                    <!-- 1. Заведение и Время -->
+                    <div class="drawer-section">
+                        <div class="drawer-section-title">🏪 Ресторан & Время</div>
+                        <div class="drawer-info-row">
+                            <span class="drawer-info-label">Заведение:</span>
+                            <span class="drawer-info-value" style="color:var(--primary);">${restaurant}</span>
+                        </div>
+                        <div class="drawer-info-row">
+                            <span class="drawer-info-label">Создан:</span>
+                            <span class="drawer-info-value">${dateFormatted}</span>
+                        </div>
+                        <div class="drawer-info-row">
+                            <span class="drawer-info-label">ID заказа:</span>
+                            <span class="drawer-info-value">#${order.id}</span>
+                        </div>
+                    </div>
+
+                    <!-- 2. Клиент и Связь -->
+                    <div class="drawer-section">
+                        <div class="drawer-section-title">👤 Данные клиента</div>
+                        <div class="drawer-info-row">
+                            <span class="drawer-info-label">Имя:</span>
+                            <span class="drawer-info-value">${clientName}</span>
+                        </div>
+                        <div class="drawer-info-row">
+                            <span class="drawer-info-label">Телефон:</span>
+                            <span class="drawer-info-value">
+                                ${cleanPhone ? `<a href="tel:${cleanPhone}" class="drawer-phone-link">${safeHtml(order.phone)}</a>` : 'Не указан'}
+                            </span>
+                        </div>
+                        <div class="drawer-action-links">
+                            ${callBtnHtml}
+                            ${tgLinkHtml}
+                        </div>
+                    </div>
+
+                    <!-- 3. Адрес и Логистика -->
+                    <div class="drawer-section">
+                        <div class="drawer-section-title">📍 Адрес доставки</div>
+                        <div class="drawer-info-row">
+                            <span class="drawer-info-label">Адрес:</span>
+                            <span class="drawer-info-value" style="color:#fff;">${address}</span>
+                        </div>
+                        <div class="drawer-info-row">
+                            <span class="drawer-info-label">Детали:</span>
+                            <span class="drawer-info-value" style="font-size:12px; color:var(--text-secondary);">${comment}</span>
+                        </div>
+                        <div class="drawer-info-row">
+                            <span class="drawer-info-label">Курьер:</span>
+                            <span class="drawer-info-value">${order.courier_id ? 'ID: ' + order.courier_id : '⚠️ Не назначен'}</span>
+                        </div>
+                        ${gisLinkHtml ? `<div class="drawer-action-links">${gisLinkHtml}</div>` : ''}
+                    </div>
+
+                    <!-- 4. Состав заказа / Чек -->
+                    <div class="drawer-section">
+                        <div class="drawer-section-title">🛒 Состав корзины</div>
+                        <table class="receipt-table">
+                            <thead>
+                                <tr>
+                                    <th>Блюдо</th>
+                                    <th style="text-align:center;">Кол-во</th>
+                                    <th style="text-align:right;">Сумма</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${itemsListHtml}
+                            </tbody>
+                        </table>
+                        <div class="receipt-total-row">
+                            <span>Итого к оплате:</span>
+                            <span class="receipt-total-val">${totalSum} сом</span>
+                        </div>
+                    </div>
+
+                    <!-- 5. Экстренные действия администратора -->
+                    <div class="drawer-section">
+                        <div class="drawer-section-title">⚡ Управление заказом</div>
+                        <div class="drawer-footer-actions">
+                            <button class="emergency-btn cancel" onclick="OrdersStore.cancelOrder(${order.id})">
+                                ❌ Отменить заказ
+                            </button>
+                            <button class="emergency-btn complete" onclick="OrdersStore.completeOrder(${order.id})">
+                                ✅ Доставлен
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+        };
+
+        // ==========================================================
+        // 5. СИСТЕМА АВТОРИЗАЦИИ PIN-КОДОМ
         // ==========================================================
         const PinAuth = {
-            MASTER_PIN: '7777', // Мастер PIN-код администратора по умолчанию
+            MASTER_PIN: '7777',
             currentInput: '',
             SESSION_KEY: 'tamak_admin_session_auth',
 
             init() {
-                // Проверяем сохраненную сессию
                 if (sessionStorage.getItem(this.SESSION_KEY) === 'true') {
                     this.unlock();
                 } else {
                     this.lock();
                 }
 
-                // Слушатель физической клавиатуры
                 window.addEventListener('keydown', (e) => {
                     if (document.getElementById('lock-screen').classList.contains('unlocked')) return;
                     if (e.key >= '0' && e.key <= '9') {
@@ -1068,7 +2138,9 @@
                 this.updateDots();
                 this.hideError();
 
-                // Обновляем размер карты после скрытия замка
+                // Инициализируем загрузку данных из Supabase
+                OrdersStore.loadInitialData();
+
                 setTimeout(() => {
                     if (AdminMap.map) AdminMap.map.invalidateSize();
                 }, 300);
@@ -1083,7 +2155,7 @@
         };
 
         // ==========================================================
-        // 2. ИНТЕРАКТИВНАЯ КАРТА БИШКЕКА (LEAFLET)
+        // 6. ИНТЕРАКТИВНАЯ КАРТА БИШКЕКА (LEAFLET)
         // ==========================================================
         const AdminMap = {
             map: null,
@@ -1094,18 +2166,16 @@
             lightLayer: null,
 
             init() {
-                // Создаем темную и стандартную подложки
                 this.darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png', {
                     maxZoom: 19,
-                    attribution: '&copy; CartoDB &copy; OpenStreetMap contributors'
+                    attribution: '&copy; CartoDB &copy; OpenStreetMap'
                 });
 
                 this.lightLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     maxZoom: 19,
-                    attribution: '&copy; OpenStreetMap contributors'
+                    attribution: '&copy; OpenStreetMap'
                 });
 
-                // Инициализируем карту
                 this.map = L.map('map', {
                     center: this.BISHKEK_COORDS,
                     zoom: this.DEFAULT_ZOOM,
@@ -1113,7 +2183,6 @@
                     layers: [this.darkLayer]
                 });
 
-                // Zoom control в правом нижнем углу
                 L.control.zoom({ position: 'bottomright' }).addTo(this.map);
             },
 
@@ -1139,32 +2208,7 @@
         };
 
         // ==========================================================
-        // 3. УПРАВЛЕНИЕ САЙДБАРОМ
-        // ==========================================================
-        const SidebarUI = {
-            isCollapsed: false,
-            currentTab: 'active',
-
-            toggle() {
-                const sidebar = document.getElementById('sidebar');
-                sidebar.classList.toggle('collapsed');
-                this.isCollapsed = sidebar.classList.contains('collapsed');
-
-                // Пересчитываем Leaflet карту при сворачивании панели
-                setTimeout(() => {
-                    if (AdminMap.map) AdminMap.map.invalidateSize();
-                }, 310);
-            },
-
-            setTab(button, tabKey) {
-                document.querySelectorAll('.feed-tab').forEach(b => b.classList.remove('active'));
-                button.classList.add('active');
-                this.currentTab = tabKey;
-            }
-        };
-
-        // ==========================================================
-        // 4. ЧАСЫ И ИНИЦИАЛИЗАЦИЯ
+        // 7. ЧАСЫ И СТАРТ ПРИЛОЖЕНИЯ
         // ==========================================================
         function updateBishkekClock() {
             const now = new Date();
@@ -1174,14 +2218,10 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Запуск часов
             updateBishkekClock();
             setInterval(updateBishkekClock, 1000);
 
-            // Инициализация карты
             AdminMap.init();
-
-            // Инициализация авторизации
             PinAuth.init();
         });
     </script>
