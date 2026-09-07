@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TamakKG | Панель Администратора & Диспетчер</title>
+
+    <!-- Leaflet Map CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        :root {
+            --bg-base: #0c0d12;
+            --bg-surface: #14161f;
+            --bg-card: #1c1e2b;
+            --bg-card-hover: #242738;
+            --border-color: #2b2e40;
+            --border-highlight: #3b3f57;
+            
+            --primary: #FCE000;
+            --primary-hover: #E5CB00;
+            --text-main: #FFFFFF;
+            --text-secondary: #9499B0;
+            --text-muted: #656980;
+
+            --status-waiting: #FFB300;
+            --status-paid: #29B6F6;
+            --status-cooking: #FF7043;
+            --status-delivery: #AB47BC;
+            --status-completed: #26A69A;
+            --status-canceled: #EF5350;
+
+            --sidebar-width: 360px;
+            --header-height: 60px;
+            --kpi-height: 80px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ==========================================================
+           1. ЭКРАН БЛОКИРОВКИ С PIN-КОДОМ (LOCK SCREEN)
+           ========================================================== */
+        #lock-screen {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 11, 16, 0.94);
+            backdrop-filter: blur(14px);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            transition: opacity 0.35s ease, visibility 0.35s ease;
+        }
+
+        #lock-screen.unlocked {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .lock-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 36px 30px;
+            width: 100%;
+            max-width: 380px;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+            animation: cardAppear 0.4s ease-out;
+        }
+
+        @keyframes cardAppear {
+            from { opacity: 0; transform: translateY(20px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .lock-icon-wrap {
+            width: 68px;
+            height: 68px;
+            border-radius: 20px;
+            background: rgba(252, 224, 0, 0.12);
+            border: 1px solid rgba(252, 224, 0, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px auto;
+            font-size: 30px;
+            color: var(--primary);
+        }
+
+        .lock-title {
+            font-size: 22px;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -0.3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .lock-badge {
+            background: var(--primary);
+            color: #000;
+            font-size: 11px;
+            font-weight: 900;
+            padding: 3px 8px;
+            border-radius: 6px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .lock-subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 6px;
+            margin-bottom: 24px;
+        }
+
+        /* Индикаторы ввода PIN */
+        .pin-dots {
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+
+        .pin-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid var(--border-highlight);
+            background: transparent;
+            transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .pin-dot.filled {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 0 12px rgba(252, 224, 0, 0.6);
+            transform: scale(1.15);
+        }
+
+        .pin-error-msg {
+            color: var(--status-canceled);
+            font-size: 13px;
+            font-weight: 700;
+            min-height: 20px;
+            margin-bottom: 12px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .pin-error-msg.visible {
+            opacity: 1;
+        }
+
+        /* Экранный NumPad */
+        .pin-keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .pin-key {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: #fff;
+            border-radius: 16px;
+            padding: 16px 0;
+            font-size: 20px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pin-key:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-highlight);
+            transform: translateY(-2px);
+        }
+
+        .pin-key:active {
+            transform: scale(0.95);
+            background: rgba(252, 224, 0, 0.15);
+            border-color: var(--primary);
+        }
+
+        .pin-key.key-action {
+            background: transparent;
+            border-color: transparent;
+            color: var(--text-secondary);
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .pin-key.key-action:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+        }
+
+        .shake-animation {
+            animation: shake 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-3px, 0, 0); }
+            20%, 80% { transform: translate3d(5px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+            40%, 60% { transform: translate3d(6px, 0, 0); }
+        }
+
+        /* ==========================================================
+           2. ШАПКА ДИСПЕТЧЕРА (HEADER)
+           ========================================================== */
+        header {
+            height: var(--header-height);
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            flex-shrink: 0;
+            z-index: 1000;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.2px;
+        }
+
+        .header-badge {
+            background: var(--primary);
+            color: #000;
+            font-size: 10px;
+            font-weight: 900;
+            padding: 3px 7px;
+            border-radius: 5px;
+            text-transform: uppercase;
+        }
+
+        .sys-status-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(38, 166, 154, 0.12);
+            border: 1px solid rgba(38, 166, 154, 0.3);
+            color: #4DB6AC;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #26A69A;
+            box-shadow: 0 0 8px #26A69A;
+            animation: blinkDot 1.8s infinite;
+        }
+
+        @keyframes blinkDot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        .header-center {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .live-clock-widget {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 600;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 6px 14px;
+            border-radius: 12px;
+        }
+
+        .live-clock-time {
+            color: #fff;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
+
+        .visitors-widget {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(41, 182, 246, 0.12);
+            border: 1px solid rgba(41, 182, 246, 0.3);
+            color: #81D4FA;
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .hdr-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 7px 12px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .hdr-btn:hover {
+            background: var(--bg-card-hover);
+            color: #fff;
+            border-color: var(--border-highlight);
+        }
+
+        .hdr-btn:active {
+            transform: scale(0.96);
+        }
+
+        .hdr-btn.lock-btn {
+            color: var(--status-canceled);
+            border-color: rgba(239, 83, 80, 0.3);
+        }
+
+        .hdr-btn.lock-btn:hover {
+            background: rgba(239, 83, 80, 0.15);
+        }
+
+        /* ==========================================================
+           3. СЕТКА ПОКАЗАТЕЛЕЙ KPI (KPI BAR)
+           ========================================================== */
+        .kpi-container {
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border-color);
+            padding: 10px 20px;
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            flex-shrink: 0;
+            scrollbar-width: none;
+        }
+
+        .kpi-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 10px 16px;
+            min-width: 150px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--card-accent, var(--border-highlight));
+        }
+
+        .kpi-card:hover {
+            border-color: var(--border-highlight);
+            transform: translateY(-1px);
+        }
+
+        .kpi-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .kpi-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .kpi-icon {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .kpi-value {
+            font-size: 18px;
+            font-weight: 800;
+            color: #fff;
+            line-height: 1.2;
+        }
+
+        .kpi-subtext {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* KPI Цвета */
+        .kpi-card.revenue { --card-accent: var(--primary); }
+        .kpi-card.revenue .kpi-value { color: var(--primary); }
+        .kpi-card.waiting { --card-accent: var(--status-waiting); }
+        .kpi-card.cooking { --card-accent: var(--status-cooking); }
+        .kpi-card.delivery { --card-accent: var(--status-delivery); }
+        .kpi-card.completed { --card-accent: var(--status-completed); }
+        .kpi-card.canceled { --card-accent: var(--status-canceled); }
+        .kpi-card.couriers { --card-accent: #00E676; }
+
+        /* ==========================================================
+           4. ОСНОВНАЯ РАБОЧАЯ ОБЛАСТЬ: САЙДБАР + КАРТА
+           ========================================================== */
+        .workspace {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Боковая лента заказов */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-surface);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            z-index: 500;
+            transition: transform 0.3s ease, width 0.3s ease;
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+            width: 0;
+            border-right: none;
+        }
+
+        .sidebar-header {
+            padding: 14px 16px 10px 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sidebar-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .orders-count-badge {
+            background: var(--bg-card);
+            border: 1px solid var(--border-highlight);
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 12px;
+        }
+
+        .sidebar-collapse-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px;
+            border-radius: 6px;
+        }
+
+        .sidebar-collapse-btn:hover {
+            color: #fff;
+            background: var(--bg-card);
+        }
+
+        /* Вкладки фильтрации */
+        .feed-tabs {
+            display: flex;
+            padding: 8px 12px;
+            gap: 6px;
+            overflow-x: auto;
+            border-bottom: 1px solid var(--border-color);
+            scrollbar-width: none;
+        }
+
+        .feed-tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .feed-tab {
+            background: var(--bg-card);
+            border: 1px solid transparent;
+            color: var(--text-secondary);
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .feed-tab:hover {
+            color: #fff;
+            background: var(--bg-card-hover);
+        }
+
+        .feed-tab.active {
+            background: rgba(252, 224, 0, 0.15);
+            border-color: rgba(252, 224, 0, 0.4);
+            color: var(--primary);
+        }
+
+        /* Поле быстрого поиска */
+        .search-bar-wrap {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 8px 12px 8px 34px;
+            font-size: 13px;
+            color: #fff;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+        }
+
+        .search-icon-svg {
+            position: absolute;
+            left: 24px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            pointer-events: none;
+            font-size: 14px;
+        }
+
+        /* Контейнер списка заказов */
+        .orders-feed-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* Пустое состояние ленты (Empty State) */
+        .feed-empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            min-height: 260px;
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-icon {
+            font-size: 40px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        .empty-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .empty-desc {
+            font-size: 12px;
+            max-width: 240px;
+            line-height: 1.4;
+        }
+
+        /* ==========================================================
+           5. ОБЛАСТЬ КАРТЫ (MAP CONTAINER)
+           ========================================================== */
+        .map-wrapper {
+            flex-grow: 1;
+            position: relative;
+            background: #0d0f14;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #0c0d12;
+        }
+
+        /* Плавающая панель на карте (Floating Map Badge) */
+        .map-floating-panel {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            z-index: 400;
+            background: rgba(20, 22, 31, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        .map-floating-title {
+            font-size: 13px;
+            font-weight: 800;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .map-layer-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .map-layer-btn:hover {
+            color: #fff;
+            background: var(--bg-card-hover);
+        }
+
+        /* Плавающая кнопка развертывания сайдбара */
+        .sidebar-uncollapse-btn {
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            z-index: 450;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+            display: none;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .sidebar.collapsed ~ .map-wrapper .sidebar-uncollapse-btn {
+            display: flex;
+        }
+
+        /* Адаптив для планшетов и мобильных */
+        @media (max-width: 900px) {
+            .sidebar {
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                z-index: 600;
+                box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ==========================================================
+         1. ЭКРАН БЛОКИРОВКИ С PIN-КОДОМ
+         ========================================================== -->
+    <div id="lock-screen">
+        <div class="lock-card" id="lock-card">
+            <div class="lock-icon-wrap">🔒</div>
+            <div class="lock-title">
+                TamakKG
+                <span class="lock-badge">Диспетчер</span>
+            </div>
+            <p class="lock-subtitle">Введите 4-значный PIN-код для входа в панель</p>
+
+            <!-- 4 точки индикатора -->
+            <div class="pin-dots">
+                <div class="pin-dot" id="dot-0"></div>
+                <div class="pin-dot" id="dot-1"></div>
+                <div class="pin-dot" id="dot-2"></div>
+                <div class="pin-dot" id="dot-3"></div>
+            </div>
+
+            <!-- Сообщение об ошибке -->
+            <div class="pin-error-msg" id="pin-error">Неверный PIN-код</div>
+
+            <!-- Цифровой блок NumPad -->
+            <div class="pin-keypad">
+                <button class="pin-key" onclick="PinAuth.addDigit('1')">1</button>
+                <button class="pin-key" onclick="PinAuth.addDigit('2')">2</button>
+                <button class="pin-key" onclick="PinAuth.addDigit('3')">3</button>
+                <button class="pin-key" onclick="PinAuth.addDigit('4')">4</button>
+                <button class="pin-key" onclick="PinAuth.addDigit('5')">5</button>
+                <button class="pin-key" onclick="PinAuth.addDigit('6')">6</button>
+                <button class="pin-key" onclick="PinAuth.addDigit('7')">7</button>
+                <button class="pin-key" onclick="PinAuth.addDigit('8')">8</button>
+                <button class="pin-key" onclick="PinAuth.addDigit('9')">9</button>
+                <button class="pin-key key-action" onclick="PinAuth.clear()">C</button>
+                <button class="pin-key" onclick="PinAuth.addDigit('0')">0</button>
+                <button class="pin-key key-action" onclick="PinAuth.deleteDigit()">⌫</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================================
+         2. ВЕРХНИЙ ИНФОРМАЦИОННЫЙ БАР (HEADER)
+         ========================================================== -->
+    <header>
+        <div class="header-left">
+            <div class="header-brand">
+                🛵 TamakKG
+                <span class="header-badge">Admin</span>
+            </div>
+            <div class="sys-status-chip">
+                <div class="pulse-dot"></div>
+                <span>Система онлайн</span>
+            </div>
+        </div>
+
+        <div class="header-center">
+            <div class="live-clock-widget">
+                <span>🕒 Бишкек:</span>
+                <span class="live-clock-time" id="clock-time">--:--:--</span>
+            </div>
+            <div class="visitors-widget">
+                <span>👥 Онлайн на сайте:</span>
+                <span id="online-visitors-val">--</span>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <button class="hdr-btn" onclick="AdminMap.centerBishkek()" title="Центрировать на Бишкеке">
+                🎯 Центр
+            </button>
+            <button class="hdr-btn" id="theme-toggle-btn" onclick="AdminMap.toggleTileLayer()" title="Сменить стиль карты">
+                🗺️ Слой
+            </button>
+            <button class="hdr-btn lock-btn" onclick="PinAuth.lock()" title="Заблокировать панель">
+                🔒 Замок
+            </button>
+        </div>
+    </header>
+
+    <!-- ==========================================================
+         3. ПАНЕЛЬ ПОКАЗАТЕЛЕЙ KPI
+         ========================================================== -->
+    <section class="kpi-container">
+        <!-- 1. Выручка за смену -->
+        <div class="kpi-card revenue">
+            <div class="kpi-title-row">
+                <span class="kpi-label">Выручка за смену</span>
+                <span class="kpi-icon">💰</span>
+            </div>
+            <div class="kpi-value" id="kpi-revenue">0 сом</div>
+            <div class="kpi-subtext" id="kpi-orders-count">0 доставленных чеков</div>
+        </div>
+
+        <!-- 2. В ожидании оплаты -->
+        <div class="kpi-card waiting">
+            <div class="kpi-title-row">
+                <span class="kpi-label">Ждут оплаты</span>
+                <span class="kpi-icon">⏳</span>
+            </div>
+            <div class="kpi-value" id="kpi-waiting">0</div>
+            <div class="kpi-subtext">waiting_payment</div>
+        </div>
+
+        <!-- 3. На кухне / Готовятся -->
+        <div class="kpi-card cooking">
+            <div class="kpi-title-row">
+                <span class="kpi-label">На кухне</span>
+                <span class="kpi-icon">👨‍🍳</span>
+            </div>
+            <div class="kpi-value" id="kpi-cooking">0</div>
+            <div class="kpi-subtext">paid / cooking</div>
+        </div>
+
+        <!-- 4. В доставке -->
+        <div class="kpi-card delivery">
+            <div class="kpi-title-row">
+                <span class="kpi-label">В доставке</span>
+                <span class="kpi-icon">🛵</span>
+            </div>
+            <div class="kpi-value" id="kpi-delivery">0</div>
+            <div class="kpi-subtext">delivery у курьеров</div>
+        </div>
+
+        <!-- 5. Доставлено сегодня -->
+        <div class="kpi-card completed">
+            <div class="kpi-title-row">
+                <span class="kpi-label">Доставлено</span>
+                <span class="kpi-icon">✅</span>
+            </div>
+            <div class="kpi-value" id="kpi-completed">0</div>
+            <div class="kpi-subtext">за сегодняшнюю смену</div>
+        </div>
+
+        <!-- 6. Отменено -->
+        <div class="kpi-card canceled">
+            <div class="kpi-title-row">
+                <span class="kpi-label">Отменено</span>
+                <span class="kpi-icon">❌</span>
+            </div>
+            <div class="kpi-value" id="kpi-canceled">0</div>
+            <div class="kpi-subtext">отмены и отказы</div>
+        </div>
+
+        <!-- 7. Курьеры -->
+        <div class="kpi-card couriers">
+            <div class="kpi-title-row">
+                <span class="kpi-label">Курьеры</span>
+                <span class="kpi-icon">🛵</span>
+            </div>
+            <div class="kpi-value" id="kpi-couriers-online">0 на линии</div>
+            <div class="kpi-subtext" id="kpi-couriers-total">из 0 зарегистрированных</div>
+        </div>
+    </section>
+
+    <!-- ==========================================================
+         4. РАБОЧАЯ ОБЛАСТЬ (САЙДБАР + КАРТА)
+         ========================================================== -->
+    <main class="workspace">
+        <!-- Боковая лента заказов -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">
+                    📋 Лента заказов
+                    <span class="orders-count-badge" id="sidebar-counter">0</span>
+                </div>
+                <button class="sidebar-collapse-btn" onclick="SidebarUI.toggle()" title="Свернуть ленту">
+                    ◀
+                </button>
+            </div>
+
+            <!-- Вкладки фильтров -->
+            <div class="feed-tabs">
+                <button class="feed-tab active" data-filter="active" onclick="SidebarUI.setTab(this, 'active')">🔥 В работе</button>
+                <button class="feed-tab" data-filter="waiting" onclick="SidebarUI.setTab(this, 'waiting')">⏳ Ожидание</button>
+                <button class="feed-tab" data-filter="completed" onclick="SidebarUI.setTab(this, 'completed')">✅ Доставлены</button>
+                <button class="feed-tab" data-filter="canceled" onclick="SidebarUI.setTab(this, 'canceled')">❌ Отмены</button>
+                <button class="feed-tab" data-filter="all" onclick="SidebarUI.setTab(this, 'all')">Все</button>
+            </div>
+
+            <!-- Быстрый поиск -->
+            <div class="search-bar-wrap">
+                <span class="search-icon-svg">🔍</span>
+                <input type="text" class="search-input" id="search-input" placeholder="Поиск по чеку, клиенту, телефону...">
+            </div>
+
+            <!-- Список заказов (Placeholder для Шага 1) -->
+            <div class="orders-feed-list" id="orders-feed">
+                <div class="feed-empty-state">
+                    <div class="empty-icon">📦</div>
+                    <div class="empty-title">Ожидание заказов</div>
+                    <div class="empty-desc">Заказы будут поступать в ленту в режиме реального времени</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Область карты -->
+        <section class="map-wrapper">
+            <!-- Кнопка развернуть ленту при сворачивании -->
+            <button class="sidebar-uncollapse-btn" onclick="SidebarUI.toggle()">
+                ▶ Показать ленту
+            </button>
+
+            <!-- Плавающий бейдж локации -->
+            <div class="map-floating-panel">
+                <div class="map-floating-title">
+                    📍 Бишкек, Чуй
+                </div>
+                <button class="map-layer-btn" onclick="AdminMap.toggleTileLayer()">
+                    Сменить тему
+                </button>
+            </div>
+
+            <!-- Контейнер Leaflet Карты -->
+            <div id="map"></div>
+        </section>
+    </main>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Изолированная логика интерфейса (Шаг 1) -->
+    <script>
+        // ==========================================================
+        // 1. СИСТЕМА АВТОРИЗАЦИИ PIN-КОДОМ
+        // ==========================================================
+        const PinAuth = {
+            MASTER_PIN: '7777', // Мастер PIN-код администратора по умолчанию
+            currentInput: '',
+            SESSION_KEY: 'tamak_admin_session_auth',
+
+            init() {
+                // Проверяем сохраненную сессию
+                if (sessionStorage.getItem(this.SESSION_KEY) === 'true') {
+                    this.unlock();
+                } else {
+                    this.lock();
+                }
+
+                // Слушатель физической клавиатуры
+                window.addEventListener('keydown', (e) => {
+                    if (document.getElementById('lock-screen').classList.contains('unlocked')) return;
+                    if (e.key >= '0' && e.key <= '9') {
+                        this.addDigit(e.key);
+                    } else if (e.key === 'Backspace') {
+                        this.deleteDigit();
+                    } else if (e.key === 'Escape' || e.key.toLowerCase() === 'c') {
+                        this.clear();
+                    }
+                });
+            },
+
+            addDigit(digit) {
+                if (this.currentInput.length >= 4) return;
+                this.currentInput += digit;
+                this.updateDots();
+
+                if (this.currentInput.length === 4) {
+                    setTimeout(() => this.verify(), 150);
+                }
+            },
+
+            deleteDigit() {
+                if (this.currentInput.length === 0) return;
+                this.currentInput = this.currentInput.slice(0, -1);
+                this.updateDots();
+                this.hideError();
+            },
+
+            clear() {
+                this.currentInput = '';
+                this.updateDots();
+                this.hideError();
+            },
+
+            updateDots() {
+                for (let i = 0; i < 4; i++) {
+                    const dot = document.getElementById(`dot-${i}`);
+                    if (i < this.currentInput.length) {
+                        dot.classList.add('filled');
+                    } else {
+                        dot.classList.remove('filled');
+                    }
+                }
+            },
+
+            verify() {
+                if (this.currentInput === this.MASTER_PIN) {
+                    sessionStorage.setItem(this.SESSION_KEY, 'true');
+                    this.unlock();
+                } else {
+                    this.showError();
+                    this.currentInput = '';
+                    this.updateDots();
+                }
+            },
+
+            showError() {
+                const card = document.getElementById('lock-card');
+                const errMsg = document.getElementById('pin-error');
+                errMsg.classList.add('visible');
+                card.classList.add('shake-animation');
+                setTimeout(() => card.classList.remove('shake-animation'), 400);
+            },
+
+            hideError() {
+                document.getElementById('pin-error').classList.remove('visible');
+            },
+
+            unlock() {
+                const lockScreen = document.getElementById('lock-screen');
+                lockScreen.classList.add('unlocked');
+                this.currentInput = '';
+                this.updateDots();
+                this.hideError();
+
+                // Обновляем размер карты после скрытия замка
+                setTimeout(() => {
+                    if (AdminMap.map) AdminMap.map.invalidateSize();
+                }, 300);
+            },
+
+            lock() {
+                sessionStorage.removeItem(this.SESSION_KEY);
+                const lockScreen = document.getElementById('lock-screen');
+                lockScreen.classList.remove('unlocked');
+                this.clear();
+            }
+        };
+
+        // ==========================================================
+        // 2. ИНТЕРАКТИВНАЯ КАРТА БИШКЕКА (LEAFLET)
+        // ==========================================================
+        const AdminMap = {
+            map: null,
+            BISHKEK_COORDS: [42.8746, 74.5698],
+            DEFAULT_ZOOM: 13,
+            currentTheme: 'dark',
+            darkLayer: null,
+            lightLayer: null,
+
+            init() {
+                // Создаем темную и стандартную подложки
+                this.darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; CartoDB &copy; OpenStreetMap contributors'
+                });
+
+                this.lightLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap contributors'
+                });
+
+                // Инициализируем карту
+                this.map = L.map('map', {
+                    center: this.BISHKEK_COORDS,
+                    zoom: this.DEFAULT_ZOOM,
+                    zoomControl: false,
+                    layers: [this.darkLayer]
+                });
+
+                // Zoom control в правом нижнем углу
+                L.control.zoom({ position: 'bottomright' }).addTo(this.map);
+            },
+
+            centerBishkek() {
+                if (!this.map) return;
+                this.map.flyTo(this.BISHKEK_COORDS, this.DEFAULT_ZOOM, { duration: 1 });
+            },
+
+            toggleTileLayer() {
+                if (!this.map) return;
+                if (this.currentTheme === 'dark') {
+                    this.map.removeLayer(this.darkLayer);
+                    this.map.addLayer(this.lightLayer);
+                    this.currentTheme = 'light';
+                    document.getElementById('theme-toggle-btn').innerText = '☀️ Светлая';
+                } else {
+                    this.map.removeLayer(this.lightLayer);
+                    this.map.addLayer(this.darkLayer);
+                    this.currentTheme = 'dark';
+                    document.getElementById('theme-toggle-btn').innerText = '🌙 Темная';
+                }
+            }
+        };
+
+        // ==========================================================
+        // 3. УПРАВЛЕНИЕ САЙДБАРОМ
+        // ==========================================================
+        const SidebarUI = {
+            isCollapsed: false,
+            currentTab: 'active',
+
+            toggle() {
+                const sidebar = document.getElementById('sidebar');
+                sidebar.classList.toggle('collapsed');
+                this.isCollapsed = sidebar.classList.contains('collapsed');
+
+                // Пересчитываем Leaflet карту при сворачивании панели
+                setTimeout(() => {
+                    if (AdminMap.map) AdminMap.map.invalidateSize();
+                }, 310);
+            },
+
+            setTab(button, tabKey) {
+                document.querySelectorAll('.feed-tab').forEach(b => b.classList.remove('active'));
+                button.classList.add('active');
+                this.currentTab = tabKey;
+            }
+        };
+
+        // ==========================================================
+        // 4. ЧАСЫ И ИНИЦИАЛИЗАЦИЯ
+        // ==========================================================
+        function updateBishkekClock() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('ru-RU', { hour12: false });
+            const clockEl = document.getElementById('clock-time');
+            if (clockEl) clockEl.innerText = timeStr;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Запуск часов
+            updateBishkekClock();
+            setInterval(updateBishkekClock, 1000);
+
+            // Инициализация карты
+            AdminMap.init();
+
+            // Инициализация авторизации
+            PinAuth.init();
+        });
+    </script>
+</body>
+</html>
