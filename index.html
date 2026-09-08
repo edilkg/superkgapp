@@ -1320,13 +1320,6 @@
             if (!isOutOfTown) {
                 // Чистый город: все км сверх 1-го по городскому тарифу
                 cityKm = extraTotal;
-            } else if (cfg.calcMode === 'flat') {
-                // Единый тариф по дальней зоне
-                if (isPurple) {
-                    superKm = extraTotal;
-                } else {
-                    outKm = extraTotal;
-                }
             } else {
                 // Раздельный расчет по зонам пути: город + красная + фиолетовая
                 const dMin = Math.min(dRes, dClient);

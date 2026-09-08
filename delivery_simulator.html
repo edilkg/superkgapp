@@ -358,28 +358,6 @@
             color: #555;
         }
 
-        /* Calculation Mode Switcher */
-        .calc-mode-box {
-            margin-top: 8px;
-            background: #F8F9FA;
-            border: 1px solid #E0E2E6;
-            border-radius: 8px;
-            padding: 6px 10px;
-            font-size: 11px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .calc-mode-select {
-            font-size: 11px;
-            font-weight: 700;
-            padding: 3px 6px;
-            border-radius: 6px;
-            border: 1px solid #CED4DA;
-            background: #fff;
-            cursor: pointer;
-        }
-
         /* Sidebar Tabs */
         .sidebar-tabs {
             display: flex;
@@ -752,15 +730,6 @@
                             <span class="tariff-mini-unit">сом</span>
                         </div>
                     </div>
-                </div>
-
-                <!-- Calculation Model Switcher -->
-                <div class="calc-mode-box">
-                    <span><b>Модель расчёта за городом:</b></span>
-                    <select id="select-calc-mode" class="calc-mode-select" onchange="onCalcModeChange(this.value)">
-                        <option value="split" selected id="opt-mode-split">Раздельный (город 17с + красная 29с + супер 43с)</option>
-                        <option value="flat" id="opt-mode-flat">Единый (все км по тарифу зоны)</option>
-                    </select>
                 </div>
 
                 <!-- Главная кнопка сохранения тарифа -->
@@ -2000,21 +1969,8 @@
                 outKm = 0;
                 superKm = 0;
                 kmFee = cityKm * config.rateCity;
-            } else if (config.calcMode === 'flat') {
-                // 2. Единая модель (все км по тарифу наивысшей зоны)
-                if (isPurple) {
-                    cityKm = 0;
-                    outKm = 0;
-                    superKm = extraKmTotal;
-                    kmFee = superKm * config.rateSuper;
-                } else {
-                    cityKm = 0;
-                    outKm = extraKmTotal;
-                    superKm = 0;
-                    kmFee = outKm * config.rateOutOfTown;
-                }
             } else {
-                // 3. Раздельная модель (Сплит): город + загород + суперзагород
+                // 2. Раздельная модель (город + загород + суперзагород)
                 const ry = (rLat - CENTER_LAT) / degLatPerKm;
                 const rx = (rLon - CENTER_LON) / degLonPerKm;
                 const cy = (cLat - CENTER_LAT) / degLatPerKm;
@@ -2183,24 +2139,6 @@
             document.getElementById('txt-start-west').innerText = config.cityWest.toFixed(1);
             document.getElementById('txt-start-south').innerText = config.citySouth.toFixed(1);
 
-            updateCalcModeDropdownLabels();
-        }
-
-        function updateCalcModeDropdownLabels() {
-            const optSplit = document.getElementById('opt-mode-split');
-            const optFlat = document.getElementById('opt-mode-flat');
-            if (optSplit) {
-                optSplit.innerText = `Раздельный: 140с + город ${config.rateCity}с + красная ${config.rateOutOfTown}с + супер ${config.rateSuper}с`;
-            }
-            if (optFlat) {
-                optFlat.innerText = `Единый: 140с + все км по ставке дальней зоны (${config.rateSuper}с)`;
-            }
-        }
-
-        function onCalcModeChange(val) {
-            config.calcMode = val;
-            recalculate();
-            showToast(val === 'split' ? "Включен раздельный расчёт (город + загород + супер)!" : "Включен единый тариф по дальней зоне!");
         }
 
         // --- ИЗМЕНЕНИЕ СЛАЙДЕРОВ ГРАНИЦ И КОРИДОРОВ ---
@@ -2293,12 +2231,21 @@
             document.getElementById('val-rate-outoftown').innerText = config.rateOutOfTown + ' сом / км';
             document.getElementById('val-rate-super').innerText = config.rateSuper + ' сом / км';
             document.getElementById('val-base-fee-setting').innerText = config.baseFee + ' сом';
-            document.getElementById('val-night-fee-setting').innerText = '+' + config.nightFee + ' сом';
+            if (document.getElementById('val-night-fee-setting')) {
+                document.getElementById('val-night-fee-setting').innerHTML = config.nightTariffEnabled !== false 
+                    ? '+' + config.nightFee + ' сом' 
+                    : '<span style="color:#EF4444; font-weight:800;">ОТКЛЮЧЕН</span>';
+            }
             if (document.getElementById('val-deep-night-fee-setting')) {
-                document.getElementById('val-deep-night-fee-setting').innerText = '+' + config.nightFeeDeep + ' сом';
+                document.getElementById('val-deep-night-fee-setting').innerHTML = config.deepNightTariffEnabled !== false 
+                    ? '+' + config.nightFeeDeep + ' сом' 
+                    : '<span style="color:#EF4444; font-weight:800;">ОТКЛЮЧЕН</span>';
+            }
+            if (document.getElementById('header-night-val')) {
+                document.getElementById('header-night-val').innerText = config.nightTariffEnabled !== false ? `+${config.nightFee}с` : 'ВЫКЛ';
             }
             if (document.getElementById('header-deep-night-val')) {
-                document.getElementById('header-deep-night-val').innerText = `+${config.nightFeeDeep}с`;
+                document.getElementById('header-deep-night-val').innerText = config.deepNightTariffEnabled !== false ? `+${config.nightFeeDeep}с` : 'ВЫКЛ';
             }
             document.getElementById('val-door-fee-setting').innerText = '+' + config.doorFee + ' сом';
 
@@ -2536,7 +2483,7 @@
                 `const DEEP_NIGHT_TARIFF_ENABLED = ${config.deepNightTariffEnabled !== false}; // Включен ли Ур.2\n` +
                 `const DOOR_DELIVERY_FEE = ${config.doorFee};          // Доставка до двери\n` +
                 `const YARD_MULTIPLIER = ${config.yardMultiplier || 1.05};       // Дворовый коэфф. Манхэттен (L1)\n` +
-                `const CALC_MODE = '${config.calcMode}';                 // 'split' (раздельный) или 'flat' (единый)\n\n` +
+                `const CALC_MODE = 'split';                              // Раздельный расчет (город + загород + супер)\n\n` +
                 `// ==========================================\n` +
                 `// 0. МЁРТВЫЕ ТОЧКИ ГОРОДСКОГО КВАДРАТА (100% ГОРОД):\n` +
                 `// ==========================================\n` +
@@ -2661,10 +2608,6 @@
             setVal('quick-rate-out', config.rateOutOfTown);
             setVal('quick-rate-super', config.rateSuper);
             setVal('quick-base-fee', config.baseFee);
-
-            // Модель расчета
-            const calcSel = document.getElementById('select-calc-mode');
-            if (calcSel && config.calcMode) calcSel.value = config.calcMode;
 
             // Обновляем бейджи коридоров
             if (document.getElementById('val-city-east')) document.getElementById('val-city-east').innerText = config.cityEast.toFixed(1) + ' км';
