@@ -33,6 +33,7 @@ VALUES (
         "rateSuper": 43,
         "baseFee": 150,
         "nightFee": 50,
+        "nightFeeDeep": 50,
         "doorFee": 50,
         "yardMultiplier": 1.05,
         "calcMode": "split",

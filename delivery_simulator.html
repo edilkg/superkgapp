@@ -624,9 +624,14 @@
                 <span id="road-coef-text" style="font-weight: 900;">Манхэттен L1 (×1.05)</span>
             </div>
 
-            <!-- Night tariff toggle -->
-            <div class="toggle-chip" id="toggle-night" onclick="toggleNightTariff()">
-                <span>🌙 Ночной (<span id="header-night-val">+50с</span>)</span>
+            <!-- Night tariff Level 1 toggle (22:00 - 06:00) -->
+            <div class="toggle-chip" id="toggle-night" onclick="toggleNightTariff()" title="1-й уровень ночи (22:00 - 06:00)">
+                <span>🌙 Ночь 22:00+ (<span id="header-night-val">+50с</span>)</span>
+            </div>
+
+            <!-- Deep night tariff Level 2 toggle (после 24:00 / с 00:00 до 06:00) -->
+            <div class="toggle-chip" id="toggle-deep-night" onclick="toggleDeepNightTariff()" title="2-й уровень: глубокая ночь после 24:00 (+50с еще сверху)">
+                <span>🌌 Полночь 00:00+ (<span id="header-deep-night-val">+50с</span>)</span>
             </div>
 
             <!-- Door delivery toggle -->
@@ -1127,14 +1132,31 @@
                         </div>
                     </div>
 
-                    <!-- 5. НОЧНОЙ ТАРИФ И ДОСТАВКА ДО ДВЕРИ -->
+                    <!-- 5. НОЧНОЙ ТАРИФ (2 УРОВНЯ) И ДОСТАВКА ДО ДВЕРИ -->
                     <div class="corridor-group-box">
                         <div class="slider-group">
                             <div class="slider-header">
-                                <span class="slider-title">🌙 Ночная надбавка (22:00 - 06:00):</span>
+                                <span class="slider-title">🌙 Ночной тариф Ур.1 (22:00 - 06:00):</span>
                                 <span class="slider-val-badge" id="val-night-fee-setting">+50 сом</span>
                             </div>
                             <input type="range" class="slider-input" id="slider-night-fee" min="0" max="150" step="5" value="50" oninput="onTariffChange()">
+                            <div class="slider-desc">Базовая надбавка за ночную доставку с 22:00 вечера до 06:00 утра.</div>
+                        </div>
+
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-title">🌌 Глубокая ночь Ур.2 (00:00 - 06:00, сверх первого уровня):</span>
+                                <span class="slider-val-badge" id="val-deep-night-fee-setting">+50 сом</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-deep-night-fee" min="0" max="150" step="5" value="50" oninput="onTariffChange()">
+                            <div class="slider-desc">Дополнительная сверхнадбавка после 24:00 (суммарно ночью клиент платит +100 сом).</div>
+                            <div class="pills-row">
+                                <button class="pill-btn" onclick="setSlider('slider-deep-night-fee', 0)">0с (Выкл)</button>
+                                <button class="pill-btn" onclick="setSlider('slider-deep-night-fee', 30)">+30с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-deep-night-fee', 50)">+50с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-deep-night-fee', 70)">+70с</button>
+                                <button class="pill-btn" onclick="setSlider('slider-deep-night-fee', 100)">+100с</button>
+                            </div>
                         </div>
 
                         <div class="slider-group">
@@ -1353,7 +1375,8 @@
             rateOutOfTown: 29,   // Загородный тариф / Красные зоны (сом за км)
             rateSuper: 43,       // Суперзагородный тариф / Фиолетовая зона (сом за км)
             baseFee: 150,        // Посадка (первый 1 км)
-            nightFee: 50,        // Ночная надбавка (+50 сом)
+            nightFee: 50,        // Ночная надбавка Ур.1 (22:00 - 06:00, +50 сом)
+            nightFeeDeep: 50,    // Сверхнадбавка Ур.2 (00:00 - 06:00, +50 сом сверху)
             doorFee: 50,         // Доставка до двери (+50 сом)
             yardMultiplier: 1.05, // Дворовый коэффициент Манхэттенской сетки (L1)
 
@@ -1420,6 +1443,7 @@
 
         let useRoadCoef = true;
         let isNightTariff = false;
+        let isDeepNightTariff = false;
         let isDoorDelivery = false;
         let clickMode = 'client'; // 'rest' (Точка А) или 'client' (Точка Б)
 
@@ -1904,7 +1928,7 @@
             const isOutOfTown = !isPurple && (clientCheck.isRed || resCheck.isRed);
 
             let baseFee = config.baseFee;
-            let nightFee = isNightTariff ? config.nightFee : 0;
+            let nightFee = (isNightTariff ? config.nightFee : 0) + (isDeepNightTariff ? config.nightFeeDeep : 0);
             let doorFee = isDoorDelivery ? config.doorFee : 0;
 
             let cityKm = 0;
@@ -2058,13 +2082,21 @@
             config.lastSuperKm = superKm;
             config.lastOutKm = outKm;
 
-            document.getElementById('val-night-fee').innerText = nightFee > 0 ? ("+" + nightFee + " сом") : "0 сом";
+            let nightLabel = "0 сом";
+            if (isNightTariff && isDeepNightTariff) {
+                nightLabel = `+${nightFee} сом (22:00-06:00 + глуб. ночь 00:00-06:00)`;
+            } else if (isNightTariff) {
+                nightLabel = `+${nightFee} сом (ночной 22:00-00:00)`;
+            } else if (isDeepNightTariff) {
+                nightLabel = `+${nightFee} сом (глуб. ночь 00:00-06:00)`;
+            }
+            document.getElementById('val-night-fee').innerText = nightLabel;
             document.getElementById('val-door-fee').innerText = doorFee > 0 ? ("+" + doorFee + " сом") : "0 сом";
 
-            document.getElementById('calc-night-rate').innerText = `+${config.nightFee}с`;
+            document.getElementById('calc-night-rate').innerText = `+${config.nightFee}с / +${config.nightFeeDeep}с`;
             document.getElementById('calc-door-rate').innerText = `+${config.doorFee}с`;
             document.getElementById('header-night-val').innerText = `+${config.nightFee}с`;
-            document.getElementById('header-door-val').innerText = `+${config.doorFee}с`;
+            if (document.getElementById('header-deep-night-val')) document.getElementById('header-deep-night-val').innerText = `+${config.nightFeeDeep}с`;
 
             // Обновляем текст в подсказках секций
             document.getElementById('txt-start-north').innerText = config.cityNorth.toFixed(1);
@@ -2169,6 +2201,8 @@
             config.rateSuper = parseInt(document.getElementById('slider-rate-super').value, 10);
             config.baseFee = parseInt(document.getElementById('slider-base-fee').value, 10);
             config.nightFee = parseInt(document.getElementById('slider-night-fee').value, 10);
+            const deepSlider = document.getElementById('slider-deep-night-fee');
+            if (deepSlider) config.nightFeeDeep = parseInt(deepSlider.value, 10);
             config.doorFee = parseInt(document.getElementById('slider-door-fee').value, 10);
 
             document.getElementById('quick-rate-city').value = config.rateCity;
@@ -2181,6 +2215,12 @@
             document.getElementById('val-rate-super').innerText = config.rateSuper + ' сом / км';
             document.getElementById('val-base-fee-setting').innerText = config.baseFee + ' сом';
             document.getElementById('val-night-fee-setting').innerText = '+' + config.nightFee + ' сом';
+            if (document.getElementById('val-deep-night-fee-setting')) {
+                document.getElementById('val-deep-night-fee-setting').innerText = '+' + config.nightFeeDeep + ' сом';
+            }
+            if (document.getElementById('header-deep-night-val')) {
+                document.getElementById('header-deep-night-val').innerText = `+${config.nightFeeDeep}с`;
+            }
             document.getElementById('val-door-fee-setting').innerText = '+' + config.doorFee + ' сом';
 
             const yardSlider = document.getElementById('slider-yard-multiplier');
@@ -2223,7 +2263,7 @@
             const input = document.getElementById(id);
             if (!input) return;
             input.value = val;
-            if (id.startsWith('slider-rate-') || id.startsWith('slider-base-') || id.startsWith('slider-night-') || id.startsWith('slider-door-') || id.startsWith('slider-yard-')) {
+            if (id.startsWith('slider-rate-') || id.startsWith('slider-base-') || id.startsWith('slider-night-') || id.startsWith('slider-deep-night-') || id.startsWith('slider-door-') || id.startsWith('slider-yard-')) {
                 onTariffChange();
             } else {
                 onConfigChange();
@@ -2336,6 +2376,22 @@
         function toggleNightTariff() {
             isNightTariff = !isNightTariff;
             document.getElementById('toggle-night').classList.toggle('active', isNightTariff);
+            if (!isNightTariff && isDeepNightTariff) {
+                isDeepNightTariff = false;
+                const deepChip = document.getElementById('toggle-deep-night');
+                if (deepChip) deepChip.classList.remove('active');
+            }
+            recalculate();
+        }
+
+        function toggleDeepNightTariff() {
+            isDeepNightTariff = !isDeepNightTariff;
+            const deepChip = document.getElementById('toggle-deep-night');
+            if (deepChip) deepChip.classList.toggle('active', isDeepNightTariff);
+            if (isDeepNightTariff && !isNightTariff) {
+                isNightTariff = true;
+                document.getElementById('toggle-night').classList.add('active');
+            }
             recalculate();
         }
 
@@ -2360,7 +2416,8 @@
                 `const RATE_CITY_PER_KM = ${config.rateCity};           // В городе (за каждый км свыше 1 км)\n` +
                 `const RATE_OUT_OF_TOWN_PER_KM = ${config.rateOutOfTown};    // За городом / Красные зоны (за каждый км свыше 1 км)\n` +
                 `const RATE_SUPER_OUT_OF_TOWN_PER_KM = ${config.rateSuper}; // Суперзагород / Фиолетовая зона (сом за км)\n` +
-                `const NIGHT_TARIFF_FEE = ${config.nightFee};           // Ночной тариф (22:00 - 06:00)\n` +
+                `const NIGHT_TARIFF_FEE = ${config.nightFee};           // Ночной тариф Ур.1 (22:00 - 06:00)\n` +
+                `const DEEP_NIGHT_TARIFF_FEE = ${config.nightFeeDeep || 50}; // Глубокая ночь Ур.2 (00:00 - 06:00)\n` +
                 `const DOOR_DELIVERY_FEE = ${config.doorFee};          // Доставка до двери\n` +
                 `const YARD_MULTIPLIER = ${config.yardMultiplier || 1.05};       // Дворовый коэфф. Манхэттен (L1)\n` +
                 `const CALC_MODE = '${config.calcMode}';                 // 'split' (раздельный) или 'flat' (единый)\n\n` +
@@ -2463,6 +2520,8 @@
             setVal('slider-rate-super', config.rateSuper);
             setVal('slider-base-fee', config.baseFee);
             setVal('slider-night-fee', config.nightFee);
+            if (config.nightFeeDeep === undefined || config.nightFeeDeep === null) config.nightFeeDeep = 50;
+            setVal('slider-deep-night-fee', config.nightFeeDeep);
             setVal('slider-door-fee', config.doorFee);
             if (config.yardMultiplier === undefined || config.yardMultiplier === null) config.yardMultiplier = 1.05;
             setVal('slider-yard-multiplier', config.yardMultiplier);
@@ -2513,10 +2572,11 @@
             if (document.getElementById('val-rate-super')) document.getElementById('val-rate-super').innerText = config.rateSuper + ' сом / км';
             if (document.getElementById('val-base-fee-setting')) document.getElementById('val-base-fee-setting').innerText = config.baseFee + ' сом';
             if (document.getElementById('val-night-fee-setting')) document.getElementById('val-night-fee-setting').innerText = '+' + config.nightFee + ' сом';
+            if (document.getElementById('val-deep-night-fee-setting')) document.getElementById('val-deep-night-fee-setting').innerText = '+' + config.nightFeeDeep + ' сом';
             if (document.getElementById('val-door-fee-setting')) document.getElementById('val-door-fee-setting').innerText = '+' + config.doorFee + ' сом';
             if (document.getElementById('val-yard-multiplier')) document.getElementById('val-yard-multiplier').innerText = '×' + Number(config.yardMultiplier).toFixed(2);
             if (document.getElementById('header-night-val')) document.getElementById('header-night-val').innerText = `+${config.nightFee}с`;
-            if (document.getElementById('header-door-val')) document.getElementById('header-door-val').innerText = `+${config.doorFee}с`;
+            if (document.getElementById('header-deep-night-val')) document.getElementById('header-deep-night-val').innerText = `+${config.nightFeeDeep}с`;
             const roadText = document.getElementById('road-coef-text');
             if (roadText && useRoadCoef) roadText.innerText = `Манхэттен L1 (×${Number(config.yardMultiplier).toFixed(2)})`;
 
