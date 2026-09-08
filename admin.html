@@ -868,6 +868,152 @@
         }
 
         /* ==========================================================
+           5.5. СТИЛИ МАРКЕРОВ LEAFLET
+           ========================================================== */
+        /* Маркер ресторана */
+        .marker-restaurant {
+            background: #1c1e2b;
+            border: 2px solid var(--primary);
+            color: #fff;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.6), 0 0 10px rgba(252, 224, 0, 0.35);
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .marker-restaurant:hover {
+            transform: scale(1.15);
+        }
+        .marker-rest-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #FF7043;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 900;
+            min-width: 18px;
+            height: 18px;
+            border-radius: 9px;
+            padding: 0 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #14161f;
+        }
+
+        /* Маркер курьера (Свободен) */
+        .marker-courier-free {
+            background: #00C853;
+            border: 2px solid #ffffff;
+            color: #fff;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 4px 14px rgba(0, 200, 83, 0.6);
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .marker-courier-free:hover {
+            transform: scale(1.15);
+        }
+
+        /* Маркер курьера (На заказе) */
+        .marker-courier-busy {
+            background: #FF9100;
+            border: 2px solid #ffffff;
+            color: #fff;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 0 16px rgba(255, 145, 0, 0.8);
+            cursor: pointer;
+            position: relative;
+            animation: pulseBusy 2s infinite;
+        }
+        @keyframes pulseBusy {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 145, 0, 0.7); }
+            50% { box-shadow: 0 0 0 10px rgba(255, 145, 0, 0); }
+        }
+
+        /* Маркер точки клиента */
+        .marker-client-dest {
+            background: #E53935;
+            border: 2px solid #ffffff;
+            color: #fff;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 4px 14px rgba(229, 57, 53, 0.6);
+            cursor: pointer;
+            animation: bouncePin 1.2s infinite alternate;
+        }
+        @keyframes bouncePin {
+            from { transform: translateY(0); }
+            to { transform: translateY(-7px); }
+        }
+
+        /* Dark Leaflet Popup Styling */
+        .leaflet-popup-content-wrapper {
+            background: var(--bg-card) !important;
+            border: 1px solid var(--border-highlight) !important;
+            color: #fff !important;
+            border-radius: 16px !important;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6) !important;
+            padding: 0 !important;
+            overflow: hidden;
+        }
+        .leaflet-popup-tip {
+            background: var(--bg-card) !important;
+            border: 1px solid var(--border-highlight) !important;
+        }
+        .leaflet-popup-content {
+            margin: 14px 16px !important;
+            line-height: 1.4 !important;
+            font-size: 13px !important;
+        }
+        .popup-title {
+            font-size: 14px;
+            font-weight: 800;
+            color: #fff;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .popup-desc {
+            color: var(--text-secondary);
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+        .popup-badge-tag {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 800;
+            margin-top: 6px;
+        }
+
+        /* ==========================================================
            6. ДЕТАЛЬНЫЙ ЧЕК ЗАКАЗА (ORDER DETAILS DRAWER)
            ========================================================== */
         .drawer-backdrop {
@@ -1016,10 +1162,12 @@
             display: flex;
             gap: 8px;
             margin-top: 10px;
+            flex-wrap: wrap;
         }
 
         .drawer-action-btn {
             flex: 1;
+            min-width: 110px;
             padding: 8px 12px;
             border-radius: 10px;
             font-size: 12px;
@@ -1059,6 +1207,16 @@
             background: rgba(0, 136, 204, 0.15);
             color: #29B6F6;
             border: 1px solid rgba(0, 136, 204, 0.3);
+        }
+
+        .drawer-action-btn.map-focus-btn {
+            background: rgba(252, 224, 0, 0.15);
+            color: var(--primary);
+            border: 1px solid rgba(252, 224, 0, 0.35);
+        }
+
+        .drawer-action-btn.map-focus-btn:hover {
+            background: rgba(252, 224, 0, 0.25);
         }
 
         /* Чек корзины */
@@ -1361,7 +1519,7 @@
                 <span class="kpi-icon">🛵</span>
             </div>
             <div class="kpi-value" id="kpi-couriers-online">0 на линии</div>
-            <div class="kpi-subtext" id="kpi-couriers-total">из 0 зарегистрированных</div>
+            <div class="kpi-subtext" id="kpi-couriers-total">0 своб. / 0 на заказе</div>
         </div>
     </section>
 
@@ -1452,7 +1610,7 @@
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- Логика админ-панели (Шаг 2: Supabase, Заказы, KPI, Realtime) -->
+    <!-- Логика админ-панели (Шаг 3: Рестораны, Курьеры, Маршруты) -->
     <script>
         // ==========================================================
         // 0. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (HELPERS)
@@ -1527,33 +1685,34 @@
         }
 
         // ==========================================================
-        // 2. ХРАНИЛИЩЕ ДАННЫХ ЗАКАЗОВ (ORDERS STORE)
+        // 2. ХРАНИЛИЩЕ ДАННЫХ (ORDERS STORE)
         // ==========================================================
         const OrdersStore = {
             orders: [],
             couriers: [],
+            restaurants: [],
             activeOrderId: null,
-            realtimeChannel: null,
+            realtimeOrdersChannel: null,
+            realtimeCouriersChannel: null,
 
             async loadInitialData() {
                 if (!supabaseClient) return;
 
-                // 1. Вычисляем начало сегодняшнего дня (00:00:00)
                 const startOfDay = new Date();
                 startOfDay.setHours(0, 0, 0, 0);
                 const startOfDayIso = startOfDay.toISOString();
 
                 try {
-                    // 2. Загружаем активные заказы ИЛИ завершенные за сегодня
-                    const { data, error } = await supabaseClient
+                    // 1. Загрузка активных заказов + заказов за сегодня
+                    const { data: ordersData, error: ordersErr } = await supabaseClient
                         .from('orders')
                         .select('*')
                         .or(`created_at.gte.${startOfDayIso},status.in.(waiting_payment,paid,cooking,delivery)`)
                         .order('id', { ascending: false })
                         .limit(300);
 
-                    if (error) {
-                        console.warn('Ошибка выборки по created_at, пробуем fallback по id:', error.message);
+                    if (ordersErr) {
+                        console.warn('Ошибка выборки по created_at, fallback по id:', ordersErr.message);
                         const fallback = await supabaseClient
                             .from('orders')
                             .select('*')
@@ -1561,24 +1720,35 @@
                             .limit(100);
                         this.orders = fallback.data || [];
                     } else {
-                        this.orders = data || [];
+                        this.orders = ordersData || [];
                     }
 
-                    // 3. Загружаем данные курьеров для KPI
+                    // 2. Загрузка ресторанов с координатами
+                    const { data: restData } = await supabaseClient
+                        .from('restaurants')
+                        .select('id, name, lat, lon, address, phone')
+                        .not('lat', 'is', null)
+                        .not('lon', 'is', null);
+                    this.restaurants = restData || [];
+
+                    // 3. Загрузка курьеров
                     const { data: couriersData } = await supabaseClient
                         .from('couriers')
-                        .select('id, name, phone, is_online, status');
+                        .select('id, name, phone, balance, is_online, status, lat, lon');
                     this.couriers = couriersData || [];
 
-                    // 4. Обновляем KPI и ленту
+                    // 4. Обновление KPI, ленты и карты
                     this.updateKPI();
                     SidebarUI.render();
+                    AdminMap.renderRestaurants();
+                    AdminMap.renderCouriers();
 
-                    // 5. Подключаем Realtime
-                    this.initRealtime();
+                    // 5. Подключение Realtime сокетов
+                    this.initRealtimeOrders();
+                    this.initRealtimeCouriers();
 
                 } catch (err) {
-                    console.error('Критическая ошибка загрузки заказов:', err);
+                    console.error('Критическая ошибка загрузки данных:', err);
                     showToast('Ошибка загрузки данных', '⚠️');
                 }
             },
@@ -1591,14 +1761,10 @@
                 let deliveryCount = 0;
                 let canceledCount = 0;
 
-                const startOfDay = new Date();
-                startOfDay.setHours(0, 0, 0, 0);
-
                 this.orders.forEach(order => {
                     const status = order.status;
                     const price = Number(order.total_price) || 0;
 
-                    // Выручка считается по оплаченным и завершенным заказам
                     if (['completed', 'paid', 'cooking', 'delivery'].includes(status)) {
                         revenue += price;
                     }
@@ -1610,9 +1776,19 @@
                     else if (status === 'canceled') canceledCount++;
                 });
 
-                // Подсчет курьеров
-                const totalCouriers = this.couriers.length;
-                const onlineCouriers = this.couriers.filter(c => c.is_online === true).length;
+                // Курьеры: всего на линии, свободны, на заказе
+                const onlineCouriers = this.couriers.filter(c => c.is_online === true);
+                const onlineTotal = onlineCouriers.length;
+                
+                // Находим ID курьеров, у которых прямо сейчас активен заказ
+                const busyCourierIds = new Set(
+                    this.orders
+                        .filter(o => ['paid', 'cooking', 'delivery'].includes(o.status) && o.courier_id)
+                        .map(o => String(o.courier_id))
+                );
+
+                const busyCouriersCount = onlineCouriers.filter(c => busyCourierIds.has(String(c.id))).length;
+                const freeCouriersCount = Math.max(0, onlineTotal - busyCouriersCount);
 
                 // Обновление DOM элементов KPI
                 document.getElementById('kpi-revenue').innerText = `${revenue.toLocaleString('ru-RU')} сом`;
@@ -1623,38 +1799,41 @@
                 document.getElementById('kpi-completed').innerText = completedCount;
                 document.getElementById('kpi-canceled').innerText = canceledCount;
 
-                document.getElementById('kpi-couriers-online').innerText = `${onlineCouriers} на линии`;
-                document.getElementById('kpi-couriers-total').innerText = `из ${totalCouriers} зарегистрированных`;
+                document.getElementById('kpi-couriers-online').innerText = `${onlineTotal} на линии`;
+                document.getElementById('kpi-couriers-total').innerText = `${freeCouriersCount} своб. / ${busyCouriersCount} на заказе`;
 
                 document.getElementById('sidebar-counter').innerText = this.orders.length;
+
+                // Пересчитываем бейджи заказов на ресторанах
+                AdminMap.renderRestaurants();
             },
 
-            initRealtime() {
-                if (!supabaseClient || this.realtimeChannel) return;
+            initRealtimeOrders() {
+                if (!supabaseClient || this.realtimeOrdersChannel) return;
 
                 const statusChip = document.getElementById('sys-status-chip');
                 const statusText = document.getElementById('sys-status-text');
 
-                this.realtimeChannel = supabaseClient.channel('admin_orders_channel')
+                this.realtimeOrdersChannel = supabaseClient.channel('admin_orders_channel')
                     .on('postgres_changes', {
                         event: 'INSERT',
                         schema: 'public',
                         table: 'orders'
                     }, (payload) => {
-                        this.handleRealtimeInsert(payload.new);
+                        this.handleRealtimeOrderInsert(payload.new);
                     })
                     .on('postgres_changes', {
                         event: 'UPDATE',
                         schema: 'public',
                         table: 'orders'
                     }, (payload) => {
-                        this.handleRealtimeUpdate(payload.new);
+                        this.handleRealtimeOrderUpdate(payload.new);
                     })
                     .subscribe((status) => {
                         if (status === 'SUBSCRIBED') {
                             statusChip.className = 'sys-status-chip';
                             statusText.innerText = 'Система онлайн';
-                            showToast('Realtime подключен', '🟢');
+                            showToast('Realtime заказов подключен', '🟢');
                         } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
                             statusChip.className = 'sys-status-chip error';
                             statusText.innerText = 'Связь потеряна';
@@ -1662,8 +1841,32 @@
                     });
             },
 
-            handleRealtimeInsert(newOrder) {
-                // Добавляем в начало массива
+            initRealtimeCouriers() {
+                if (!supabaseClient || this.realtimeCouriersChannel) return;
+
+                this.realtimeCouriersChannel = supabaseClient.channel('admin_couriers_channel')
+                    .on('postgres_changes', {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'couriers'
+                    }, (payload) => {
+                        this.handleRealtimeCourierUpdate(payload.new);
+                    })
+                    .on('postgres_changes', {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'couriers'
+                    }, (payload) => {
+                        this.handleRealtimeCourierInsert(payload.new);
+                    })
+                    .subscribe((status) => {
+                        if (status === 'SUBSCRIBED') {
+                            console.log('[Realtime] Радар курьеров активен');
+                        }
+                    });
+            },
+
+            handleRealtimeOrderInsert(newOrder) {
                 const exists = this.orders.some(o => o.id === newOrder.id);
                 if (!exists) {
                     this.orders.unshift(newOrder);
@@ -1673,7 +1876,7 @@
                 }
             },
 
-            handleRealtimeUpdate(updatedOrder) {
+            handleRealtimeOrderUpdate(updatedOrder) {
                 const index = this.orders.findIndex(o => o.id === updatedOrder.id);
                 if (index !== -1) {
                     this.orders[index] = updatedOrder;
@@ -1684,13 +1887,34 @@
                 this.updateKPI();
                 SidebarUI.render();
 
-                // Если открыт чек этого заказа — обновляем чек в реальном времени
                 if (this.activeOrderId === updatedOrder.id) {
                     OrderDrawer.render(updatedOrder);
                 }
 
                 const sInfo = STATUS_MAP[updatedOrder.status] || { text: updatedOrder.status };
                 showToast(`Заказ #${updatedOrder.id}: статус "${sInfo.text}"`, '🔄');
+            },
+
+            handleRealtimeCourierUpdate(updatedCourier) {
+                const idx = this.couriers.findIndex(c => c.id === updatedCourier.id);
+                if (idx !== -1) {
+                    this.couriers[idx] = updatedCourier;
+                } else {
+                    this.couriers.push(updatedCourier);
+                }
+
+                // Плавное обновление маркера курьера на карте
+                AdminMap.updateCourierMarker(updatedCourier);
+                this.updateKPI();
+            },
+
+            handleRealtimeCourierInsert(newCourier) {
+                const exists = this.couriers.some(c => c.id === newCourier.id);
+                if (!exists) {
+                    this.couriers.push(newCourier);
+                    AdminMap.updateCourierMarker(newCourier);
+                    this.updateKPI();
+                }
             },
 
             async cancelOrder(orderId) {
@@ -1733,7 +1957,7 @@
         // ==========================================================
         const SidebarUI = {
             isCollapsed: false,
-            currentTab: 'active', // 'active' | 'waiting' | 'completed' | 'canceled' | 'all'
+            currentTab: 'active',
             searchQuery: '',
 
             toggle() {
@@ -1762,7 +1986,6 @@
                 return OrdersStore.orders.filter(order => {
                     const status = order.status || '';
 
-                    // Фильтр по вкладке
                     let matchesTab = true;
                     if (this.currentTab === 'active') {
                         matchesTab = ['paid', 'cooking', 'delivery'].includes(status);
@@ -1776,7 +1999,6 @@
 
                     if (!matchesTab) return false;
 
-                    // Фильтр по поиску
                     if (this.searchQuery) {
                         const idStr = String(order.id);
                         const clientName = (order.client_name || '').toLowerCase();
@@ -1864,7 +2086,7 @@
                 if (!order) return;
 
                 OrdersStore.activeOrderId = orderId;
-                SidebarUI.render(); // Обновляем подсветку активной карточки
+                SidebarUI.render();
 
                 this.render(order);
 
@@ -1935,6 +2157,9 @@
                 const address = safeHtml(order.address || 'Не указан');
                 const comment = safeHtml(order.comment || 'Нет');
                 const dateFormatted = formatOrderDateTime(order.created_at);
+
+                // Кнопка фокуса на карте Leaflet
+                const mapBtnHtml = `<button class="drawer-action-btn map-focus-btn" onclick="AdminMap.focusOrder(${order.id})">🗺️ Показать на карте</button>`;
 
                 // Ссылка на 2ГИС
                 let gisLinkHtml = '';
@@ -2007,7 +2232,10 @@
                             <span class="drawer-info-label">Курьер:</span>
                             <span class="drawer-info-value">${order.courier_id ? 'ID: ' + order.courier_id : '⚠️ Не назначен'}</span>
                         </div>
-                        ${gisLinkHtml ? `<div class="drawer-action-links">${gisLinkHtml}</div>` : ''}
+                        <div class="drawer-action-links">
+                            ${mapBtnHtml}
+                            ${gisLinkHtml}
+                        </div>
                     </div>
 
                     <!-- 4. Состав заказа / Чек -->
@@ -2048,7 +2276,276 @@
         };
 
         // ==========================================================
-        // 5. СИСТЕМА АВТОРИЗАЦИИ PIN-КОДОМ
+        // 5. ИНТЕРАКТИВНАЯ КАРТА LEAFLET (РЕСТОРАНЫ, КУРЬЕРЫ, МАРШРУТЫ)
+        // ==========================================================
+        const AdminMap = {
+            map: null,
+            BISHKEK_COORDS: [42.8746, 74.5698],
+            DEFAULT_ZOOM: 13,
+            currentTheme: 'dark',
+            darkLayer: null,
+            lightLayer: null,
+
+            restaurantMarkers: new Map(), // restId -> L.Marker
+            courierMarkers: new Map(),    // courierId -> L.Marker
+            activeClientMarker: null,
+            activeRoutePolyline: null,
+
+            init() {
+                this.darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; CartoDB &copy; OpenStreetMap'
+                });
+
+                this.lightLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap'
+                });
+
+                this.map = L.map('map', {
+                    center: this.BISHKEK_COORDS,
+                    zoom: this.DEFAULT_ZOOM,
+                    zoomControl: false,
+                    layers: [this.darkLayer]
+                });
+
+                L.control.zoom({ position: 'bottomright' }).addTo(this.map);
+            },
+
+            centerBishkek() {
+                if (!this.map) return;
+                this.map.flyTo(this.BISHKEK_COORDS, this.DEFAULT_ZOOM, { duration: 1 });
+            },
+
+            toggleTileLayer() {
+                if (!this.map) return;
+                if (this.currentTheme === 'dark') {
+                    this.map.removeLayer(this.darkLayer);
+                    this.map.addLayer(this.lightLayer);
+                    this.currentTheme = 'light';
+                    document.getElementById('theme-toggle-btn').innerText = '☀️ Светлая';
+                } else {
+                    this.map.removeLayer(this.lightLayer);
+                    this.map.addLayer(this.darkLayer);
+                    this.currentTheme = 'dark';
+                    document.getElementById('theme-toggle-btn').innerText = '🌙 Темная';
+                }
+            },
+
+            // 1. Отрисовка ресторанов-партнеров
+            renderRestaurants() {
+                if (!this.map) return;
+
+                OrdersStore.restaurants.forEach(rest => {
+                    const lat = Number(rest.lat);
+                    const lon = Number(rest.lon);
+                    if (!lat || !lon) return;
+
+                    // Считаем активные заказы кухни для этого заведения
+                    const activeCount = OrdersStore.orders.filter(o => 
+                        o.restaurant === rest.name && ['paid', 'cooking'].includes(o.status)
+                    ).length;
+
+                    const badgeHtml = activeCount > 0 ? `<div class="marker-rest-badge">${activeCount}</div>` : '';
+
+                    const icon = L.divIcon({
+                        className: 'custom-leaflet-icon',
+                        html: `<div class="marker-restaurant">🏪${badgeHtml}</div>`,
+                        iconSize: [38, 38],
+                        iconAnchor: [19, 19]
+                    });
+
+                    const popupContent = `
+                        <div class="popup-title">🏪 ${safeHtml(rest.name)}</div>
+                        <div class="popup-desc">📍 ${safeHtml(rest.address || 'Адрес не указан')}</div>
+                        ${rest.phone ? `<div class="popup-desc">📞 <a href="tel:${rest.phone}" style="color:var(--primary);">${rest.phone}</a></div>` : ''}
+                        <div class="popup-badge-tag" style="background:${activeCount > 0 ? 'rgba(255,112,67,0.2)' : 'rgba(38,166,154,0.2)'}; color:${activeCount > 0 ? '#FF7043' : '#4DB6AC'}; border:1px solid ${activeCount > 0 ? '#FF7043' : '#4DB6AC'};">
+                            ${activeCount > 0 ? `🔥 ${activeCount} заказов на кухне` : '✅ Нет заказов в очереди'}
+                        </div>
+                    `;
+
+                    if (this.restaurantMarkers.has(rest.id)) {
+                        const marker = this.restaurantMarkers.get(rest.id);
+                        marker.setIcon(icon);
+                        marker.setPopupContent(popupContent);
+                    } else {
+                        const marker = L.marker([lat, lon], { icon }).addTo(this.map);
+                        marker.bindPopup(popupContent);
+                        this.restaurantMarkers.set(rest.id, marker);
+                    }
+                });
+            },
+
+            // 2. Отрисовка курьеров на радаре
+            renderCouriers() {
+                if (!this.map) return;
+
+                OrdersStore.couriers.forEach(courier => {
+                    this.updateCourierMarker(courier);
+                });
+            },
+
+            updateCourierMarker(courier) {
+                if (!this.map) return;
+
+                const lat = Number(courier.lat);
+                const lon = Number(courier.lon);
+                const isOnline = courier.is_online === true;
+
+                // Если курьер офлайн или нет координат — удаляем маркер с карты
+                if (!isOnline || !lat || !lon) {
+                    if (this.courierMarkers.has(courier.id)) {
+                        this.map.removeLayer(this.courierMarkers.get(courier.id));
+                        this.courierMarkers.delete(courier.id);
+                    }
+                    return;
+                }
+
+                // Проверяем, занят ли курьер активным заказом
+                const activeOrder = OrdersStore.orders.find(o => 
+                    String(o.courier_id) === String(courier.id) && ['paid', 'cooking', 'delivery'].includes(o.status)
+                );
+                const isBusy = !!activeOrder;
+
+                const markerClass = isBusy ? 'marker-courier-busy' : 'marker-courier-free';
+                const statusText = isBusy ? `Везет заказ #${activeOrder.id}` : '🟢 Свободен на линии';
+                const statusColor = isBusy ? '#FF9100' : '#00E676';
+
+                const icon = L.divIcon({
+                    className: 'custom-leaflet-icon',
+                    html: `<div class="${markerClass}">🛵</div>`,
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 18]
+                });
+
+                const cleanPhone = (courier.phone || '').replace(/[^\d\+]/g, '');
+                const popupContent = `
+                    <div class="popup-title">🛵 ${safeHtml(courier.name || 'Курьер')}</div>
+                    <div class="popup-desc">📞 ${cleanPhone ? `<a href="tel:${cleanPhone}" style="color:var(--primary); font-weight:700;">${safeHtml(courier.phone)}</a>` : 'Нет телефона'}</div>
+                    <div class="popup-desc">💰 Баланс: <b style="color:#fff;">${Number(courier.balance || 0).toLocaleString('ru-RU')} сом</b></div>
+                    <div class="popup-badge-tag" style="background:rgba(255,255,255,0.06); color:${statusColor}; border:1px solid ${statusColor};">
+                        ${statusText}
+                    </div>
+                `;
+
+                if (this.courierMarkers.has(courier.id)) {
+                    // Плавное перемещение без перерисовки всей карты!
+                    const marker = this.courierMarkers.get(courier.id);
+                    marker.setLatLng([lat, lon]);
+                    marker.setIcon(icon);
+                    marker.setPopupContent(popupContent);
+                } else {
+                    const marker = L.marker([lat, lon], { icon }).addTo(this.map);
+                    marker.bindPopup(popupContent);
+                    this.courierMarkers.set(courier.id, marker);
+                }
+            },
+
+            // 3. Связка чека с картой (Фокус и Маршрут)
+            focusOrder(orderId) {
+                const order = OrdersStore.orders.find(o => o.id === orderId);
+                if (!order) return;
+
+                // Находим координаты клиента
+                let destLat = Number(order.dest_lat);
+                let destLon = Number(order.dest_lon);
+
+                // Если координат нет в dest_lat, пробуем извлечь из ссылки 2GIS в комментарии
+                if ((!destLat || !destLon) && order.comment) {
+                    const match = order.comment.match(/2gis\.kg\/geo\/([\d\.]+),([\d\.]+)/);
+                    if (match) {
+                        destLon = Number(match[1]);
+                        destLat = Number(match[2]);
+                    }
+                }
+
+                if (!destLat || !destLon) {
+                    showToast(`⚠️ У заказа #${order.id} нет GPS-координат адреса`, '📍');
+                    return;
+                }
+
+                const clientCoords = [destLat, destLon];
+
+                // Очищаем старый фокусный маркер клиента и полилинию
+                if (this.activeClientMarker) {
+                    this.map.removeLayer(this.activeClientMarker);
+                    this.activeClientMarker = null;
+                }
+                if (this.activeRoutePolyline) {
+                    this.map.removeLayer(this.activeRoutePolyline);
+                    this.activeRoutePolyline = null;
+                }
+
+                // Создаем яркий маркер доставки клиента
+                const clientIcon = L.divIcon({
+                    className: 'custom-leaflet-icon',
+                    html: `<div class="marker-client-dest">📍</div>`,
+                    iconSize: [34, 34],
+                    iconAnchor: [17, 34]
+                });
+
+                const clientPopup = `
+                    <div class="popup-title">📍 Доставка заказа #${order.id}</div>
+                    <div class="popup-desc">🏠 <b>${safeHtml(order.address)}</b></div>
+                    <div class="popup-desc">👤 Клиент: ${safeHtml(order.client_name || 'Гость')}</div>
+                    <div class="popup-desc">💰 Сумма: <b>${order.total_price || 0} сом</b></div>
+                `;
+
+                this.activeClientMarker = L.marker(clientCoords, { icon: clientIcon }).addTo(this.map);
+                this.activeClientMarker.bindPopup(clientPopup).openPopup();
+
+                // Поиск координат ресторана
+                let restCoords = null;
+                if (order.restaurant) {
+                    const rest = OrdersStore.restaurants.find(r => r.name === order.restaurant);
+                    if (rest && rest.lat && rest.lon) {
+                        restCoords = [Number(rest.lat), Number(rest.lon)];
+                    }
+                }
+
+                // Поиск координат назначенного курьера
+                let courierCoords = null;
+                if (order.courier_id) {
+                    const courier = OrdersStore.couriers.find(c => String(c.id) === String(order.courier_id));
+                    if (courier && courier.lat && courier.lon) {
+                        courierCoords = [Number(courier.lat), Number(courier.lon)];
+                    }
+                }
+
+                // Формируем точки маршрута: Курьер ➔ Ресторан ➔ Клиент
+                const routePoints = [];
+                if (courierCoords) routePoints.push(courierCoords);
+                if (restCoords) routePoints.push(restCoords);
+                routePoints.push(clientCoords);
+
+                if (routePoints.length >= 2) {
+                    this.activeRoutePolyline = L.polyline(routePoints, {
+                        color: '#FCE000',
+                        weight: 4,
+                        opacity: 0.85,
+                        dashArray: '8, 8',
+                        lineJoin: 'round'
+                    }).addTo(this.map);
+
+                    this.map.fitBounds(this.activeRoutePolyline.getBounds(), {
+                        padding: [60, 60],
+                        maxZoom: 16
+                    });
+                } else {
+                    this.map.flyTo(clientCoords, 16, { duration: 1 });
+                }
+
+                // На мобильных экранах закрываем drawer для удобного просмотра карты
+                if (window.innerWidth < 768) {
+                    OrderDrawer.close();
+                }
+
+                showToast(`🗺️ Маршрут заказа #${order.id} отображен`, '📍');
+            }
+        };
+
+        // ==========================================================
+        // 6. СИСТЕМА АВТОРИЗАЦИИ PIN-КОДОМ
         // ==========================================================
         const PinAuth = {
             MASTER_PIN: '7777',
@@ -2138,7 +2635,7 @@
                 this.updateDots();
                 this.hideError();
 
-                // Инициализируем загрузку данных из Supabase
+                // Инициализация данных и сокетов
                 OrdersStore.loadInitialData();
 
                 setTimeout(() => {
@@ -2151,59 +2648,6 @@
                 const lockScreen = document.getElementById('lock-screen');
                 lockScreen.classList.remove('unlocked');
                 this.clear();
-            }
-        };
-
-        // ==========================================================
-        // 6. ИНТЕРАКТИВНАЯ КАРТА БИШКЕКА (LEAFLET)
-        // ==========================================================
-        const AdminMap = {
-            map: null,
-            BISHKEK_COORDS: [42.8746, 74.5698],
-            DEFAULT_ZOOM: 13,
-            currentTheme: 'dark',
-            darkLayer: null,
-            lightLayer: null,
-
-            init() {
-                this.darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '&copy; CartoDB &copy; OpenStreetMap'
-                });
-
-                this.lightLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '&copy; OpenStreetMap'
-                });
-
-                this.map = L.map('map', {
-                    center: this.BISHKEK_COORDS,
-                    zoom: this.DEFAULT_ZOOM,
-                    zoomControl: false,
-                    layers: [this.darkLayer]
-                });
-
-                L.control.zoom({ position: 'bottomright' }).addTo(this.map);
-            },
-
-            centerBishkek() {
-                if (!this.map) return;
-                this.map.flyTo(this.BISHKEK_COORDS, this.DEFAULT_ZOOM, { duration: 1 });
-            },
-
-            toggleTileLayer() {
-                if (!this.map) return;
-                if (this.currentTheme === 'dark') {
-                    this.map.removeLayer(this.darkLayer);
-                    this.map.addLayer(this.lightLayer);
-                    this.currentTheme = 'light';
-                    document.getElementById('theme-toggle-btn').innerText = '☀️ Светлая';
-                } else {
-                    this.map.removeLayer(this.lightLayer);
-                    this.map.addLayer(this.darkLayer);
-                    this.currentTheme = 'dark';
-                    document.getElementById('theme-toggle-btn').innerText = '🌙 Темная';
-                }
             }
         };
 
