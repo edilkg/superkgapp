@@ -101,8 +101,9 @@
 
         // Обновление цены
         function calculatePrice() {
-            const straightDist = getDistance(resLat, resLon, clientLat, clientLon);
-            const realDist = straightDist * 1.3; // Коэффициент извилистости дорог Бишкека
+            const distWE = getDistance(resLat, resLon, resLat, clientLon);
+            const distNS = getDistance(resLat, clientLon, clientLat, clientLon);
+            const realDist = (distWE + distNS) * 1.05; // Манхэттенская сетка Бишкека (L1) + 5% дворы
             
             let price = 100; // Базовая подача
             if (realDist > 1) {

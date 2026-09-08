@@ -1131,6 +1131,7 @@
             baseFee: 150,
             nightFee: 50,
             doorFee: 50,
+            yardMultiplier: 1.05,
             calcMode: 'split',
             cityNorth: 4.0,
             cityEast: 10.0,
@@ -1220,9 +1221,11 @@
 
             const cfg = window.tamakDeliveryConfig || DEFAULT_DELIVERY_CONFIG;
 
-            // 2. Получаем расстояние в километрах с учетом извилистости дорог Бишкека (×1.3)
-            const straightDist = getDistance(rLat, rLon, cLat, cLon);
-            const distKm = straightDist * 1.3;
+            // 2. Манхэттенская сетка Бишкека (L1): сумма катетов Запад-Восток + Север-Юг с дворовым коэфф.
+            const distWE = getDistance(rLat, rLon, rLat, cLon);
+            const distNS = getDistance(rLat, cLon, cLat, cLon);
+            const yardMultiplier = Number(cfg.yardMultiplier) || 1.05;
+            const distKm = (distWE + distNS) * yardMultiplier;
 
             // 3. БАЗОВАЯ ПОСАДКА (первый 1 км)
             let baseFee = Number(cfg.baseFee) || 150;

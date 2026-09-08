@@ -618,10 +618,10 @@
         </div>
 
         <div class="header-toggles">
-            <!-- Road multiplier 1.3 toggle -->
+            <!-- Manhattan L1 grid formula toggle -->
             <div class="toggle-chip active" id="toggle-road-coef" onclick="toggleRoadCoef()">
-                <span>🛣️ Коэфф. дорог:</span>
-                <span id="road-coef-text" style="font-weight: 900;">ВКЛ (×1.3)</span>
+                <span>📐 Формула:</span>
+                <span id="road-coef-text" style="font-weight: 900;">Манхэттен L1 (×1.05)</span>
             </div>
 
             <!-- Night tariff toggle -->
@@ -1146,6 +1146,25 @@
                         </div>
                     </div>
 
+                    <!-- 6. КОЭФФИЦИЕНТ ДВОРОВЫХ ЗАЕЗДОВ (МАНХЭТТЕН L1) -->
+                    <div class="corridor-group-box">
+                        <div class="slider-group">
+                            <div class="slider-header">
+                                <span class="slider-title">📐 Манхэттен L1 (Дворовый коэфф.):</span>
+                                <span class="slider-val-badge" id="val-yard-multiplier">×1.05</span>
+                            </div>
+                            <input type="range" class="slider-input" id="slider-yard-multiplier" min="1.00" max="1.20" step="0.01" value="1.05" oninput="onTariffChange()">
+                            <div class="slider-desc">Умножается на сумму катетов (distWE + distNS). 1.05 = +5% на дворы и развороты.</div>
+                            <div class="pills-row">
+                                <button class="pill-btn" onclick="setSlider('slider-yard-multiplier', 1.00)">1.00 (Чистый L1)</button>
+                                <button class="pill-btn" onclick="setSlider('slider-yard-multiplier', 1.03)">1.03 (+3%)</button>
+                                <button class="pill-btn" onclick="setSlider('slider-yard-multiplier', 1.05)">1.05 (+5%)</button>
+                                <button class="pill-btn" onclick="setSlider('slider-yard-multiplier', 1.08)">1.08 (+8%)</button>
+                                <button class="pill-btn" onclick="setSlider('slider-yard-multiplier', 1.10)">1.10 (+10%)</button>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
 
                 <!-- Export with tariffs -->
@@ -1204,12 +1223,20 @@
                     <div class="section-title">Дистанция и Тарификация</div>
                     
                     <div class="breakdown-row">
-                        <span class="breakdown-label">📏 Прямая дистанция (А ➔ Б):</span>
+                        <span class="breakdown-label">📏 Прямая гипотенуза (А ➔ Б):</span>
                         <span class="breakdown-value" id="val-straight-dist">0.0 км</span>
                     </div>
                     <div class="breakdown-row">
-                        <span class="breakdown-label">🛣️ Расчётная дистанция:</span>
-                        <span class="breakdown-value" style="color: #E65100;" id="val-calc-dist">0.0 км</span>
+                        <span class="breakdown-label">↔️ Катет Запад-Восток (distWE):</span>
+                        <span class="breakdown-value" id="val-dist-we">0.0 км</span>
+                    </div>
+                    <div class="breakdown-row">
+                        <span class="breakdown-label">↕️ Катет Север-Юг (distNS):</span>
+                        <span class="breakdown-value" id="val-dist-ns">0.0 км</span>
+                    </div>
+                    <div class="breakdown-row">
+                        <span class="breakdown-label">🛣️ Расчётная дистанция (Манхэттен L1):</span>
+                        <span class="breakdown-value" style="color: #E65100; font-weight: bold;" id="val-calc-dist">0.0 км</span>
                     </div>
                     <div class="breakdown-row">
                         <span class="breakdown-label">🧭 Смещение точки Б от центра:</span>
@@ -1328,6 +1355,7 @@
             baseFee: 150,        // Посадка (первый 1 км)
             nightFee: 50,        // Ночная надбавка (+50 сом)
             doorFee: 50,         // Доставка до двери (+50 сом)
+            yardMultiplier: 1.05, // Дворовый коэффициент Манхэттенской сетки (L1)
 
             // Модель расчёта за городом: 'split' (дифференцированный) или 'flat' (единый повышенный)
             calcMode: 'split',
@@ -1398,7 +1426,7 @@
         let restaurantPos = { lat: 42.8746, lon: 74.5878, name: "Чуй - Манаса (Центр)" };
         let clientPos = { lat: 42.744, lon: 74.654, name: "Село Арашан (Южный сектор)" };
 
-        let map, restMarker, clientMarker, routeLine;
+        let map, restMarker, clientMarker, routeLine, hypoLine, cornerMarker;
         let cityBoxLayer, mainZoneLayer;
         let redSouthLayer, redEastLayer, redNorthLayer, redWestLayer;
         let purpleSouthLayer, purpleEastLayer, purpleNorthLayer, purpleWestLayer;
@@ -1799,12 +1827,31 @@
             restMarker.bindPopup("<b>🏪 Точка А (Ресторан)</b><br>Перетаскивай мышкой!");
             clientMarker.bindPopup("<b>🛵 Точка Б (Клиент)</b><br>Перетаскивай мышкой!");
 
-            routeLine = L.polyline([[restaurantPos.lat, restaurantPos.lon], [clientPos.lat, clientPos.lon]], {
-                color: '#1E1E24',
-                weight: 3.5,
-                opacity: 0.8,
-                dashArray: '6, 8'
+            // Гипотенуза по прямой (тонкая пунктирная)
+            hypoLine = L.polyline([[restaurantPos.lat, restaurantPos.lon], [clientPos.lat, clientPos.lon]], {
+                color: '#9CA3AF',
+                weight: 2,
+                opacity: 0.5,
+                dashArray: '5, 6'
             }).addTo(map);
+
+            // Манхэттенский L-образный маршрут (Запад-Восток затем Север-Юг)
+            const cornerLat = restaurantPos.lat;
+            const cornerLon = clientPos.lon;
+            routeLine = L.polyline([[restaurantPos.lat, restaurantPos.lon], [cornerLat, cornerLon], [clientPos.lat, clientPos.lon]], {
+                color: '#1E1E24',
+                weight: 4,
+                opacity: 0.85
+            }).addTo(map);
+
+            // Маркер угла поворота сетки Бишкека (90°)
+            cornerMarker = L.circleMarker([cornerLat, cornerLon], {
+                radius: 5,
+                fillColor: '#FF9F1C',
+                color: '#fff',
+                weight: 2,
+                fillOpacity: 0.95
+            }).addTo(map).bindPopup("<b>📐 Угол поворота (90°)</b><br>Переход с проспекта на поперечную улицу");
 
             restMarker.on('drag', () => {
                 const p = restMarker.getLatLng();
@@ -1826,10 +1873,28 @@
             const rLat = restaurantPos.lat, rLon = restaurantPos.lon;
             const cLat = clientPos.lat, cLon = clientPos.lon;
 
-            routeLine.setLatLngs([[rLat, rLon], [cLat, cLon]]);
+            // Точка прямого угла поворота Манхэттенской сетки: широта ресторана, долгота клиента
+            const cornerLat = rLat;
+            const cornerLon = cLon;
+
+            if (routeLine) {
+                routeLine.setLatLngs([[rLat, rLon], [cornerLat, cornerLon], [cLat, cLon]]);
+            }
+            if (hypoLine) {
+                hypoLine.setLatLngs([[rLat, rLon], [cLat, cLon]]);
+            }
+            if (cornerMarker) {
+                cornerMarker.setLatLng([cornerLat, cornerLon]);
+            }
+
+            // 1. МАНХЭТТЕНСКАЯ СЕТКА (L1): сумма катетов Запад-Восток + Север-Юг
+            const distWE = getDistance(rLat, rLon, rLat, cLon);
+            const distNS = getDistance(rLat, cLon, cLat, cLon);
+            const rawSumL1 = distWE + distNS;
+            const yardFactor = Number(config.yardMultiplier) || 1.05;
 
             const straightDist = getDistance(rLat, rLon, cLat, cLon);
-            const effectiveDist = useRoadCoef ? (straightDist * 1.3) : straightDist;
+            const effectiveDist = useRoadCoef ? (rawSumL1 * yardFactor) : straightDist;
 
             const resCheck = evaluateLocation(rLat, rLon);
             const clientCheck = evaluateLocation(cLat, cLon);
@@ -1960,15 +2025,17 @@
                 }
             }
 
-            stickyDist.innerText = effectiveDist.toFixed(1) + " км" + (useRoadCoef ? " (×1.3)" : " (прямая)");
+            stickyDist.innerText = effectiveDist.toFixed(1) + " км" + (useRoadCoef ? ` (L1 ×${yardFactor.toFixed(2)})` : " (прямая)");
 
             document.getElementById('val-rest-name').innerText = restaurantPos.name;
             document.getElementById('val-rest-status').innerText = resCheck.reason;
             document.getElementById('val-client-name').innerText = clientPos.name;
             document.getElementById('val-client-status').innerText = clientCheck.reason;
 
+            if (document.getElementById('val-dist-we')) document.getElementById('val-dist-we').innerText = distWE.toFixed(2) + " км";
+            if (document.getElementById('val-dist-ns')) document.getElementById('val-dist-ns').innerText = distNS.toFixed(2) + " км";
             document.getElementById('val-straight-dist').innerText = straightDist.toFixed(2) + " км";
-            document.getElementById('val-calc-dist').innerText = effectiveDist.toFixed(2) + " км" + (useRoadCoef ? " (с коэфф. 1.3)" : " (по прямой)");
+            document.getElementById('val-calc-dist').innerText = effectiveDist.toFixed(2) + " км" + (useRoadCoef ? ` (Манхэттен L1 ×${yardFactor.toFixed(2)})` : " (по прямой)");
             document.getElementById('val-point-offset').innerText = (clientCheck.distOffset || 0).toFixed(2) + " км от центра";
 
             document.getElementById('val-base-fee').innerText = baseFee + " сом";
@@ -2116,6 +2183,15 @@
             document.getElementById('val-night-fee-setting').innerText = '+' + config.nightFee + ' сом';
             document.getElementById('val-door-fee-setting').innerText = '+' + config.doorFee + ' сом';
 
+            const yardSlider = document.getElementById('slider-yard-multiplier');
+            if (yardSlider) {
+                config.yardMultiplier = parseFloat(yardSlider.value);
+                const yardValBadge = document.getElementById('val-yard-multiplier');
+                if (yardValBadge) yardValBadge.innerText = '×' + config.yardMultiplier.toFixed(2);
+                const roadText = document.getElementById('road-coef-text');
+                if (roadText && useRoadCoef) roadText.innerText = `Манхэттен L1 (×${config.yardMultiplier.toFixed(2)})`;
+            }
+
             recalculate();
         }
 
@@ -2147,7 +2223,7 @@
             const input = document.getElementById(id);
             if (!input) return;
             input.value = val;
-            if (id.startsWith('slider-rate-') || id.startsWith('slider-base-') || id.startsWith('slider-night-') || id.startsWith('slider-door-')) {
+            if (id.startsWith('slider-rate-') || id.startsWith('slider-base-') || id.startsWith('slider-night-') || id.startsWith('slider-door-') || id.startsWith('slider-yard-')) {
                 onTariffChange();
             } else {
                 onConfigChange();
@@ -2242,12 +2318,17 @@
             useRoadCoef = !useRoadCoef;
             const chip = document.getElementById('toggle-road-coef');
             const text = document.getElementById('road-coef-text');
+            const yf = (Number(config.yardMultiplier) || 1.05).toFixed(2);
             if (useRoadCoef) {
                 chip.classList.add('active');
-                text.innerText = 'ВКЛ (×1.3)';
+                text.innerText = `Манхэттен L1 (×${yf})`;
+                if (routeLine) routeLine.setStyle({ opacity: 0.85 });
+                if (hypoLine) hypoLine.setStyle({ opacity: 0.4 });
             } else {
                 chip.classList.remove('active');
-                text.innerText = 'ВЫКЛ (по прямой)';
+                text.innerText = 'Прямая (Гипотенуза)';
+                if (routeLine) routeLine.setStyle({ opacity: 0.25 });
+                if (hypoLine) hypoLine.setStyle({ opacity: 0.9, color: '#E71D36' });
             }
             recalculate();
         }
@@ -2281,6 +2362,7 @@
                 `const RATE_SUPER_OUT_OF_TOWN_PER_KM = ${config.rateSuper}; // Суперзагород / Фиолетовая зона (сом за км)\n` +
                 `const NIGHT_TARIFF_FEE = ${config.nightFee};           // Ночной тариф (22:00 - 06:00)\n` +
                 `const DOOR_DELIVERY_FEE = ${config.doorFee};          // Доставка до двери\n` +
+                `const YARD_MULTIPLIER = ${config.yardMultiplier || 1.05};       // Дворовый коэфф. Манхэттен (L1)\n` +
                 `const CALC_MODE = '${config.calcMode}';                 // 'split' (раздельный) или 'flat' (единый)\n\n` +
                 `// ==========================================\n` +
                 `// 0. МЁРТВЫЕ ТОЧКИ ГОРОДСКОГО КВАДРАТА (100% ГОРОД):\n` +
@@ -2382,6 +2464,8 @@
             setVal('slider-base-fee', config.baseFee);
             setVal('slider-night-fee', config.nightFee);
             setVal('slider-door-fee', config.doorFee);
+            if (config.yardMultiplier === undefined || config.yardMultiplier === null) config.yardMultiplier = 1.05;
+            setVal('slider-yard-multiplier', config.yardMultiplier);
 
             // Быстрые мини-инпуты
             setVal('quick-rate-city', config.rateCity);
@@ -2430,8 +2514,11 @@
             if (document.getElementById('val-base-fee-setting')) document.getElementById('val-base-fee-setting').innerText = config.baseFee + ' сом';
             if (document.getElementById('val-night-fee-setting')) document.getElementById('val-night-fee-setting').innerText = '+' + config.nightFee + ' сом';
             if (document.getElementById('val-door-fee-setting')) document.getElementById('val-door-fee-setting').innerText = '+' + config.doorFee + ' сом';
+            if (document.getElementById('val-yard-multiplier')) document.getElementById('val-yard-multiplier').innerText = '×' + Number(config.yardMultiplier).toFixed(2);
             if (document.getElementById('header-night-val')) document.getElementById('header-night-val').innerText = `+${config.nightFee}с`;
             if (document.getElementById('header-door-val')) document.getElementById('header-door-val').innerText = `+${config.doorFee}с`;
+            const roadText = document.getElementById('road-coef-text');
+            if (roadText && useRoadCoef) roadText.innerText = `Манхэттен L1 (×${Number(config.yardMultiplier).toFixed(2)})`;
 
             if (typeof redrawAllPolygons === 'function') redrawAllPolygons();
             if (typeof recalculate === 'function') recalculate();
