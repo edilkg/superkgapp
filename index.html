@@ -1119,6 +1119,73 @@
         const supabaseUrl = 'https://dtxybpdjbdmqrvsdwvvk.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHlicGRqYmRtcXJ2c2R3dnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwODI5OTYsImV4cCI6MjA5MTY1ODk5Nn0.WFWBrwvxqEgfR9tzusvFcvfPN_mS4SmwvsWlyH13LEs'; 
         const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // ==========================================
+        // ДИНАМИЧЕСКИЕ НАСТРОЙКИ ТАРИФОВ И ЗОН (TAMAKKG TARIFF CONFIG)
+        // Синхронизируются с delivery_simulator.html через Supabase
+        // ==========================================
+        const DEFAULT_DELIVERY_CONFIG = {
+            rateCity: 17,
+            rateOutOfTown: 29,
+            rateSuper: 43,
+            baseFee: 150,
+            nightFee: 50,
+            doorFee: 50,
+            calcMode: 'split',
+            cityNorth: 4.0,
+            cityEast: 10.0,
+            citySouth: 8.0,
+            cityWest: 4.6,
+            maxNorth: 11.0,
+            corridorNorthWest: 4.4,
+            corridorNorthEast: 12.0,
+            redZoneNorth: 6.0,
+            purpleZoneNorth: 8.0,
+            maxEast: 19.0,
+            corridorEastNorth: 2.1,
+            corridorEastSouth: 8.5,
+            redZoneEast: 11.0,
+            purpleZoneEast: 17.5,
+            maxWest: 12.0,
+            corridorWestNorth: 2.5,
+            corridorWestSouth: 2.5,
+            redZoneWest: 6.0,
+            purpleZoneWest: 9.0,
+            maxSouth: 18.5,
+            corridorSouthWest: 6.0,
+            corridorSouthEast: 11.0,
+            redZoneSouth: 7.2,
+            purpleZoneSouth: 10.0
+        };
+
+        window.tamakDeliveryConfig = { ...DEFAULT_DELIVERY_CONFIG };
+        try {
+            const cachedCfg = localStorage.getItem('tamak_tariff_config');
+            if (cachedCfg) {
+                window.tamakDeliveryConfig = Object.assign(window.tamakDeliveryConfig, JSON.parse(cachedCfg));
+            }
+        } catch (e) {
+            console.warn('Кэш тарифов:', e);
+        }
+
+        async function syncDeliveryTariffConfig() {
+            if (!supabaseClient) return;
+            try {
+                const { data, error } = await supabaseClient
+                    .from('delivery_settings')
+                    .select('value')
+                    .eq('key', 'tariff_config')
+                    .single();
+
+                if (!error && data && data.value) {
+                    window.tamakDeliveryConfig = Object.assign(window.tamakDeliveryConfig, data.value);
+                    localStorage.setItem('tamak_tariff_config', JSON.stringify(window.tamakDeliveryConfig));
+                }
+            } catch (err) {
+                console.warn('Ошибка фоновой синхронизации тарифов:', err);
+            }
+        }
+        syncDeliveryTariffConfig();
         
         let globalCity = localStorage.getItem('tamak_city') || "Бишкек";
         
@@ -1131,129 +1198,157 @@
         }
 
         // ==========================================
-// ЛОГИКА РАСЧЕТА СТОИМОСТИ ДОСТАВКИ TAMAKKG
-// 1. Посадка (первый 1 км): 140 сом
-// 2. В городе: 18 сом за каждый километр свыше 1 км
-// 3. Красные зоны (33 сом/км):
-//    - Юг > 7.8 км (Чон-Арык, Байтик, Арашан)
-//    - Восток > 11.0 км (Новопокровка)
-//    - Север > 6.0 км (Дордой)
-//    - Запад > 6.0 км (Военно-Антоновка)
-// 4. Ночной тариф (22:00 - 06:00): +50 сом
-// 5. Округление в большую сторону до кратного 5 сом
-// ==========================================
-function calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon) {
-    // 1. ЗАЩИТА: Если координаты не пришли или невалидны, отдаем 0
-    if (!resLat || !resLon || !clientLat || !clientLon) return 0;
+        // ЛОГИКА РАСЧЕТА СТОИМОСТИ ДОСТАВКИ TAMAKKG
+        // Синхронизирована с Симулятором Зон (delivery_simulator.html)
+        // 1. Посадка (первый 1 км): config.baseFee (150 сом)
+        // 2. В городе: config.rateCity (17 сом/км)
+        // 3. Красные зоны: config.rateOutOfTown (29 сом/км)
+        // 4. Фиолетовые зоны (Суперзагород): config.rateSuper (43 сом/км)
+        // 5. Ночной тариф (22:00 - 06:00): +config.nightFee (+50 сом)
+        // 6. Округление в большую сторону до кратного 5 сом
+        // ==========================================
+        function calculateDynamicDeliveryFee(resLat, resLon, clientLat, clientLon) {
+            // 1. ЗАЩИТА: Если координаты не пришли или невалидны, отдаем 0
+            if (!resLat || !resLon || !clientLat || !clientLon) return 0;
 
-    const rLat = parseFloat(resLat);
-    const rLon = parseFloat(resLon);
-    const cLat = parseFloat(clientLat);
-    const cLon = parseFloat(clientLon);
+            const rLat = parseFloat(resLat);
+            const rLon = parseFloat(resLon);
+            const cLat = parseFloat(clientLat);
+            const cLon = parseFloat(clientLon);
 
-    if (isNaN(rLat) || isNaN(rLon) || isNaN(cLat) || isNaN(cLon)) return 0;
+            if (isNaN(rLat) || isNaN(rLon) || isNaN(cLat) || isNaN(cLon)) return 0;
 
-    // 2. Получаем расстояние в километрах с учетом извилистости дорог Бишкека (×1.3)
-    const straightDist = getDistance(rLat, rLon, cLat, cLon);
-    const distKm = straightDist * 1.3;
+            const cfg = window.tamakDeliveryConfig || DEFAULT_DELIVERY_CONFIG;
 
-    // 3. БАЗОВАЯ ПОСАДКА (первый 1 км) = 150 сом
-    let baseFee = 150;
+            // 2. Получаем расстояние в километрах с учетом извилистости дорог Бишкека (×1.3)
+            const straightDist = getDistance(rLat, rLon, cLat, cLon);
+            const distKm = straightDist * 1.3;
 
-    // 4. НОЧНОЙ ТАРИФ (+50 сом с 22:00 до 06:00)
-    const currentHour = new Date().getHours();
-    if (currentHour >= 22 || currentHour < 6) {
-        baseFee += 50; 
-    }
+            // 3. БАЗОВАЯ ПОСАДКА (первый 1 км)
+            let baseFee = Number(cfg.baseFee) || 150;
 
-    // 5. ОПРЕДЕЛЕНИЕ СТАВКИ И РАЗДЕЛЬНЫЙ РАСЧЕТ ПО ЗОНАМ (150с посадка + 17с город + 29с красная + 43с фиолетовая):
-    const CENTER_LAT = 42.8746;
-    const CENTER_LON = 74.5698;
-    const degLatPerKm = 1 / 111.139;
-    const degLonPerKm = 1 / (111.320 * Math.cos(CENTER_LAT * Math.PI / 180));
+            // 4. НОЧНОЙ ТАРИФ (+50 сом с 22:00 до 06:00)
+            const currentHour = new Date().getHours();
+            if (currentHour >= 22 || currentHour < 6) {
+                baseFee += (Number(cfg.nightFee) || 50); 
+            }
 
-    // Пороги 4 красных зон (29 сом/км)
-    const RED_ZONE_SOUTH_KM = 7.2;   // Юг (Чон-Арык / начало Байтика)
-    const RED_ZONE_EAST_KM = 11.0;   // Восток (Новопокровка)
-    const RED_ZONE_NORTH_KM = 6.0;   // Север (Дордой)
-    const RED_ZONE_WEST_KM = 6.0;    // Запад (Военно-Антоновка)
+            // 5. ОПРЕДЕЛЕНИЕ СТАВКИ И РАСЧЕТ ПО ЗОНАМ
+            const CENTER_LAT = 42.8746;
+            const CENTER_LON = 74.5698;
+            const degLatPerKm = 1 / 111.139;
+            const degLonPerKm = 1 / (111.320 * Math.cos(CENTER_LAT * Math.PI / 180));
 
-    // Пороги 4 фиолетовых зон (43 сом/км - Суперзагород)
-    const PURPLE_ZONE_SOUTH_KM = 10.0; // Юг (Арашан / горы)
-    const PURPLE_ZONE_EAST_KM = 17.5;  // Восток (Люксембург / Кант)
-    const PURPLE_ZONE_NORTH_KM = 8.0;  // Север (Объездная дальняя)
-    const PURPLE_ZONE_WEST_KM = 9.0;   // Запад (Сокулук)
+            // Пороги красных зон
+            const RED_ZONE_SOUTH_KM = Number(cfg.redZoneSouth) || 7.2;
+            const RED_ZONE_EAST_KM = Number(cfg.redZoneEast) || 11.0;
+            const RED_ZONE_NORTH_KM = Number(cfg.redZoneNorth) || 6.0;
+            const RED_ZONE_WEST_KM = Number(cfg.redZoneWest) || 6.0;
 
-    const ry = (rLat - CENTER_LAT) / degLatPerKm;
-    const rx = (rLon - CENTER_LON) / degLonPerKm;
-    const cy = (cLat - CENTER_LAT) / degLatPerKm;
-    const cx = (cLon - CENTER_LON) / degLonPerKm;
+            // Пороги фиолетовых зон (Суперзагород)
+            const PURPLE_ZONE_SOUTH_KM = Number(cfg.purpleZoneSouth) || 10.0;
+            const PURPLE_ZONE_EAST_KM = Number(cfg.purpleZoneEast) || 17.5;
+            const PURPLE_ZONE_NORTH_KM = Number(cfg.purpleZoneNorth) || 8.0;
+            const PURPLE_ZONE_WEST_KM = Number(cfg.purpleZoneWest) || 9.0;
 
-    const extraTotal = Math.max(0, distKm - 1);
-    let cityKm = 0, outKm = 0, superKm = 0;
+            const rateCity = Number(cfg.rateCity) || 17;
+            const rateOutOfTown = Number(cfg.rateOutOfTown) || 29;
+            const rateSuper = Number(cfg.rateSuper) || 43;
 
-    // Определяем коридор направления доставки
-    let bRed = RED_ZONE_SOUTH_KM, bPurple = PURPLE_ZONE_SOUTH_KM;
-    let dRes = Math.max(0, -ry), dClient = Math.max(0, -cy);
-    let isOutOfTown = false;
+            const ry = (rLat - CENTER_LAT) / degLatPerKm;
+            const rx = (rLon - CENTER_LON) / degLonPerKm;
+            const cy = (cLat - CENTER_LAT) / degLatPerKm;
+            const cx = (cLon - CENTER_LON) / degLonPerKm;
 
-    if (cy < -RED_ZONE_SOUTH_KM || ry < -RED_ZONE_SOUTH_KM) {
-        bRed = RED_ZONE_SOUTH_KM; bPurple = PURPLE_ZONE_SOUTH_KM;
-        dRes = Math.max(0, -ry); dClient = Math.max(0, -cy);
-        isOutOfTown = true;
-    } else if (cx > RED_ZONE_EAST_KM || rx > RED_ZONE_EAST_KM) {
-        bRed = RED_ZONE_EAST_KM; bPurple = PURPLE_ZONE_EAST_KM;
-        dRes = Math.max(0, rx); dClient = Math.max(0, cx);
-        isOutOfTown = true;
-    } else if (cy > RED_ZONE_NORTH_KM || ry > RED_ZONE_NORTH_KM) {
-        bRed = RED_ZONE_NORTH_KM; bPurple = PURPLE_ZONE_NORTH_KM;
-        dRes = Math.max(0, ry); dClient = Math.max(0, cy);
-        isOutOfTown = true;
-    } else if (cx < -RED_ZONE_WEST_KM || rx < -RED_ZONE_WEST_KM) {
-        bRed = RED_ZONE_WEST_KM; bPurple = PURPLE_ZONE_WEST_KM;
-        dRes = Math.max(0, -rx); dClient = Math.max(0, -cx);
-        isOutOfTown = true;
-    }
+            const extraTotal = Math.max(0, distKm - 1);
+            let cityKm = 0, outKm = 0, superKm = 0;
 
-    if (!isOutOfTown) {
-        // Чистый город: все км сверх 1-го по 17 сом/км
-        cityKm = extraTotal;
-    } else {
-        // Раздельный расчет по зонам пути: город (17) + красная (29) + фиолетовая (43)
-        const dMin = Math.min(dRes, dClient);
-        const dMax = Math.max(dRes, dClient);
-        const span = Math.max(0.001, dMax - dMin);
+            // Определяем коридор направления доставки
+            let bRed = RED_ZONE_SOUTH_KM, bPurple = PURPLE_ZONE_SOUTH_KM;
+            let dRes = Math.max(0, -ry), dClient = Math.max(0, -cy);
+            let isOutOfTown = false;
+            let isPurple = false;
 
-        const rawCity = Math.max(0, Math.min(dMax, bRed) - dMin);
-        const rawRed = Math.max(0, Math.min(dMax, bPurple) - Math.max(dMin, bRed));
-        const rawPurple = Math.max(0, dMax - Math.max(dMin, bPurple));
+            if (cy < -PURPLE_ZONE_SOUTH_KM || ry < -PURPLE_ZONE_SOUTH_KM) {
+                bRed = RED_ZONE_SOUTH_KM; bPurple = PURPLE_ZONE_SOUTH_KM;
+                dRes = Math.max(0, -ry); dClient = Math.max(0, -cy);
+                isOutOfTown = true; isPurple = true;
+            } else if (cx > PURPLE_ZONE_EAST_KM || rx > PURPLE_ZONE_EAST_KM) {
+                bRed = RED_ZONE_EAST_KM; bPurple = PURPLE_ZONE_EAST_KM;
+                dRes = Math.max(0, rx); dClient = Math.max(0, cx);
+                isOutOfTown = true; isPurple = true;
+            } else if (cy > PURPLE_ZONE_NORTH_KM || ry > PURPLE_ZONE_NORTH_KM) {
+                bRed = RED_ZONE_NORTH_KM; bPurple = PURPLE_ZONE_NORTH_KM;
+                dRes = Math.max(0, ry); dClient = Math.max(0, cy);
+                isOutOfTown = true; isPurple = true;
+            } else if (cx < -PURPLE_ZONE_WEST_KM || rx < -PURPLE_ZONE_WEST_KM) {
+                bRed = RED_ZONE_WEST_KM; bPurple = PURPLE_ZONE_WEST_KM;
+                dRes = Math.max(0, -rx); dClient = Math.max(0, -cx);
+                isOutOfTown = true; isPurple = true;
+            } else if (cy < -RED_ZONE_SOUTH_KM || ry < -RED_ZONE_SOUTH_KM) {
+                bRed = RED_ZONE_SOUTH_KM; bPurple = PURPLE_ZONE_SOUTH_KM;
+                dRes = Math.max(0, -ry); dClient = Math.max(0, -cy);
+                isOutOfTown = true;
+            } else if (cx > RED_ZONE_EAST_KM || rx > RED_ZONE_EAST_KM) {
+                bRed = RED_ZONE_EAST_KM; bPurple = PURPLE_ZONE_EAST_KM;
+                dRes = Math.max(0, rx); dClient = Math.max(0, cx);
+                isOutOfTown = true;
+            } else if (cy > RED_ZONE_NORTH_KM || ry > RED_ZONE_NORTH_KM) {
+                bRed = RED_ZONE_NORTH_KM; bPurple = PURPLE_ZONE_NORTH_KM;
+                dRes = Math.max(0, ry); dClient = Math.max(0, cy);
+                isOutOfTown = true;
+            } else if (cx < -RED_ZONE_WEST_KM || rx < -RED_ZONE_WEST_KM) {
+                bRed = RED_ZONE_WEST_KM; bPurple = PURPLE_ZONE_WEST_KM;
+                dRes = Math.max(0, -rx); dClient = Math.max(0, -cx);
+                isOutOfTown = true;
+            }
 
-        const pCity = rawCity / span;
-        const pRed = rawRed / span;
-        const pPurple = rawPurple / span;
+            if (!isOutOfTown) {
+                // Чистый город: все км сверх 1-го по городскому тарифу
+                cityKm = extraTotal;
+            } else if (cfg.calcMode === 'flat') {
+                // Единый тариф по дальней зоне
+                if (isPurple) {
+                    superKm = extraTotal;
+                } else {
+                    outKm = extraTotal;
+                }
+            } else {
+                // Раздельный расчет по зонам пути: город + красная + фиолетовая
+                const dMin = Math.min(dRes, dClient);
+                const dMax = Math.max(dRes, dClient);
+                const span = Math.max(0.001, dMax - dMin);
 
-        const effCityFull = distKm * pCity;
-        const effRed = distKm * pRed;
-        const effPurple = distKm * pPurple;
+                const rawCity = Math.max(0, Math.min(dMax, bRed) - dMin);
+                const rawRed = Math.max(0, Math.min(dMax, bPurple) - Math.max(dMin, bRed));
+                const rawPurple = Math.max(0, dMax - Math.max(dMin, bPurple));
 
-        cityKm = Math.max(0, effCityFull - 1);
-        let remBase = Math.max(0, 1 - effCityFull);
-        outKm = Math.max(0, effRed - remBase);
-        remBase = Math.max(0, remBase - effRed);
-        superKm = Math.max(0, effPurple - remBase);
-    }
+                const pCity = rawCity / span;
+                const pRed = rawRed / span;
+                const pPurple = rawPurple / span;
 
-    const kmFee = (cityKm * 17) + (outKm * 29) + (superKm * 43);
-    let totalFee = baseFee + kmFee;
+                const effCityFull = distKm * pCity;
+                const effRed = distKm * pRed;
+                const effPurple = distKm * pPurple;
 
-    // ЖЕЛЕЗНОЕ ПРАВИЛО: Доставка никогда не может быть дешевле базовой посадки
-    let finalFee = Math.max(baseFee, totalFee);
+                cityKm = Math.max(0, effCityFull - 1);
+                let remBase = Math.max(0, 1 - effCityFull);
+                outKm = Math.max(0, effRed - remBase);
+                remBase = Math.max(0, remBase - effRed);
+                superKm = Math.max(0, effPurple - remBase);
+            }
 
-    // 7. УМНОЕ ОКРУГЛЕНИЕ: Всегда в большую сторону до ближайшего числа, кратного 5
-    finalFee = Math.ceil(finalFee / 5) * 5;
+            const kmFee = (cityKm * rateCity) + (outKm * rateOutOfTown) + (superKm * rateSuper);
+            let totalFee = baseFee + kmFee;
 
-    return finalFee;
-}
+            // ЖЕЛЕЗНОЕ ПРАВИЛО: Доставка никогда не может быть дешевле базовой посадки
+            let finalFee = Math.max(baseFee, totalFee);
+
+            // 7. УМНОЕ ОКРУГЛЕНИЕ: Всегда в большую сторону до ближайшего числа, кратного 5
+            finalFee = Math.ceil(finalFee / 5) * 5;
+
+            return finalFee;
+        }
 
         
 
@@ -1624,34 +1719,52 @@ function isInsideBishkekZone(lat, lon) {
     const y = (lat - CENTER_LAT) / degLatPerKm;
     const x = (lon - CENTER_LON) / degLonPerKm;
 
+    const cfg = window.tamakDeliveryConfig || DEFAULT_DELIVERY_CONFIG;
+
+    const cityWest = Number(cfg.cityWest) || 4.6;
+    const cityEast = Number(cfg.cityEast) || 10.0;
+    const citySouth = Number(cfg.citySouth) || 8.0;
+    const cityNorth = Number(cfg.cityNorth) || 4.0;
+
     // 0. Базовый Городской Квадрат (Мёртвые точки города - 100% город):
-    // Восток: 10.0 км (Аламедин-1 / Тунгуч), Север: 4.0 км, Юг: 8.0 км (12 мкр), Запад: 4.6 км (Кызыл-Аскер)
     const inCityBox = (
-        x >= -4.6 && 
-        x <= 10.0 && 
-        y >= -8.0 && 
-        y <= 4.0
+        x >= -cityWest && 
+        x <= cityEast && 
+        y >= -citySouth && 
+        y <= cityNorth
     );
     if (inCityBox) return true;
 
-    // 1. Вытягивающийся Северный коридор (Дордой и объездная, y от 4.0 км до 10.0 км):
-    if (y > 4.0 && y <= 10.0) {
-        if (x >= -4.4 && x <= 12.0) return true; // Слева 4.4 км, Справа 12.0 км (Жер-Казар)
+    // 1. Вытягивающийся Северный коридор (Дордой и объездная):
+    const maxNorth = Number(cfg.maxNorth) || 11.0;
+    const corNorthWest = Number(cfg.corridorNorthWest) || 4.4;
+    const corNorthEast = Number(cfg.corridorNorthEast) || 12.0;
+    if (y > cityNorth && y <= maxNorth) {
+        if (x >= -corNorthWest && x <= corNorthEast) return true;
     }
 
-    // 2. Вытягивающийся Восточный коридор (Новопокровка / Кант, x от 10.0 км до 19.0 км):
-    if (x > 10.0 && x <= 19.0) {
-        if (y >= -2.0 && y <= 2.0) return true; // Сверху +2.0 км, Снизу -2.0 км от трассы
+    // 2. Вытягивающийся Восточный коридор (Новопокровка / Кант):
+    const maxEast = Number(cfg.maxEast) || 19.0;
+    const corEastNorth = Number(cfg.corridorEastNorth) || 2.1;
+    const corEastSouth = Number(cfg.corridorEastSouth) || 8.5;
+    if (x > cityEast && x <= maxEast) {
+        if (y >= -corEastSouth && y <= corEastNorth) return true;
     }
 
-    // 3. Вытягивающийся Западный коридор (Военно-Антоновка / Сокулук, x от -4.6 км до -12.0 км):
-    if (x < -4.6 && Math.abs(x) <= 12.0) {
-        if (y >= -2.5 && y <= 2.5) return true; // Сверху +2.5 км, Снизу -2.5 км от трассы
+    // 3. Вытягивающийся Западный коридор (Военно-Антоновка / Сокулук):
+    const maxWest = Number(cfg.maxWest) || 12.0;
+    const corWestNorth = Number(cfg.corridorWestNorth) || 2.5;
+    const corWestSouth = Number(cfg.corridorWestSouth) || 2.5;
+    if (x < -cityWest && Math.abs(x) <= maxWest) {
+        if (y >= -corWestSouth && y <= corWestNorth) return true;
     }
 
-    // 4. Вытягивающийся Южный коридор (Чон-Арык / Байтик / Арашан, y от -8.0 км до -18.5 км):
-    if (y < -8.0 && Math.abs(y) <= 18.5) {
-        if (x >= -6.0 && x <= 11.0) return true; // Слева 6.0 км (Байтик), Справа 11.0 км (Арашан)
+    // 4. Вытягивающийся Южный коридор (Чон-Арык / Байтик / Арашан):
+    const maxSouth = Number(cfg.maxSouth) || 18.5;
+    const corSouthWest = Number(cfg.corridorSouthWest) || 6.0;
+    const corSouthEast = Number(cfg.corridorSouthEast) || 11.0;
+    if (y < -citySouth && Math.abs(y) <= maxSouth) {
+        if (x >= -corSouthWest && x <= corSouthEast) return true;
     }
 
     // Все остальные точки за пределами квадрата и коридоров — вне зоны доставки

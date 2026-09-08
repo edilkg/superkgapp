@@ -7,6 +7,8 @@
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Supabase JS CDN (v2) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --primary: #FCE000;
@@ -78,6 +80,88 @@
             background: var(--primary);
             color: #000;
             border-color: var(--primary);
+        }
+
+        .save-tariff-btn {
+            background: #10B981;
+            color: #ffffff;
+            border: none;
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+        }
+        .save-tariff-btn:hover {
+            background: #059669;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.5);
+        }
+        .save-tariff-btn:active {
+            transform: translateY(1px);
+        }
+        .save-tariff-btn:disabled, .save-tariff-btn-panel:disabled, .btn-save-main:disabled {
+            background: #9CA3AF !important;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        .save-tariff-btn-panel {
+            width: 100%;
+            background: #10B981;
+            color: #ffffff;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+            margin-top: 10px;
+        }
+        .save-tariff-btn-panel:hover {
+            background: #059669;
+        }
+
+        .btn-save-main {
+            background: #10B981 !important;
+            color: #ffffff !important;
+            font-weight: 800 !important;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35) !important;
+            margin-bottom: 8px;
+        }
+        .btn-save-main:hover {
+            background: #059669 !important;
+        }
+
+        .back-to-admin-btn {
+            background: rgba(255,255,255,0.12);
+            color: #fff;
+            text-decoration: none;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .back-to-admin-btn:hover {
+            background: rgba(255,255,255,0.25);
+            color: #fff;
         }
 
         /* Map floating tool for Point A / B */
@@ -526,8 +610,11 @@
     <!-- Header with Quick Controls -->
     <header>
         <div class="brand">
+            <a href="admin.html" class="back-to-admin-btn" title="Вернуться в диспетчерскую панель админа">
+                ⬅️ В админку
+            </a>
             <span>🛵 TamakKG</span>
-            <span class="brand-badge">ГОРОДСКОЙ КВАДРАТ + КОРИДОРЫ</span>
+            <span class="brand-badge">СИМУЛЯТОР & ТАРИФЫ</span>
         </div>
 
         <div class="header-toggles">
@@ -546,6 +633,11 @@
             <div class="toggle-chip" id="toggle-door" onclick="toggleDoorDelivery()">
                 <span>🚪 До двери (<span id="header-door-val">+50с</span>)</span>
             </div>
+
+            <!-- Кнопка сохранения тарифа -->
+            <button class="save-tariff-btn" id="btn-save-tariffs-header" onclick="saveTariffConfig()" title="Сохранить текущие тарифы и границы зон в Supabase">
+                💾 Сохранить тариф
+            </button>
         </div>
     </header>
 
@@ -625,6 +717,11 @@
                         <option value="flat" id="opt-mode-flat">Единый (все км по тарифу зоны)</option>
                     </select>
                 </div>
+
+                <!-- Главная кнопка сохранения тарифа -->
+                <button class="save-tariff-btn-panel" id="btn-save-tariffs-panel" onclick="saveTariffConfig()" title="Сохранить текущие тарифы и границы зон в базу данных">
+                    💾 Сохранить тариф (Для всех клиентов)
+                </button>
             </div>
 
             <!-- Tabs Switcher -->
@@ -931,6 +1028,9 @@
 
                 <!-- Buttons Section -->
                 <div class="panel-section">
+                    <button class="btn-action btn-save-main" onclick="saveTariffConfig()">
+                        💾 Сохранить тариф и зоны в базу
+                    </button>
                     <button class="btn-action" onclick="copyZoneCode()">
                         📋 Скопировать готовый код настроек
                     </button>
@@ -1050,6 +1150,9 @@
 
                 <!-- Export with tariffs -->
                 <div class="panel-section">
+                    <button class="btn-action btn-save-main" onclick="saveTariffConfig()">
+                        💾 Сохранить тариф и зоны в базу
+                    </button>
                     <button class="btn-action" onclick="copyZoneCode()">
                         📋 Скопировать код (Тарифы + Зоны)
                     </button>
@@ -1204,6 +1307,18 @@
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
+        // --- SUPABASE CLIENT ДЛЯ СИНХРОНИЗАЦИИ ТАРИФОВ ---
+        const SUPABASE_URL = 'https://dtxybpdjbdmqrvsdwvvk.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR0eHlicGRqYmRtcXJ2c2R3dnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwODI5OTYsImV4cCI6MjA5MTY1ODk5Nn0.WFWBrwvxqEgfR9tzusvFcvfPN_mS4SmwvsWlyH13LEs';
+        let supabaseClient = null;
+        try {
+            if (window.supabase) {
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            }
+        } catch (e) {
+            console.warn('Supabase init error in simulator:', e);
+        }
+
         // --- КОНФИГУРАЦИЯ: БАЗОВЫЙ ГОРОДСКОЙ КВАДРАТ + 4 КОРИДОРА ---
         const config = {
             // ТАРИФЫ (УПРАВЛЯЕМЫЕ ИЗ СИМУЛЯТОРА):
@@ -1445,6 +1560,7 @@
             initZoneLayers();
             createMarkers();
             recalculate();
+            loadTariffConfigFromSupabase();
 
             // Клик по карте
             map.on('click', function(e) {
@@ -2206,6 +2322,218 @@
             }).catch(() => {
                 showToast("Параметры сохранены!");
             });
+        }
+
+        // --- ПРИМЕНЕНИЕ КОНФИГУРАЦИИ К UI СИМУЛЯТОРА ---
+        function applyConfigToUI(newCfg) {
+            if (!newCfg || typeof newCfg !== 'object') return;
+
+            Object.keys(newCfg).forEach(k => {
+                if (k in config) {
+                    config[k] = newCfg[k];
+                }
+            });
+
+            const setVal = (id, val) => {
+                const el = document.getElementById(id);
+                if (el && val !== undefined && val !== null) {
+                    el.value = val;
+                }
+            };
+
+            // 0. Городской квадрат
+            setVal('slider-city-east', config.cityEast);
+            setVal('slider-city-north', config.cityNorth);
+            setVal('slider-city-south', config.citySouth);
+            setVal('slider-city-west', config.cityWest);
+
+            // 1. Север (Дордой)
+            setVal('slider-north-west', config.corridorNorthWest);
+            setVal('slider-north-east', config.corridorNorthEast);
+            setVal('slider-max-north', config.maxNorth);
+            setVal('slider-red-north', config.redZoneNorth);
+            setVal('slider-purple-north', config.purpleZoneNorth);
+
+            // 2. Восток (Новопокровка)
+            setVal('slider-east-north', config.corridorEastNorth);
+            setVal('slider-east-south', config.corridorEastSouth);
+            setVal('slider-max-east', config.maxEast);
+            setVal('slider-red-east', config.redZoneEast);
+            setVal('slider-purple-east', config.purpleZoneEast);
+
+            // 3. Запад (В-Антоновка)
+            setVal('slider-west-north', config.corridorWestNorth);
+            setVal('slider-west-south', config.corridorWestSouth);
+            setVal('slider-max-west', config.maxWest);
+            setVal('slider-red-west', config.redZoneWest);
+            setVal('slider-purple-west', config.purpleZoneWest);
+
+            // 4. Юг (Горы / Арашан)
+            setVal('slider-south-west', config.corridorSouthWest);
+            setVal('slider-south-east', config.corridorSouthEast);
+            setVal('slider-max-south', config.maxSouth);
+            setVal('slider-red-south', config.redZoneSouth);
+            setVal('slider-purple-south', config.purpleZoneSouth);
+
+            // Тарифы
+            setVal('slider-rate-city', config.rateCity);
+            setVal('slider-rate-outoftown', config.rateOutOfTown);
+            setVal('slider-rate-super', config.rateSuper);
+            setVal('slider-base-fee', config.baseFee);
+            setVal('slider-night-fee', config.nightFee);
+            setVal('slider-door-fee', config.doorFee);
+
+            // Быстрые мини-инпуты
+            setVal('quick-rate-city', config.rateCity);
+            setVal('quick-rate-out', config.rateOutOfTown);
+            setVal('quick-rate-super', config.rateSuper);
+            setVal('quick-base-fee', config.baseFee);
+
+            // Модель расчета
+            const calcSel = document.getElementById('select-calc-mode');
+            if (calcSel && config.calcMode) calcSel.value = config.calcMode;
+
+            // Обновляем бейджи коридоров
+            if (document.getElementById('val-city-east')) document.getElementById('val-city-east').innerText = config.cityEast.toFixed(1) + ' км';
+            if (document.getElementById('val-city-north')) document.getElementById('val-city-north').innerText = config.cityNorth.toFixed(1) + ' км';
+            if (document.getElementById('val-city-south')) document.getElementById('val-city-south').innerText = config.citySouth.toFixed(1) + ' км';
+            if (document.getElementById('val-city-west')) document.getElementById('val-city-west').innerText = config.cityWest.toFixed(1) + ' км';
+
+            if (document.getElementById('val-north-west')) document.getElementById('val-north-west').innerText = '-' + config.corridorNorthWest.toFixed(1) + ' км';
+            if (document.getElementById('val-north-east')) document.getElementById('val-north-east').innerText = '+' + config.corridorNorthEast.toFixed(1) + ' км';
+            if (document.getElementById('val-max-north')) document.getElementById('val-max-north').innerText = config.maxNorth.toFixed(1) + ' км';
+            if (document.getElementById('val-red-north')) document.getElementById('val-red-north').innerText = config.redZoneNorth.toFixed(1) + ' км';
+            if (document.getElementById('val-purple-north')) document.getElementById('val-purple-north').innerText = config.purpleZoneNorth.toFixed(1) + ' км';
+
+            if (document.getElementById('val-east-north')) document.getElementById('val-east-north').innerText = '+' + config.corridorEastNorth.toFixed(1) + ' км';
+            if (document.getElementById('val-east-south')) document.getElementById('val-east-south').innerText = '-' + config.corridorEastSouth.toFixed(1) + ' км';
+            if (document.getElementById('val-max-east')) document.getElementById('val-max-east').innerText = config.maxEast.toFixed(1) + ' км';
+            if (document.getElementById('val-red-east')) document.getElementById('val-red-east').innerText = config.redZoneEast.toFixed(1) + ' км';
+            if (document.getElementById('val-purple-east')) document.getElementById('val-purple-east').innerText = config.purpleZoneEast.toFixed(1) + ' км';
+
+            if (document.getElementById('val-west-north')) document.getElementById('val-west-north').innerText = '+' + config.corridorWestNorth.toFixed(1) + ' км';
+            if (document.getElementById('val-west-south')) document.getElementById('val-west-south').innerText = '-' + config.corridorWestSouth.toFixed(1) + ' км';
+            if (document.getElementById('val-max-west')) document.getElementById('val-max-west').innerText = config.maxWest.toFixed(1) + ' км';
+            if (document.getElementById('val-red-west')) document.getElementById('val-red-west').innerText = config.redZoneWest.toFixed(1) + ' км';
+            if (document.getElementById('val-purple-west')) document.getElementById('val-purple-west').innerText = config.purpleZoneWest.toFixed(1) + ' км';
+
+            if (document.getElementById('val-south-west')) document.getElementById('val-south-west').innerText = '-' + config.corridorSouthWest.toFixed(1) + ' км';
+            if (document.getElementById('val-south-east')) document.getElementById('val-south-east').innerText = '+' + config.corridorSouthEast.toFixed(1) + ' км';
+            if (document.getElementById('val-max-south')) document.getElementById('val-max-south').innerText = config.maxSouth.toFixed(1) + ' км';
+            if (document.getElementById('val-red-south')) document.getElementById('val-red-south').innerText = config.redZoneSouth.toFixed(1) + ' км';
+            if (document.getElementById('val-purple-south')) document.getElementById('val-purple-south').innerText = config.purpleZoneSouth.toFixed(1) + ' км';
+
+            // Обновляем бейджи тарифов
+            if (document.getElementById('val-rate-city')) document.getElementById('val-rate-city').innerText = config.rateCity + ' сом / км';
+            if (document.getElementById('val-rate-outoftown')) document.getElementById('val-rate-outoftown').innerText = config.rateOutOfTown + ' сом / км';
+            if (document.getElementById('val-rate-super')) document.getElementById('val-rate-super').innerText = config.rateSuper + ' сом / км';
+            if (document.getElementById('val-base-fee-setting')) document.getElementById('val-base-fee-setting').innerText = config.baseFee + ' сом';
+            if (document.getElementById('val-night-fee-setting')) document.getElementById('val-night-fee-setting').innerText = '+' + config.nightFee + ' сом';
+            if (document.getElementById('val-door-fee-setting')) document.getElementById('val-door-fee-setting').innerText = '+' + config.doorFee + ' сом';
+            if (document.getElementById('header-night-val')) document.getElementById('header-night-val').innerText = `+${config.nightFee}с`;
+            if (document.getElementById('header-door-val')) document.getElementById('header-door-val').innerText = `+${config.doorFee}с`;
+
+            if (typeof redrawAllPolygons === 'function') redrawAllPolygons();
+            if (typeof recalculate === 'function') recalculate();
+        }
+
+        // --- ЗАГРУЗКА ТАРИФОВ ИЗ SUPABASE / LOCALSTORAGE ---
+        async function loadTariffConfigFromSupabase() {
+            // 1. Сначала применяем из localStorage для мгновенного отклика
+            try {
+                const cached = localStorage.getItem('tamak_tariff_config');
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    applyConfigToUI(parsed);
+                }
+            } catch (e) {
+                console.warn('Ошибка чтения кэша тарифов:', e);
+            }
+
+            if (!supabaseClient) return;
+
+            // 2. Асинхронно обновляем из Supabase
+            try {
+                const { data, error } = await supabaseClient
+                    .from('delivery_settings')
+                    .select('value')
+                    .eq('key', 'tariff_config')
+                    .single();
+
+                if (!error && data && data.value) {
+                    applyConfigToUI(data.value);
+                    localStorage.setItem('tamak_tariff_config', JSON.stringify(data.value));
+                    showToast('✅ Актуальные тарифы загружены из базы');
+                } else if (error && error.code !== 'PGRST116') {
+                    console.warn('Supabase delivery_settings info:', error.message || error);
+                }
+            } catch (err) {
+                console.warn('Ошибка загрузки тарифов из Supabase:', err);
+            }
+        }
+
+        // --- СОХРАНЕНИЕ ТАРИФОВ В SUPABASE ---
+        async function saveTariffConfig() {
+            const btnHdr = document.getElementById('btn-save-tariffs-header');
+            const btnPnl = document.getElementById('btn-save-tariffs-panel');
+            const btnsMain = document.querySelectorAll('.btn-save-main');
+
+            const setButtonsState = (loading) => {
+                if (btnHdr) {
+                    btnHdr.disabled = loading;
+                    btnHdr.innerHTML = loading ? '⏳ Сохраняем...' : '💾 Сохранить тариф';
+                }
+                if (btnPnl) {
+                    btnPnl.disabled = loading;
+                    btnPnl.innerHTML = loading ? '⏳ Сохраняем в базу...' : '💾 Сохранить тариф (Для всех клиентов)';
+                }
+                btnsMain.forEach(btn => {
+                    btn.disabled = loading;
+                    btn.innerHTML = loading ? '⏳ Сохранение...' : '💾 Сохранить тариф и зоны в базу';
+                });
+            };
+
+            setButtonsState(true);
+
+            // Кэшируем немедленно в браузере
+            try {
+                localStorage.setItem('tamak_tariff_config', JSON.stringify(config));
+            } catch (e) {}
+
+            if (!supabaseClient) {
+                setButtonsState(false);
+                showToast('⚠️ Supabase не подключен, сохранено в кэше браузера');
+                return;
+            }
+
+            try {
+                const payload = {
+                    key: 'tariff_config',
+                    value: config,
+                    updated_at: new Date().toISOString()
+                };
+
+                const { data, error } = await supabaseClient
+                    .from('delivery_settings')
+                    .upsert(payload, { onConflict: 'key' });
+
+                if (error) {
+                    console.error('Ошибка сохранения тарифов в Supabase:', error);
+                    if (error.code === 'PGRST205' || (error.message && error.message.includes('delivery_settings'))) {
+                        alert('⚠️ Внимание: Таблица delivery_settings ещё не создана в Supabase!\n\nПожалуйста, откройте Supabase Dashboard -> SQL Editor и выполните скрипт из файла migration_delivery_settings.sql.\n\n(Данные сейчас сохранены в вашем браузере).');
+                    } else {
+                        alert('⚠️ Ошибка сохранения в Supabase: ' + (error.message || JSON.stringify(error)));
+                    }
+                    showToast('⚠️ Ошибка сохранения в базу');
+                } else {
+                    showToast('🎉 Тарифы и зоны успешно сохранены для всей системы!');
+                }
+            } catch (err) {
+                console.error('Исключение при сохранении:', err);
+                showToast('⚠️ Ошибка сети при обращении к базе');
+            } finally {
+                setButtonsState(false);
+            }
         }
 
         window.onload = initMap;

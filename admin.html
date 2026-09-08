@@ -403,6 +403,19 @@
             background: rgba(239, 83, 80, 0.15);
         }
 
+        .hdr-btn.tariff-link-btn {
+            text-decoration: none;
+            color: var(--primary);
+            border-color: rgba(255, 179, 0, 0.4);
+            background: rgba(255, 179, 0, 0.08);
+        }
+
+        .hdr-btn.tariff-link-btn:hover {
+            background: rgba(255, 179, 0, 0.18);
+            border-color: var(--primary);
+            color: #fff;
+        }
+
         /* ==========================================================
            3. СЕТКА ПОКАЗАТЕЛЕЙ KPI (KPI BAR)
            ========================================================== */
@@ -1436,6 +1449,9 @@
         </div>
 
         <div class="header-right">
+            <a href="delivery_simulator.html" target="_blank" class="hdr-btn tariff-link-btn" title="Настройка зон и тарифов в симуляторе">
+                ⚙️ Зоны и тарифы
+            </a>
             <button class="hdr-btn" onclick="AdminMap.centerBishkek()" title="Центрировать на Бишкеке">
                 🎯 Центр
             </button>
