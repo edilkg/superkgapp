@@ -2474,6 +2474,52 @@
 
         // --- СОХРАНЕНИЕ ТАРИФОВ В SUPABASE ---
         async function saveTariffConfig() {
+            // 1. ПРОВЕРКА PIN-КОДА АДМИНИСТРАТОРА (Мастер-код: 7777)
+            const isAuthorized = sessionStorage.getItem('tamak_tariff_admin_auth') === 'true' || sessionStorage.getItem('tamak_admin_session_auth') === 'true';
+
+            if (!isAuthorized) {
+                const inputPin = prompt('🔐 Введите PIN-код администратора для сохранения тарифов:');
+                if (inputPin === null) {
+                    return; // Пользователь нажал "Отмена"
+                }
+
+                if (inputPin.trim() !== '7777') {
+                    alert('❌ Неверный PIN-код! Доступ запрещен.');
+                    showToast('❌ Доступ запрещен');
+                    return;
+                }
+
+                // Сохраняем сессию в текущей вкладке
+                sessionStorage.setItem('tamak_tariff_admin_auth', 'true');
+                sessionStorage.setItem('tamak_admin_session_auth', 'true');
+            }
+
+            // 2. ЗАЩИТА ОТ ДУРАКА (ВАЛИДАЦИЯ ЗНАЧЕНИЙ ТАРИФОВ)
+            const baseFee = Number(config.baseFee);
+            const rateCity = Number(config.rateCity);
+            const rateOut = Number(config.rateOutOfTown);
+            const rateSuper = Number(config.rateSuper);
+
+            if (isNaN(baseFee) || baseFee < 50) {
+                alert('❌ Ошибка: Базовая посадка (baseFee) не может быть меньше 50 сом!');
+                return;
+            }
+
+            if (isNaN(rateCity) || rateCity < 10) {
+                alert('❌ Ошибка: Городской тариф (rateCity) не может быть меньше 10 сом/км!');
+                return;
+            }
+
+            if (!isNaN(rateOut) && rateOut < 10) {
+                alert('❌ Ошибка: Загородный тариф не может быть меньше 10 сом/км!');
+                return;
+            }
+
+            if (!isNaN(rateSuper) && rateSuper < 10) {
+                alert('❌ Ошибка: Суперзагородный тариф не может быть меньше 10 сом/км!');
+                return;
+            }
+
             const btnHdr = document.getElementById('btn-save-tariffs-header');
             const btnPnl = document.getElementById('btn-save-tariffs-panel');
             const btnsMain = document.querySelectorAll('.btn-save-main');
