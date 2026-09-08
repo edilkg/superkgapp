@@ -1131,6 +1131,8 @@
             baseFee: 150,
             nightFee: 50,
             nightFeeDeep: 50,
+            nightTariffEnabled: true,
+            deepNightTariffEnabled: true,
             doorFee: 50,
             yardMultiplier: 1.05,
             calcMode: 'split',
@@ -1231,14 +1233,17 @@
             // 3. БАЗОВАЯ ПОСАДКА (первый 1 км)
             let baseFee = Number(cfg.baseFee) || 150;
 
-            // 4. ДВУХУРОВНЕВЫЙ НОЧНОЙ ТАРИФ:
-            // 1-й уровень (22:00 - 06:00): базовая надбавка (+50 сом)
-            // 2-й уровень (после 24:00 / с 00:00 до 06:00): глубокая ночь (+50 сом еще сверху, итого +100 сом)
+            // 4. ДВУХУРОВНЕВЫЙ НОЧНОЙ ТАРИФ (С ВОЗМОЖНОСТЬЮ ОТКЛЮЧЕНИЯ В ТАРИФАХ):
             const currentHour = new Date().getHours();
-            if (currentHour >= 22 || currentHour < 6) {
+            const isNightEnabled = cfg.nightTariffEnabled !== false;
+            const isDeepNightEnabled = cfg.deepNightTariffEnabled !== false;
+
+            // 1-й уровень (22:00 - 06:00): базовая надбавка (+50 сом)
+            if (isNightEnabled && (currentHour >= 22 || currentHour < 6)) {
                 baseFee += (Number(cfg.nightFee) || 50); 
             }
-            if (currentHour < 6) {
+            // 2-й уровень (после 24:00 / с 00:00 до 06:00): глубокая ночь (+50 сом еще сверху, итого +100 сом)
+            if (isDeepNightEnabled && currentHour < 6) {
                 baseFee += (Number(cfg.nightFeeDeep) || 50);
             }
 

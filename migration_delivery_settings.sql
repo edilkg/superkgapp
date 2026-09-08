@@ -34,6 +34,8 @@ VALUES (
         "baseFee": 150,
         "nightFee": 50,
         "nightFeeDeep": 50,
+        "nightTariffEnabled": true,
+        "deepNightTariffEnabled": true,
         "doorFee": 50,
         "yardMultiplier": 1.05,
         "calcMode": "split",

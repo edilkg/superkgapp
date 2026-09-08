@@ -82,6 +82,46 @@
             border-color: var(--primary);
         }
 
+        /* iOS-like switch toggle */
+        .switch-control {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 22px;
+            flex-shrink: 0;
+        }
+        .switch-control input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .switch-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #CBD5E1;
+            transition: .25s;
+            border-radius: 22px;
+        }
+        .switch-slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .25s;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        .switch-control input:checked + .switch-slider {
+            background-color: #10B981;
+        }
+        .switch-control input:checked + .switch-slider:before {
+            transform: translateX(18px);
+        }
+
         .save-tariff-btn {
             background: #10B981;
             color: #ffffff;
@@ -1135,21 +1175,33 @@
                     <!-- 5. НОЧНОЙ ТАРИФ (2 УРОВНЯ) И ДОСТАВКА ДО ДВЕРИ -->
                     <div class="corridor-group-box">
                         <div class="slider-group">
-                            <div class="slider-header">
-                                <span class="slider-title">🌙 Ночной тариф Ур.1 (22:00 - 06:00):</span>
+                            <div class="slider-header" style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <label class="switch-control" title="Включить / Отключить ночной тариф">
+                                        <input type="checkbox" id="switch-night-enabled" checked onchange="onNightToggleChange('night', this.checked)">
+                                        <span class="switch-slider"></span>
+                                    </label>
+                                    <span class="slider-title">🌙 Ночной тариф Ур.1 (22:00 - 06:00):</span>
+                                </div>
                                 <span class="slider-val-badge" id="val-night-fee-setting">+50 сом</span>
                             </div>
                             <input type="range" class="slider-input" id="slider-night-fee" min="0" max="150" step="5" value="50" oninput="onTariffChange()">
-                            <div class="slider-desc">Базовая надбавка за ночную доставку с 22:00 вечера до 06:00 утра.</div>
+                            <div class="slider-desc">Базовая надбавка за ночную доставку с 22:00 вечера до 06:00 утра. Тумблер слева полностью включает/выключает тариф.</div>
                         </div>
 
                         <div class="slider-group">
-                            <div class="slider-header">
-                                <span class="slider-title">🌌 Глубокая ночь Ур.2 (00:00 - 06:00, сверх первого уровня):</span>
+                            <div class="slider-header" style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <label class="switch-control" title="Включить / Отключить тариф полуночи">
+                                        <input type="checkbox" id="switch-deep-night-enabled" checked onchange="onNightToggleChange('deepNight', this.checked)">
+                                        <span class="switch-slider"></span>
+                                    </label>
+                                    <span class="slider-title">🌌 Глубокая ночь Ур.2 (00:00 - 06:00):</span>
+                                </div>
                                 <span class="slider-val-badge" id="val-deep-night-fee-setting">+50 сом</span>
                             </div>
                             <input type="range" class="slider-input" id="slider-deep-night-fee" min="0" max="150" step="5" value="50" oninput="onTariffChange()">
-                            <div class="slider-desc">Дополнительная сверхнадбавка после 24:00 (суммарно ночью клиент платит +100 сом).</div>
+                            <div class="slider-desc">Дополнительная надбавка после 24:00 (суммарно ночью клиент платит +100 сом). Тумблер слева полностью включает/выключает этот уровень.</div>
                             <div class="pills-row">
                                 <button class="pill-btn" onclick="setSlider('slider-deep-night-fee', 0)">0с (Выкл)</button>
                                 <button class="pill-btn" onclick="setSlider('slider-deep-night-fee', 30)">+30с</button>
@@ -1377,6 +1429,8 @@
             baseFee: 150,        // Посадка (первый 1 км)
             nightFee: 50,        // Ночная надбавка Ур.1 (22:00 - 06:00, +50 сом)
             nightFeeDeep: 50,    // Сверхнадбавка Ур.2 (00:00 - 06:00, +50 сом сверху)
+            nightTariffEnabled: true,     // Включен ли ночной тариф 1-го уровня
+            deepNightTariffEnabled: true, // Включен ли тариф полуночи 2-го уровня
             doorFee: 50,         // Доставка до двери (+50 сом)
             yardMultiplier: 1.05, // Дворовый коэффициент Манхэттенской сетки (L1)
 
@@ -1928,7 +1982,9 @@
             const isOutOfTown = !isPurple && (clientCheck.isRed || resCheck.isRed);
 
             let baseFee = config.baseFee;
-            let nightFee = (isNightTariff ? config.nightFee : 0) + (isDeepNightTariff ? config.nightFeeDeep : 0);
+            let effectiveNightFee1 = (config.nightTariffEnabled !== false && isNightTariff) ? config.nightFee : 0;
+            let effectiveNightFeeDeep = (config.deepNightTariffEnabled !== false && isDeepNightTariff) ? config.nightFeeDeep : 0;
+            let nightFee = effectiveNightFee1 + effectiveNightFeeDeep;
             let doorFee = isDoorDelivery ? config.doorFee : 0;
 
             let cityKm = 0;
@@ -2083,20 +2139,43 @@
             config.lastOutKm = outKm;
 
             let nightLabel = "0 сом";
-            if (isNightTariff && isDeepNightTariff) {
-                nightLabel = `+${nightFee} сом (22:00-06:00 + глуб. ночь 00:00-06:00)`;
-            } else if (isNightTariff) {
-                nightLabel = `+${nightFee} сом (ночной 22:00-00:00)`;
-            } else if (isDeepNightTariff) {
-                nightLabel = `+${nightFee} сом (глуб. ночь 00:00-06:00)`;
+            if (config.nightTariffEnabled === false && config.deepNightTariffEnabled === false) {
+                nightLabel = "0 сом (отключен в тарифах)";
+            } else if (nightFee > 0) {
+                if (effectiveNightFee1 > 0 && effectiveNightFeeDeep > 0) {
+                    nightLabel = `+${nightFee} сом (22:00-06:00 + глуб. ночь 00:00-06:00)`;
+                } else if (effectiveNightFee1 > 0) {
+                    nightLabel = `+${nightFee} сом (ночной 22:00-00:00)`;
+                } else if (effectiveNightFeeDeep > 0) {
+                    nightLabel = `+${nightFee} сом (глуб. ночь 00:00-06:00)`;
+                }
             }
             document.getElementById('val-night-fee').innerText = nightLabel;
             document.getElementById('val-door-fee').innerText = doorFee > 0 ? ("+" + doorFee + " сом") : "0 сом";
 
-            document.getElementById('calc-night-rate').innerText = `+${config.nightFee}с / +${config.nightFeeDeep}с`;
+            document.getElementById('calc-night-rate').innerText = 
+                (config.nightTariffEnabled !== false ? `+${config.nightFee}с` : 'ВЫКЛ') + ' / ' +
+                (config.deepNightTariffEnabled !== false ? `+${config.nightFeeDeep}с` : 'ВЫКЛ');
             document.getElementById('calc-door-rate').innerText = `+${config.doorFee}с`;
-            document.getElementById('header-night-val').innerText = `+${config.nightFee}с`;
-            if (document.getElementById('header-deep-night-val')) document.getElementById('header-deep-night-val').innerText = `+${config.nightFeeDeep}с`;
+
+            // Обновление состояния чипов в шапке
+            const hdrNight = document.getElementById('header-night-val');
+            const chipNight = document.getElementById('toggle-night');
+            if (hdrNight) {
+                hdrNight.innerText = config.nightTariffEnabled !== false ? `+${config.nightFee}с` : 'ВЫКЛ';
+            }
+            if (chipNight) {
+                chipNight.style.opacity = config.nightTariffEnabled !== false ? '1' : '0.45';
+            }
+
+            const hdrDeep = document.getElementById('header-deep-night-val');
+            const chipDeep = document.getElementById('toggle-deep-night');
+            if (hdrDeep) {
+                hdrDeep.innerText = config.deepNightTariffEnabled !== false ? `+${config.nightFeeDeep}с` : 'ВЫКЛ';
+            }
+            if (chipDeep) {
+                chipDeep.style.opacity = config.deepNightTariffEnabled !== false ? '1' : '0.45';
+            }
 
             // Обновляем текст в подсказках секций
             document.getElementById('txt-start-north').innerText = config.cityNorth.toFixed(1);
@@ -2373,7 +2452,38 @@
             recalculate();
         }
 
+        function onNightToggleChange(type, isChecked) {
+            if (type === 'night') {
+                config.nightTariffEnabled = isChecked;
+                const slider = document.getElementById('slider-night-fee');
+                if (slider) slider.disabled = !isChecked;
+                const badge = document.getElementById('val-night-fee-setting');
+                if (badge) {
+                    badge.innerHTML = isChecked 
+                        ? `+${config.nightFee} сом` 
+                        : `<span style="color:#EF4444; font-weight:800;">ОТКЛЮЧЕН</span>`;
+                }
+                showToast(isChecked ? "🌙 Ночной тариф (Ур.1) включен" : "🌙 Ночной тариф (Ур.1) отключен");
+            } else if (type === 'deepNight') {
+                config.deepNightTariffEnabled = isChecked;
+                const slider = document.getElementById('slider-deep-night-fee');
+                if (slider) slider.disabled = !isChecked;
+                const badge = document.getElementById('val-deep-night-fee-setting');
+                if (badge) {
+                    badge.innerHTML = isChecked 
+                        ? `+${config.nightFeeDeep} сом` 
+                        : `<span style="color:#EF4444; font-weight:800;">ОТКЛЮЧЕН</span>`;
+                }
+                showToast(isChecked ? "🌌 Тариф полуночи (Ур.2) включен" : "🌌 Тариф полуночи (Ур.2) отключен");
+            }
+            recalculate();
+        }
+
         function toggleNightTariff() {
+            if (config.nightTariffEnabled === false) {
+                showToast("⚠️ Ночной тариф выключен в тарифах! Включи тумблер во вкладке «Тарифы».");
+                return;
+            }
             isNightTariff = !isNightTariff;
             document.getElementById('toggle-night').classList.toggle('active', isNightTariff);
             if (!isNightTariff && isDeepNightTariff) {
@@ -2385,6 +2495,10 @@
         }
 
         function toggleDeepNightTariff() {
+            if (config.deepNightTariffEnabled === false) {
+                showToast("⚠️ Тариф полуночи выключен в тарифах! Включи тумблер во вкладке «Тарифы».");
+                return;
+            }
             isDeepNightTariff = !isDeepNightTariff;
             const deepChip = document.getElementById('toggle-deep-night');
             if (deepChip) deepChip.classList.toggle('active', isDeepNightTariff);
@@ -2417,7 +2531,9 @@
                 `const RATE_OUT_OF_TOWN_PER_KM = ${config.rateOutOfTown};    // За городом / Красные зоны (за каждый км свыше 1 км)\n` +
                 `const RATE_SUPER_OUT_OF_TOWN_PER_KM = ${config.rateSuper}; // Суперзагород / Фиолетовая зона (сом за км)\n` +
                 `const NIGHT_TARIFF_FEE = ${config.nightFee};           // Ночной тариф Ур.1 (22:00 - 06:00)\n` +
+                `const NIGHT_TARIFF_ENABLED = ${config.nightTariffEnabled !== false}; // Включен ли Ур.1\n` +
                 `const DEEP_NIGHT_TARIFF_FEE = ${config.nightFeeDeep || 50}; // Глубокая ночь Ур.2 (00:00 - 06:00)\n` +
+                `const DEEP_NIGHT_TARIFF_ENABLED = ${config.deepNightTariffEnabled !== false}; // Включен ли Ур.2\n` +
                 `const DOOR_DELIVERY_FEE = ${config.doorFee};          // Доставка до двери\n` +
                 `const YARD_MULTIPLIER = ${config.yardMultiplier || 1.05};       // Дворовый коэфф. Манхэттен (L1)\n` +
                 `const CALC_MODE = '${config.calcMode}';                 // 'split' (раздельный) или 'flat' (единый)\n\n` +
@@ -2522,6 +2638,20 @@
             setVal('slider-night-fee', config.nightFee);
             if (config.nightFeeDeep === undefined || config.nightFeeDeep === null) config.nightFeeDeep = 50;
             setVal('slider-deep-night-fee', config.nightFeeDeep);
+
+            config.nightTariffEnabled = newCfg.nightTariffEnabled !== undefined ? Boolean(newCfg.nightTariffEnabled) : (config.nightTariffEnabled !== undefined ? config.nightTariffEnabled : true);
+            config.deepNightTariffEnabled = newCfg.deepNightTariffEnabled !== undefined ? Boolean(newCfg.deepNightTariffEnabled) : (config.deepNightTariffEnabled !== undefined ? config.deepNightTariffEnabled : true);
+
+            const chkNight = document.getElementById('switch-night-enabled');
+            if (chkNight) chkNight.checked = config.nightTariffEnabled;
+            const chkDeep = document.getElementById('switch-deep-night-enabled');
+            if (chkDeep) chkDeep.checked = config.deepNightTariffEnabled;
+
+            const sliderNight = document.getElementById('slider-night-fee');
+            if (sliderNight) sliderNight.disabled = !config.nightTariffEnabled;
+            const sliderDeep = document.getElementById('slider-deep-night-fee');
+            if (sliderDeep) sliderDeep.disabled = !config.deepNightTariffEnabled;
+
             setVal('slider-door-fee', config.doorFee);
             if (config.yardMultiplier === undefined || config.yardMultiplier === null) config.yardMultiplier = 1.05;
             setVal('slider-yard-multiplier', config.yardMultiplier);
@@ -2571,12 +2701,20 @@
             if (document.getElementById('val-rate-outoftown')) document.getElementById('val-rate-outoftown').innerText = config.rateOutOfTown + ' сом / км';
             if (document.getElementById('val-rate-super')) document.getElementById('val-rate-super').innerText = config.rateSuper + ' сом / км';
             if (document.getElementById('val-base-fee-setting')) document.getElementById('val-base-fee-setting').innerText = config.baseFee + ' сом';
-            if (document.getElementById('val-night-fee-setting')) document.getElementById('val-night-fee-setting').innerText = '+' + config.nightFee + ' сом';
-            if (document.getElementById('val-deep-night-fee-setting')) document.getElementById('val-deep-night-fee-setting').innerText = '+' + config.nightFeeDeep + ' сом';
+            if (document.getElementById('val-night-fee-setting')) {
+                document.getElementById('val-night-fee-setting').innerHTML = config.nightTariffEnabled !== false 
+                    ? '+' + config.nightFee + ' сом' 
+                    : '<span style="color:#EF4444; font-weight:800;">ОТКЛЮЧЕН</span>';
+            }
+            if (document.getElementById('val-deep-night-fee-setting')) {
+                document.getElementById('val-deep-night-fee-setting').innerHTML = config.deepNightTariffEnabled !== false 
+                    ? '+' + config.nightFeeDeep + ' сом' 
+                    : '<span style="color:#EF4444; font-weight:800;">ОТКЛЮЧЕН</span>';
+            }
             if (document.getElementById('val-door-fee-setting')) document.getElementById('val-door-fee-setting').innerText = '+' + config.doorFee + ' сом';
             if (document.getElementById('val-yard-multiplier')) document.getElementById('val-yard-multiplier').innerText = '×' + Number(config.yardMultiplier).toFixed(2);
-            if (document.getElementById('header-night-val')) document.getElementById('header-night-val').innerText = `+${config.nightFee}с`;
-            if (document.getElementById('header-deep-night-val')) document.getElementById('header-deep-night-val').innerText = `+${config.nightFeeDeep}с`;
+            if (document.getElementById('header-night-val')) document.getElementById('header-night-val').innerText = config.nightTariffEnabled !== false ? `+${config.nightFee}с` : 'ВЫКЛ';
+            if (document.getElementById('header-deep-night-val')) document.getElementById('header-deep-night-val').innerText = config.deepNightTariffEnabled !== false ? `+${config.nightFeeDeep}с` : 'ВЫКЛ';
             const roadText = document.getElementById('road-coef-text');
             if (roadText && useRoadCoef) roadText.innerText = `Манхэттен L1 (×${Number(config.yardMultiplier).toFixed(2)})`;
 
